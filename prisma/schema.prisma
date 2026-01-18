@@ -1,0 +1,93 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum GroupKind {
+  AMIGOS
+  TRABAJO
+  PAREJA
+}
+
+enum DrawType {
+  PRIMITIVA
+  EUROMILLONES
+}
+
+enum TicketStatus {
+  PENDIENTE
+  COMPROBADO
+  PREMIO
+}
+
+enum LineNumberKind {
+  MAIN
+  STAR
+}
+
+model Group {
+  id        String   @id @default(cuid())
+  name      String
+  kind      GroupKind?
+  tickets   Ticket[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Ticket {
+  id         String       @id @default(cuid())
+  groupId    String
+  group      Group        @relation(fields: [groupId], references: [id])
+  drawType   DrawType
+  drawDate   DateTime?
+  status     TicketStatus @default(PENDIENTE)
+  priceCents Int?
+  notes      String?
+  lines      TicketLine[]
+  receipt    Receipt?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  @@index([groupId, drawType])
+  @@index([status])
+}
+
+model TicketLine {
+  id         String   @id @default(cuid())
+  ticketId   String
+  ticket     Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  complement Int?
+  reintegro  Int?
+  numbers    TicketLineNumber[]
+  lineIndex  Int      @default(1)
+  createdAt  DateTime @default(now())
+
+  @@index([ticketId, lineIndex])
+}
+
+model TicketLineNumber {
+  id        String         @id @default(cuid())
+  lineId    String
+  line      TicketLine     @relation(fields: [lineId], references: [id], onDelete: Cascade)
+  kind      LineNumberKind
+  position  Int
+  value     Int
+  createdAt DateTime       @default(now())
+
+  @@unique([lineId, kind, position])
+  @@index([lineId, kind])
+}
+
+model Receipt {
+  id        String   @id @default(cuid())
+  ticketId  String   @unique
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  blobUrl   String
+  blobPath  String?
+  mimeType  String?
+  sizeBytes Int?
+  createdAt DateTime @default(now())
+}
