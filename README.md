@@ -7,6 +7,9 @@ Web movil para gestionar boletos de Primitiva y Euromillon con grupos.
 - Alta de boleto con numeros, tipo de sorteo y resguardo.
 - Resguardos en Vercel Blob y metadata en Postgres (Prisma Postgres).
 
+## Docs
+- `docs/hito-01-mvp.md`: definición MVP, modelo de datos y validaciones.
+
 ## Stack
 - Next.js (App Router)
 - Tailwind CSS

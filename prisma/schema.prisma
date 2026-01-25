@@ -37,12 +37,25 @@ model Group {
   updatedAt DateTime @updatedAt
 }
 
+model Draw {
+  id        String   @id @default(cuid())
+  type      DrawType
+  drawDate  DateTime
+  label     String?
+  tickets   Ticket[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([type, drawDate])
+  @@index([type, drawDate])
+}
+
 model Ticket {
   id         String       @id @default(cuid())
   groupId    String
   group      Group        @relation(fields: [groupId], references: [id])
-  drawType   DrawType
-  drawDate   DateTime?
+  drawId     String
+  draw       Draw         @relation(fields: [drawId], references: [id])
   status     TicketStatus @default(PENDIENTE)
   priceCents Int?
   notes      String?
@@ -51,7 +64,7 @@ model Ticket {
   createdAt  DateTime     @default(now())
   updatedAt  DateTime     @updatedAt
 
-  @@index([groupId, drawType])
+  @@index([groupId, drawId])
   @@index([status])
 }
 
