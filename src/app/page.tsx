@@ -17,13 +17,28 @@ type Draw = {
   label?: string | null;
 };
 
+type TicketLineNumber = {
+  id: string;
+  kind: "MAIN" | "STAR";
+  position: number;
+  value: number;
+};
+
+type TicketLine = {
+  id: string;
+  lineIndex: number;
+  complement?: number | null;
+  reintegro?: number | null;
+  numbers: TicketLineNumber[];
+};
+
 type Ticket = {
   id: string;
   status: "PENDIENTE" | "COMPROBADO" | "PREMIO";
   createdAt: string;
   group?: Group | null;
   draw?: Draw | null;
-  lines?: Array<{ id: string }>;
+  lines?: TicketLine[];
 };
 
 type LineState = {
@@ -86,6 +101,140 @@ const validateNumberSet = (
   return { values, errors };
 };
 
+const formatDate = (value?: string | null) => {
+  if (!value) return "Sin fecha";
+  return new Date(value).toLocaleDateString("es-ES");
+};
+
+const buildDrawLabel = (draw?: Draw | null) => {
+  if (!draw) return "Sorteo";
+  const fallback = DRAW_TYPES.find((item) => item.id === draw.type)?.label;
+  return draw.label ?? `${fallback ?? "Sorteo"} · ${formatDate(draw.drawDate)}`;
+};
+
+const TicketDetailModal = ({
+  ticket,
+  onClose,
+}: {
+  ticket: Ticket | null;
+  onClose: () => void;
+}) => {
+  if (!ticket) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-10">
+      <div
+        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <div className="relative w-full max-w-3xl rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_30px_80px_rgba(15,23,42,0.35)]">
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <div className="text-xs uppercase tracking-wide text-slate-400">
+              {ticket.group?.name ?? "Grupo"} · {ticket.status}
+            </div>
+            <h3 className="mt-1 text-2xl font-semibold text-slate-900">
+              {buildDrawLabel(ticket.draw)}
+            </h3>
+            <p className="text-sm text-slate-500">
+              {formatDate(ticket.createdAt)}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
+          >
+            Cerrar
+          </button>
+        </div>
+
+        <div className="mt-5 grid gap-4 md:grid-cols-[1.2fr_0.8fr]">
+          <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Numeros
+            </h4>
+            <div className="mt-3 space-y-3">
+              {(ticket.lines ?? []).map((line) => {
+                const main = line.numbers
+                  .filter((number) => number.kind === "MAIN")
+                  .sort((a, b) => a.position - b.position)
+                  .map((number) => number.value);
+                const stars = line.numbers
+                  .filter((number) => number.kind === "STAR")
+                  .sort((a, b) => a.position - b.position)
+                  .map((number) => number.value);
+                return (
+                  <div
+                    key={line.id}
+                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3"
+                  >
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      Linea {line.lineIndex}
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {main.map((value, index) => (
+                        <span
+                          key={`${line.id}-main-${index}`}
+                          className="rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white"
+                        >
+                          {value}
+                        </span>
+                      ))}
+                    </div>
+                    {stars.length > 0 ? (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {stars.map((value, index) => (
+                          <span
+                            key={`${line.id}-star-${index}`}
+                            className="rounded-full bg-[#f9c784] px-3 py-1 text-xs font-semibold text-slate-900"
+                          >
+                            {value}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="mt-2 text-xs text-slate-500">
+                        Complementario: {line.complement ?? "-"} · Reintegro:{" "}
+                        {line.reintegro ?? "-"}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Resguardo
+            </h4>
+            {ticket.receipt?.blobUrl ? (
+              <div className="mt-3 space-y-3">
+                <img
+                  src={ticket.receipt.blobUrl}
+                  alt="Resguardo"
+                  className="w-full rounded-2xl border border-slate-200 object-cover"
+                />
+                <a
+                  href={ticket.receipt.blobUrl}
+                  className="text-xs font-semibold uppercase tracking-wide text-slate-500"
+                >
+                  Abrir imagen
+                </a>
+              </div>
+            ) : (
+              <p className="mt-3 text-sm text-slate-500">
+                No hay resguardo adjunto.
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function Home() {
   const [drawType, setDrawType] = useState<DrawType>("PRIMITIVA");
   const [groupId, setGroupId] = useState<string>("");
@@ -104,6 +253,8 @@ export default function Home() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loadingTickets, setLoadingTickets] = useState(true);
   const [ticketsError, setTicketsError] = useState<string | null>(null);
+  const [copiedTicketId, setCopiedTicketId] = useState<string | null>(null);
+  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
 
   useEffect(() => {
     let isActive = true;
@@ -366,6 +517,39 @@ export default function Home() {
 
   const selectedDraw = drawId ? draws.find((item) => item.id === drawId) : null;
   const selectedDrawType = selectedDraw?.type ?? drawType;
+  const latestTickets = tickets.slice(0, 5);
+
+  const handleCopy = async (ticket: Ticket) => {
+    const firstLine = ticket.lines?.[0];
+    if (!firstLine) return;
+
+    const mainNumbers = firstLine.numbers
+      .filter((number) => number.kind === "MAIN")
+      .sort((a, b) => a.position - b.position)
+      .map((number) => number.value)
+      .join(" ");
+    const stars = firstLine.numbers
+      .filter((number) => number.kind === "STAR")
+      .sort((a, b) => a.position - b.position)
+      .map((number) => number.value)
+      .join(" ");
+    const extras =
+      stars.length > 0
+        ? ` | Estrellas: ${stars}`
+        : ` | C:${firstLine.complement ?? "-"} R:${firstLine.reintegro ?? "-"}`;
+
+    const text = `${buildDrawLabel(ticket.draw)} · ${mainNumbers}${extras}`;
+
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedTicketId(ticket.id);
+      setTimeout(() => {
+        setCopiedTicketId((current) => (current === ticket.id ? null : current));
+      }, 2000);
+    } catch {
+      setCopiedTicketId(null);
+    }
+  };
 
   return (
     <div className="relative min-h-screen bg-[#f7f2ea] text-slate-900">
@@ -794,36 +978,100 @@ export default function Home() {
               </div>
             ) : null}
             {loadingTickets ? (
-              <p className="mt-3 text-sm text-slate-500">Cargando boletos...</p>
-            ) : tickets.length === 0 ? (
+              <div className="mt-4 space-y-3">
+                {[0, 1, 2].map((item) => (
+                  <div
+                    key={item}
+                    className="h-16 rounded-2xl border border-slate-200 bg-white/70 animate-pulse"
+                  />
+                ))}
+              </div>
+            ) : latestTickets.length === 0 ? (
               <p className="mt-3 text-sm text-slate-500">
                 Aun no hay boletos guardados.
               </p>
             ) : (
               <div className="mt-4 flex flex-col gap-3">
-                {tickets.slice(0, 5).map((ticket) => {
-                  const drawLabel =
-                    ticket.draw?.label ??
-                    (ticket.draw
-                      ? `${DRAW_TYPES.find((item) => item.id === ticket.draw?.type)?.label ?? "Sorteo"} · ${new Date(
-                          ticket.draw.drawDate
-                        ).toLocaleDateString("es-ES")}`
-                      : "Sorteo");
+                {latestTickets.map((ticket) => {
+                  const drawLabel = buildDrawLabel(ticket.draw);
                   const groupLabel = ticket.group?.name ?? "Grupo";
                   const lineCount = ticket.lines?.length ?? 0;
+                  const firstLine = ticket.lines?.[0];
+                  const mainNumbers = firstLine
+                    ? firstLine.numbers
+                        .filter((number) => number.kind === "MAIN")
+                        .sort((a, b) => a.position - b.position)
+                        .map((number) => number.value)
+                    : [];
+                  const stars = firstLine
+                    ? firstLine.numbers
+                        .filter((number) => number.kind === "STAR")
+                        .sort((a, b) => a.position - b.position)
+                        .map((number) => number.value)
+                    : [];
                   return (
                     <div
                       key={ticket.id}
                       className="rounded-2xl border border-slate-200 bg-white px-4 py-3"
                     >
-                      <div className="text-xs uppercase tracking-wide text-slate-400">
-                        {groupLabel} · {ticket.status}
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs uppercase tracking-wide text-slate-400">
+                        <span>
+                          {groupLabel} · {ticket.status}
+                        </span>
+                        <span>{formatDate(ticket.createdAt)}</span>
                       </div>
                       <div className="mt-1 text-sm font-semibold text-slate-900">
                         {drawLabel}
                       </div>
-                      <div className="mt-1 text-xs text-slate-500">
-                        {lineCount} linea(s)
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {mainNumbers.length > 0 ? (
+                          mainNumbers.map((value, index) => (
+                            <span
+                              key={`${ticket.id}-main-${index}`}
+                              className="rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white"
+                            >
+                              {value}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-xs text-slate-400">
+                            Sin numeros
+                          </span>
+                        )}
+                        {stars.length > 0
+                          ? stars.map((value, index) => (
+                              <span
+                                key={`${ticket.id}-star-${index}`}
+                                className="rounded-full bg-[#f9c784] px-3 py-1 text-xs font-semibold text-slate-900"
+                              >
+                                {value}
+                              </span>
+                            ))
+                          : null}
+                      </div>
+                      <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
+                        <span>{lineCount} linea(s)</span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleCopy(ticket)}
+                            className="rounded-full border border-slate-200 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500 transition hover:border-slate-400 hover:text-slate-700"
+                          >
+                            {copiedTicketId === ticket.id
+                              ? "Copiado"
+                              : "Copiar"}
+                          </button>
+                          <Link
+                            href="#"
+                            onClick={(event) => {
+                              event.preventDefault();
+                              setSelectedTicket(ticket);
+                            }}
+                            className="rounded-full border border-slate-200 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500 transition hover:border-slate-400 hover:text-slate-700"
+                          >
+                            Ver detalle
+                          </Link>
+                        </div>
                       </div>
                     </div>
                   );
@@ -833,6 +1081,10 @@ export default function Home() {
           </div>
         </aside>
       </main>
+      <TicketDetailModal
+        ticket={selectedTicket}
+        onClose={() => setSelectedTicket(null)}
+      />
     </div>
   );
 }
