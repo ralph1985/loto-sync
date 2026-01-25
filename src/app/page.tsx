@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 type DrawType = "PRIMITIVA" | "EUROMILLONES";
@@ -387,6 +388,12 @@ export default function Home() {
               Guarda numeros, grupo y resguardo en un solo paso. Validaciones
               listas para Primitiva y Euromillones.
             </p>
+            <Link
+              href="/review"
+              className="inline-flex w-fit items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
+            >
+              Ver revision
+            </Link>
           </header>
 
           <form className="flex flex-col gap-6" onSubmit={handleSubmit}>
