@@ -1,4 +1,5 @@
 import { promises as fs } from 'node:fs'
+import { existsSync } from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
 
@@ -27,7 +28,21 @@ const slugify = (value: string) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)+/g, '')
 
-const getUploadsRoot = () => path.join(process.cwd(), 'uploads')
+const getProjectRoot = () => {
+  const cwd = process.cwd()
+  if (path.basename(cwd) === 'loto-sync') {
+    return cwd
+  }
+
+  const candidate = path.join(cwd, 'projects', 'loto-sync')
+  if (existsSync(path.join(candidate, 'package.json'))) {
+    return candidate
+  }
+
+  return cwd
+}
+
+const getUploadsRoot = () => path.join(getProjectRoot(), 'uploads')
 
 const buildFilename = (originalName: string) => {
   const ext = path.extname(originalName)

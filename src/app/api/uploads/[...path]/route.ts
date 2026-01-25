@@ -1,14 +1,29 @@
-import { promises as fs } from 'node:fs'
+import { existsSync, promises as fs } from 'node:fs'
 import path from 'node:path'
 import { NextResponse } from 'next/server'
 
-const uploadsRoot = path.join(process.cwd(), 'uploads')
+const getProjectRoot = () => {
+  const cwd = process.cwd()
+  if (path.basename(cwd) === 'loto-sync') {
+    return cwd
+  }
+
+  const candidate = path.join(cwd, 'projects', 'loto-sync')
+  if (existsSync(path.join(candidate, 'package.json'))) {
+    return candidate
+  }
+
+  return cwd
+}
+
+const uploadsRoot = path.join(getProjectRoot(), 'uploads')
 
 export async function GET(
   _request: Request,
   context: { params: { path?: string[] } }
 ) {
-  const filePath = context.params.path?.join('/')
+  const { path: pathParts } = await context.params
+  const filePath = pathParts?.join('/')
   if (!filePath) {
     return NextResponse.json({ error: 'Archivo no encontrado.' }, { status: 404 })
   }
