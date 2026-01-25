@@ -1,8 +1,29 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type DrawType = "PRIMITIVA" | "EUROMILLONES";
+
+type Group = {
+  id: string;
+  name: string;
+};
+
+type Draw = {
+  id: string;
+  type: DrawType;
+  drawDate: string;
+  label?: string | null;
+};
+
+type Ticket = {
+  id: string;
+  status: "PENDIENTE" | "COMPROBADO" | "PREMIO";
+  createdAt: string;
+  group?: Group | null;
+  draw?: Draw | null;
+  lines?: Array<{ id: string }>;
+};
 
 type LineState = {
   mainInput: string;
@@ -10,12 +31,6 @@ type LineState = {
   complement: string;
   reintegro: string;
 };
-
-const GROUPS = [
-  { id: "amigos", name: "Amigos" },
-  { id: "trabajo", name: "Trabajo" },
-  { id: "pareja", name: "Pareja" },
-];
 
 const DRAW_TYPES: { id: DrawType; label: string; description: string }[] = [
   {
@@ -73,11 +88,109 @@ const validateNumberSet = (
 export default function Home() {
   const [drawType, setDrawType] = useState<DrawType>("PRIMITIVA");
   const [groupId, setGroupId] = useState<string>("");
-  const [drawDate, setDrawDate] = useState<string>("");
+  const [drawId, setDrawId] = useState<string>("");
   const [lines, setLines] = useState<LineState[]>([createEmptyLine()]);
   const [notes, setNotes] = useState<string>("");
   const [receipt, setReceipt] = useState<File | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [draws, setDraws] = useState<Draw[]>([]);
+  const [loadingData, setLoadingData] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [loadingTickets, setLoadingTickets] = useState(true);
+  const [ticketsError, setTicketsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isActive = true;
+
+    const load = async () => {
+      setLoadingData(true);
+      setLoadError(null);
+
+      try {
+        const [groupsResponse, drawsResponse] = await Promise.all([
+          fetch("/api/groups"),
+          fetch("/api/draws"),
+        ]);
+
+        if (!groupsResponse.ok || !drawsResponse.ok) {
+          throw new Error("No se pudieron cargar los datos iniciales.");
+        }
+
+        const groupsPayload = await groupsResponse.json();
+        const drawsPayload = await drawsResponse.json();
+
+        if (!isActive) return;
+
+        setGroups(groupsPayload.data ?? []);
+        setDraws(drawsPayload.data ?? []);
+      } catch (error) {
+        if (!isActive) return;
+        setLoadError(
+          error instanceof Error
+            ? error.message
+            : "No se pudieron cargar los datos iniciales."
+        );
+      } finally {
+        if (isActive) {
+          setLoadingData(false);
+        }
+      }
+    };
+
+    load();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isActive = true;
+
+    const loadTickets = async () => {
+      setLoadingTickets(true);
+      setTicketsError(null);
+
+      try {
+        const response = await fetch("/api/tickets");
+        if (!response.ok) {
+          throw new Error("No se pudieron cargar los boletos.");
+        }
+        const payload = await response.json();
+        if (!isActive) return;
+        setTickets(payload.data ?? []);
+      } catch (error) {
+        if (!isActive) return;
+        setTicketsError(
+          error instanceof Error
+            ? error.message
+            : "No se pudieron cargar los boletos."
+        );
+      } finally {
+        if (isActive) {
+          setLoadingTickets(false);
+        }
+      }
+    };
+
+    loadTickets();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const draw = draws.find((item) => item.id === drawId);
+    if (draw && draw.type !== drawType) {
+      setDrawType(draw.type);
+    }
+  }, [drawId, drawType, draws]);
 
   const validation = useMemo(() => {
     const issues: string[] = [];
@@ -85,8 +198,8 @@ export default function Home() {
     if (!groupId) {
       issues.push("Selecciona un grupo.");
     }
-    if (!drawDate) {
-      issues.push("Selecciona la fecha del sorteo.");
+    if (!drawId) {
+      issues.push("Selecciona el sorteo.");
     }
 
     if (receipt && !receipt.type.startsWith("image/")) {
@@ -148,9 +261,11 @@ export default function Home() {
     return {
       issues,
       lineResults,
-      isValid: issues.length === 0 && lineResults.every((line) => line.issues.length === 0),
+      isValid:
+        issues.length === 0 &&
+        lineResults.every((line) => line.issues.length === 0),
     };
-  }, [drawDate, drawType, groupId, lines, receipt]);
+  }, [drawId, drawType, groupId, lines, receipt]);
 
   const handleLineChange = (index: number, patch: Partial<LineState>) => {
     setLines((current) =>
@@ -160,12 +275,74 @@ export default function Home() {
     );
   };
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setSubmitted(true);
+    setSaveError(null);
+    setSaveSuccess(null);
+
+    if (!validation.isValid || saving) {
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const response = await fetch("/api/tickets", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          groupId,
+          drawId,
+          notes: notes.trim() || undefined,
+          lines: lines.map((line) => ({
+            mainNumbers: toIntArray(line.mainInput),
+            starNumbers:
+              drawType === "EUROMILLONES"
+                ? toIntArray(line.starInput)
+                : undefined,
+            complement: line.complement
+              ? Number.parseInt(line.complement, 10)
+              : undefined,
+            reintegro: line.reintegro
+              ? Number.parseInt(line.reintegro, 10)
+              : undefined,
+          })),
+        }),
+      });
+
+      const payload = await response.json();
+
+      if (!response.ok) {
+        const issues = Array.isArray(payload?.issues)
+          ? payload.issues.join(" ")
+          : payload?.error;
+        throw new Error(issues || "No se pudo guardar el boleto.");
+      }
+
+      setSaveSuccess("Boleto guardado correctamente.");
+      setLines([createEmptyLine()]);
+      setNotes("");
+      setReceipt(null);
+      setSubmitted(false);
+      const refreshResponse = await fetch("/api/tickets");
+      if (refreshResponse.ok) {
+        const payload = await refreshResponse.json();
+        setTickets(payload.data ?? []);
+      }
+    } catch (error) {
+      setSaveError(
+        error instanceof Error ? error.message : "No se pudo guardar el boleto."
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const selectedDraw = DRAW_TYPES.find((item) => item.id === drawType);
+  const selectedDraw = drawId ? draws.find((item) => item.id === drawId) : null;
+  const selectedDrawType = selectedDraw?.type ?? drawType;
 
   return (
     <div className="relative min-h-screen bg-[#f7f2ea] text-slate-900">
@@ -190,36 +367,49 @@ export default function Home() {
             </p>
           </header>
 
-          <form
-            className="flex flex-col gap-6"
-            onSubmit={handleSubmit}
-          >
+          <form className="flex flex-col gap-6" onSubmit={handleSubmit}>
             <section className="animate-fade-up rounded-3xl border border-white/70 bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
               <h2 className="text-lg font-semibold text-slate-900">Seleccion</h2>
               <p className="mt-1 text-sm text-slate-500">
                 Define sorteo, grupo y fecha del boleto.
               </p>
+              {loadError ? (
+                <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                  {loadError}
+                </div>
+              ) : null}
               <div className="mt-5 grid gap-4 md:grid-cols-3">
                 <div className="flex flex-col gap-2">
                   <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Sorteo
                   </label>
-                  <div className="grid gap-2">
-                    {DRAW_TYPES.map((option) => (
-                      <button
-                        key={option.id}
-                        type="button"
-                        onClick={() => setDrawType(option.id)}
-                        className={`flex items-center justify-between rounded-2xl border px-4 py-3 text-left text-sm transition ${
-                          drawType === option.id
-                            ? "border-slate-900 bg-slate-900 text-white"
-                            : "border-slate-200 bg-white text-slate-700 hover:border-slate-400"
-                        }`}
-                      >
-                        <span className="font-semibold">{option.label}</span>
-                        <span className="text-xs opacity-70">{option.description}</span>
-                      </button>
-                    ))}
+                  <select
+                    value={drawId}
+                    onChange={(event) => setDrawId(event.target.value)}
+                    disabled={loadingData || !!loadError}
+                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none disabled:opacity-60"
+                  >
+                    <option value="">
+                      {loadingData ? "Cargando..." : "Selecciona sorteo"}
+                    </option>
+                    {draws.map((draw) => {
+                      const drawLabel =
+                        draw.label ??
+                        `${DRAW_TYPES.find((item) => item.id === draw.type)?.label ?? "Sorteo"} · ${new Date(
+                          draw.drawDate
+                        ).toLocaleDateString("es-ES")}`;
+                      return (
+                        <option key={draw.id} value={draw.id}>
+                          {drawLabel}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <div className="text-xs text-slate-500">
+                    {selectedDraw
+                      ? DRAW_TYPES.find((item) => item.id === selectedDraw.type)
+                          ?.description
+                      : "Selecciona un sorteo para ver sus reglas."}
                   </div>
                 </div>
 
@@ -230,10 +420,13 @@ export default function Home() {
                   <select
                     value={groupId}
                     onChange={(event) => setGroupId(event.target.value)}
-                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
+                    disabled={loadingData || !!loadError}
+                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none disabled:opacity-60"
                   >
-                    <option value="">Selecciona...</option>
-                    {GROUPS.map((group) => (
+                    <option value="">
+                      {loadingData ? "Cargando..." : "Selecciona grupo"}
+                    </option>
+                    {groups.map((group) => (
                       <option key={group.id} value={group.id}>
                         {group.name}
                       </option>
@@ -243,13 +436,16 @@ export default function Home() {
 
                 <div className="flex flex-col gap-2">
                   <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Fecha sorteo
+                    Tipo de sorteo
                   </label>
                   <input
-                    type="date"
-                    value={drawDate}
-                    onChange={(event) => setDrawDate(event.target.value)}
-                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
+                    type="text"
+                    value={
+                      DRAW_TYPES.find((item) => item.id === selectedDrawType)
+                        ?.label ?? "Sin definir"
+                    }
+                    readOnly
+                    className="rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm text-slate-700 focus:outline-none"
                   />
                 </div>
               </div>
@@ -310,7 +506,7 @@ export default function Home() {
                               handleLineChange(index, { mainInput: event.target.value })
                             }
                             placeholder={
-                              drawType === "PRIMITIVA"
+                              selectedDrawType === "PRIMITIVA"
                                 ? "Ej: 4 9 13 28 33 41"
                                 : "Ej: 7 18 24 33 49"
                             }
@@ -318,7 +514,7 @@ export default function Home() {
                           />
                         </div>
 
-                        {drawType === "EUROMILLONES" ? (
+                        {selectedDrawType === "EUROMILLONES" ? (
                           <div className="flex flex-col gap-2">
                             <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                               Estrellas
@@ -413,25 +609,31 @@ export default function Home() {
             <section className="animate-fade-up rounded-3xl border border-white/70 bg-white/90 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div className="text-sm text-slate-500">
-                  {selectedDraw ? selectedDraw.label : "Sorteo"} ·{" "}
+                  {selectedDraw ? selectedDraw.label ?? "Sorteo" : "Sorteo"} ·{" "}
                   {lines.length} linea(s)
                 </div>
                 <button
                   type="submit"
-                  disabled={!validation.isValid}
+                  disabled={!validation.isValid || saving}
                   className={`rounded-full px-6 py-3 text-sm font-semibold uppercase tracking-wide transition ${
-                    validation.isValid
+                    validation.isValid && !saving
                       ? "bg-slate-900 text-white hover:bg-slate-700"
                       : "cursor-not-allowed bg-slate-200 text-slate-500"
                   }`}
                 >
-                  Guardar boleto
+                  {saving ? "Guardando..." : "Guardar boleto"}
                 </button>
               </div>
 
-              {submitted && validation.isValid ? (
+              {saveSuccess ? (
                 <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-                  Boleto listo para guardar. Aun falta conectar el backend.
+                  {saveSuccess}
+                </div>
+              ) : null}
+
+              {saveError ? (
+                <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                  {saveError}
                 </div>
               ) : null}
 
@@ -457,7 +659,11 @@ export default function Home() {
                   Sorteo
                 </span>
                 <p className="mt-1 font-semibold text-slate-900">
-                  {selectedDraw?.label ?? "Sin definir"}
+                  {selectedDraw?.label ??
+                    (selectedDraw
+                      ? DRAW_TYPES.find((item) => item.id === selectedDraw.type)
+                          ?.label
+                      : "Sin definir")}
                 </p>
               </div>
               <div>
@@ -465,7 +671,7 @@ export default function Home() {
                   Grupo
                 </span>
                 <p className="mt-1 font-semibold text-slate-900">
-                  {GROUPS.find((group) => group.id === groupId)?.name ??
+                  {groups.find((group) => group.id === groupId)?.name ??
                     "Sin definir"}
                 </p>
               </div>
@@ -474,14 +680,19 @@ export default function Home() {
                   Fecha
                 </span>
                 <p className="mt-1 font-semibold text-slate-900">
-                  {drawDate || "Sin definir"}
+                  {selectedDraw?.drawDate
+                    ? new Date(selectedDraw.drawDate).toLocaleDateString("es-ES")
+                    : "Sin definir"}
                 </p>
               </div>
             </div>
 
             <div className="mt-6 space-y-4">
               {validation.lineResults.map((line, index) => (
-                <div key={index} className="rounded-2xl bg-slate-900 px-4 py-3 text-white">
+                <div
+                  key={index}
+                  className="rounded-2xl bg-slate-900 px-4 py-3 text-white"
+                >
                   <p className="text-xs uppercase tracking-wide text-white/60">
                     Linea {index + 1}
                   </p>
@@ -502,7 +713,7 @@ export default function Home() {
                     )}
                   </div>
 
-                  {drawType === "EUROMILLONES" ? (
+                  {selectedDrawType === "EUROMILLONES" ? (
                     <div className="mt-3 flex flex-wrap gap-2">
                       {line.stars.length ? (
                         line.stars.map((value, valueIndex) => (
@@ -537,11 +748,59 @@ export default function Home() {
               Checklist MVP
             </h4>
             <ul className="mt-3 space-y-2">
-              <li>Seleccion sorteo + grupo + fecha</li>
+              <li>Seleccion sorteo + grupo</li>
               <li>Validaciones por tipo de sorteo</li>
               <li>Alta con multiples lineas</li>
               <li>Resguardo opcional</li>
             </ul>
+          </div>
+
+          <div className="rounded-3xl border border-white/70 bg-white/90 p-6 text-sm text-slate-600 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+            <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+              Boletos recientes
+            </h4>
+            {ticketsError ? (
+              <div className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                {ticketsError}
+              </div>
+            ) : null}
+            {loadingTickets ? (
+              <p className="mt-3 text-sm text-slate-500">Cargando boletos...</p>
+            ) : tickets.length === 0 ? (
+              <p className="mt-3 text-sm text-slate-500">
+                Aun no hay boletos guardados.
+              </p>
+            ) : (
+              <div className="mt-4 flex flex-col gap-3">
+                {tickets.slice(0, 5).map((ticket) => {
+                  const drawLabel =
+                    ticket.draw?.label ??
+                    (ticket.draw
+                      ? `${DRAW_TYPES.find((item) => item.id === ticket.draw?.type)?.label ?? "Sorteo"} · ${new Date(
+                          ticket.draw.drawDate
+                        ).toLocaleDateString("es-ES")}`
+                      : "Sorteo");
+                  const groupLabel = ticket.group?.name ?? "Grupo";
+                  const lineCount = ticket.lines?.length ?? 0;
+                  return (
+                    <div
+                      key={ticket.id}
+                      className="rounded-2xl border border-slate-200 bg-white px-4 py-3"
+                    >
+                      <div className="text-xs uppercase tracking-wide text-slate-400">
+                        {groupLabel} · {ticket.status}
+                      </div>
+                      <div className="mt-1 text-sm font-semibold text-slate-900">
+                        {drawLabel}
+                      </div>
+                      <div className="mt-1 text-xs text-slate-500">
+                        {lineCount} linea(s)
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </aside>
       </main>

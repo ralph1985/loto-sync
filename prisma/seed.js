@@ -7,18 +7,18 @@ const adapter = new PrismaBetterSqlite3({ url: databaseUrl })
 const prisma = new PrismaClient({ adapter })
 
 async function main() {
-  const existing = await prisma.group.count()
-  if (existing > 0) {
-    return
-  }
+  const existingGroups = await prisma.group.count()
+  const existingDraws = await prisma.draw.count()
 
-  await prisma.group.createMany({
-    data: [
-      { name: 'Amigos', kind: 'AMIGOS' },
-      { name: 'Trabajo', kind: 'TRABAJO' },
-      { name: 'Pareja', kind: 'PAREJA' }
-    ]
-  })
+  if (existingGroups === 0) {
+    await prisma.group.createMany({
+      data: [
+        { name: 'Amigos', kind: 'AMIGOS' },
+        { name: 'Trabajo', kind: 'TRABAJO' },
+        { name: 'Pareja', kind: 'PAREJA' }
+      ]
+    })
+  }
 
   const today = new Date()
   const drawDates = [0, 3, 7].map((offset) => {
@@ -28,25 +28,27 @@ async function main() {
     return date
   })
 
-  await prisma.draw.createMany({
-    data: [
-      {
-        type: 'PRIMITIVA',
-        drawDate: drawDates[0],
-        label: 'Primitiva semanal'
-      },
-      {
-        type: 'EUROMILLONES',
-        drawDate: drawDates[1],
-        label: 'Euromillones'
-      },
-      {
-        type: 'PRIMITIVA',
-        drawDate: drawDates[2],
-        label: 'Primitiva especial'
-      }
-    ]
-  })
+  if (existingDraws === 0) {
+    await prisma.draw.createMany({
+      data: [
+        {
+          type: 'PRIMITIVA',
+          drawDate: drawDates[0],
+          label: 'Primitiva semanal'
+        },
+        {
+          type: 'EUROMILLONES',
+          drawDate: drawDates[1],
+          label: 'Euromillones'
+        },
+        {
+          type: 'PRIMITIVA',
+          drawDate: drawDates[2],
+          label: 'Primitiva especial'
+        }
+      ]
+    })
+  }
 }
 
 main()
