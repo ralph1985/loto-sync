@@ -25,6 +25,13 @@ npm run dev
 
 Abre http://localhost:3000 en el navegador.
 
+## Entorno
+
+Copia `.env.example` a `.env` y completa:
+
+- `DATABASE_URL` (Postgres)
+- `BLOB_READ_WRITE_TOKEN` (Vercel Blob)
+
 ## Prisma
 
 Configura `DATABASE_URL` en `.env` (puedes copiar `.env.example`).
