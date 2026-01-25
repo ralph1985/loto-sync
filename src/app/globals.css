@@ -22,5 +22,42 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans);
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes glow-pulse {
+  0% {
+    opacity: 0.35;
+    transform: scale(0.98);
+  }
+  100% {
+    opacity: 0.65;
+    transform: scale(1.02);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 600ms ease forwards;
+}
+
+.animate-glow {
+  animation: glow-pulse 6s ease-in-out infinite alternate;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-up,
+  .animate-glow {
+    animation: none;
+  }
 }
