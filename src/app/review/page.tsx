@@ -48,6 +48,21 @@ type Ticket = {
   receipt?: Receipt | null;
 };
 
+type VerifyResponse = {
+  status: "PENDIENTE" | "COMPROBADO";
+  reason?: string;
+  matches?: {
+    main: number;
+    stars: number;
+  };
+  result?: {
+    game: DrawType;
+    drawDate: string;
+    numbers: number[];
+    stars?: number[];
+  };
+};
+
 const STATUS_OPTIONS: { value: "ALL" | TicketStatus; label: string }[] = [
   { value: "ALL", label: "Todos" },
   { value: "PENDIENTE", label: "Pendiente" },
@@ -83,6 +98,9 @@ export default function ReviewPage() {
   const [statusFilter, setStatusFilter] = useState<"ALL" | TicketStatus>("ALL");
   const [groupFilter, setGroupFilter] = useState<string>("ALL");
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+  const [verifying, setVerifying] = useState(false);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [verifyResult, setVerifyResult] = useState<VerifyResponse | null>(null);
 
   useEffect(() => {
     let isActive = true;
@@ -255,7 +273,11 @@ export default function ReviewPage() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => setSelectedTicket(ticket)}
+                      onClick={() => {
+                        setSelectedTicket(ticket);
+                        setVerifyResult(null);
+                        setVerifyError(null);
+                      }}
                       className="rounded-full border border-slate-200 bg-white px-5 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
                     >
                       Ver detalle
@@ -294,6 +316,57 @@ export default function ReviewPage() {
               >
                 Cerrar
               </button>
+            </div>
+
+            <div className="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
+                <span>Comprobacion de premio (API externa)</span>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setVerifying(true);
+                    setVerifyError(null);
+                    setVerifyResult(null);
+                    try {
+                      const response = await fetch(
+                        `/api/results/verify?ticketId=${selectedTicket.id}`
+                      );
+                      const payload = await response.json();
+                      if (!response.ok) {
+                        throw new Error(payload?.error || "Error al comprobar.");
+                      }
+                      setVerifyResult(payload.data);
+                    } catch (error) {
+                      setVerifyError(
+                        error instanceof Error
+                          ? error.message
+                          : "Error al comprobar."
+                      );
+                    } finally {
+                      setVerifying(false);
+                    }
+                  }}
+                  className="rounded-full border border-slate-200 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500 transition hover:border-slate-400 hover:text-slate-700"
+                >
+                  {verifying ? "Comprobando..." : "Comprobar"}
+                </button>
+              </div>
+              {verifyError ? (
+                <div className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                  {verifyError}
+                </div>
+              ) : null}
+              {verifyResult ? (
+                <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                  {verifyResult.status === "PENDIENTE"
+                    ? verifyResult.reason ?? "Pendiente de sorteo."
+                    : `Aciertos: ${verifyResult.matches?.main ?? 0}${
+                        verifyResult.matches?.stars
+                          ? ` + ${verifyResult.matches?.stars} estrellas`
+                          : ""
+                      }`}
+                </div>
+              ) : null}
             </div>
 
             <div className="mt-5 grid gap-4 md:grid-cols-[1.2fr_0.8fr]">

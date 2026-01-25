@@ -30,6 +30,8 @@ Abre http://localhost:3000 en el navegador.
 Copia `.env.example` a `.env` y completa:
 
 - `DATABASE_URL` (SQLite local)
+- `LOTERIAS_API_KEY` (API terceros para resultados)
+- `LOTERIAS_API_BASE` (opcional, por defecto loteriasapi.com)
 
 ## Prisma
 
@@ -49,6 +51,8 @@ Endpoints disponibles:
 - `POST /api/tickets`
 - `POST /api/receipts` (multipart/form-data: `ticketId`, `file`)
 - `GET /api/uploads/<path>` (serve ficheros locales)
+- `GET /api/results/latest?game=PRIMITIVA|EUROMILLONES`
+- `GET /api/results/verify?ticketId=...`
 
 Ejemplo de payload para crear boleto:
 
