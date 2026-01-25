@@ -47,6 +47,8 @@ Endpoints disponibles:
 - `GET /api/draws`
 - `GET /api/tickets`
 - `POST /api/tickets`
+- `POST /api/receipts` (multipart/form-data: `ticketId`, `file`)
+- `GET /api/uploads/<path>` (serve ficheros locales)
 
 Ejemplo de payload para crear boleto:
 
@@ -65,6 +67,10 @@ Ejemplo de payload para crear boleto:
   ]
 }
 ```
+
+## Storage local
+
+Los resguardos se guardan en `uploads/` y se sirven via `GET /api/uploads/<path>`.
 
 ---
 

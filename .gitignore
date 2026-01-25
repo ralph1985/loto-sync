@@ -37,6 +37,9 @@ yarn-error.log*
 # local sqlite db
 /data/*.db
 
+# local uploads
+/uploads
+
 # vercel
 .vercel
 

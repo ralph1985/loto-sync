@@ -322,7 +322,29 @@ export default function Home() {
         throw new Error(issues || "No se pudo guardar el boleto.");
       }
 
-      setSaveSuccess("Boleto guardado correctamente.");
+      let successMessage = "Boleto guardado correctamente.";
+
+      if (receipt) {
+        const formData = new FormData();
+        formData.append("ticketId", payload.data.id);
+        formData.append("file", receipt);
+
+        const uploadResponse = await fetch("/api/receipts", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!uploadResponse.ok) {
+          const uploadPayload = await uploadResponse.json();
+          const uploadMessage =
+            uploadPayload?.error || "No se pudo subir el resguardo.";
+          throw new Error(`${successMessage} ${uploadMessage}`);
+        }
+
+        successMessage = "Boleto y resguardo guardados correctamente.";
+      }
+
+      setSaveSuccess(successMessage);
       setLines([createEmptyLine()]);
       setNotes("");
       setReceipt(null);
