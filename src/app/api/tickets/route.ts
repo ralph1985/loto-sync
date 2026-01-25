@@ -1,0 +1,191 @@
+import { NextResponse } from 'next/server'
+
+import { prisma } from '@/lib/prisma'
+
+type TicketLineInput = {
+  mainNumbers: number[]
+  starNumbers?: number[]
+  complement?: number
+  reintegro?: number
+}
+
+type TicketInput = {
+  groupId: string
+  drawId: string
+  priceCents?: number
+  notes?: string
+  lines: TicketLineInput[]
+}
+
+const isValidNumberArray = (values: number[], expected: number, min: number, max: number) => {
+  if (values.length !== expected) {
+    return `Necesitas ${expected} numeros.`
+  }
+  const unique = new Set(values)
+  if (unique.size !== values.length) {
+    return 'Hay numeros repetidos.'
+  }
+  if (values.some((value) => value < min || value > max)) {
+    return `Los numeros deben estar entre ${min} y ${max}.`
+  }
+  return null
+}
+
+const ensureOptionalNumber = (value: number | undefined, min: number, max: number) => {
+  if (value === undefined || value === null) {
+    return null
+  }
+  if (!Number.isInteger(value)) {
+    return 'Debe ser un numero entero.'
+  }
+  if (value < min || value > max) {
+    return `Debe estar entre ${min} y ${max}.`
+  }
+  return null
+}
+
+const validateTicket = (input: TicketInput, drawType: 'PRIMITIVA' | 'EUROMILLONES') => {
+  const issues: string[] = []
+
+  if (!input.groupId) {
+    issues.push('groupId es obligatorio.')
+  }
+  if (!input.drawId) {
+    issues.push('drawId es obligatorio.')
+  }
+  if (!Array.isArray(input.lines) || input.lines.length === 0) {
+    issues.push('Debes incluir al menos una linea.')
+  }
+  if (input.priceCents !== undefined && input.priceCents < 0) {
+    issues.push('priceCents no puede ser negativo.')
+  }
+
+  input.lines.forEach((line, index) => {
+    const linePrefix = `Linea ${index + 1}: `
+    const main = line.mainNumbers ?? []
+    const stars = line.starNumbers ?? []
+
+    if (drawType === 'PRIMITIVA') {
+      const error = isValidNumberArray(main, 6, 1, 49)
+      if (error) issues.push(`${linePrefix}Numeros: ${error}`)
+
+      if (line.complement !== undefined) {
+        const errorComplement = ensureOptionalNumber(line.complement, 1, 49)
+        if (errorComplement) {
+          issues.push(`${linePrefix}Complementario: ${errorComplement}`)
+        } else if (main.includes(line.complement)) {
+          issues.push(`${linePrefix}Complementario no puede repetirse.`)
+        }
+      }
+
+      if (line.reintegro !== undefined) {
+        const errorReintegro = ensureOptionalNumber(line.reintegro, 0, 9)
+        if (errorReintegro) {
+          issues.push(`${linePrefix}Reintegro: ${errorReintegro}`)
+        }
+      }
+    }
+
+    if (drawType === 'EUROMILLONES') {
+      const errorMain = isValidNumberArray(main, 5, 1, 50)
+      if (errorMain) issues.push(`${linePrefix}Numeros: ${errorMain}`)
+
+      const errorStars = isValidNumberArray(stars, 2, 1, 12)
+      if (errorStars) issues.push(`${linePrefix}Estrellas: ${errorStars}`)
+    }
+  })
+
+  return issues
+}
+
+export async function GET() {
+  const tickets = await prisma.ticket.findMany({
+    orderBy: { createdAt: 'desc' },
+    include: {
+      group: true,
+      draw: true,
+      lines: {
+        include: {
+          numbers: true
+        }
+      },
+      receipt: true
+    }
+  })
+
+  return NextResponse.json({ data: tickets })
+}
+
+export async function POST(request: Request) {
+  const payload = (await request.json()) as TicketInput
+
+  const draw = await prisma.draw.findUnique({
+    where: { id: payload.drawId }
+  })
+  if (!draw) {
+    return NextResponse.json(
+      { error: 'drawId no existe.' },
+      { status: 400 }
+    )
+  }
+
+  const groupExists = await prisma.group.findUnique({
+    where: { id: payload.groupId }
+  })
+  if (!groupExists) {
+    return NextResponse.json(
+      { error: 'groupId no existe.' },
+      { status: 400 }
+    )
+  }
+
+  const issues = validateTicket(payload, draw.type)
+  if (issues.length > 0) {
+    return NextResponse.json(
+      { error: 'Validacion fallida.', issues },
+      { status: 400 }
+    )
+  }
+
+  const created = await prisma.ticket.create({
+    data: {
+      groupId: payload.groupId,
+      drawId: payload.drawId,
+      status: 'PENDIENTE',
+      priceCents: payload.priceCents ?? null,
+      notes: payload.notes ?? null,
+      lines: {
+        create: payload.lines.map((line, index) => ({
+          lineIndex: index + 1,
+          complement: line.complement ?? null,
+          reintegro: line.reintegro ?? null,
+          numbers: {
+            create: [
+              ...line.mainNumbers.map((value, position) => ({
+                kind: 'MAIN',
+                position: position + 1,
+                value
+              })),
+              ...(draw.type === 'EUROMILLONES'
+                ? (line.starNumbers ?? []).map((value, position) => ({
+                    kind: 'STAR',
+                    position: position + 1,
+                    value
+                  }))
+                : [])
+            ]
+          }
+        }))
+      }
+    },
+    include: {
+      group: true,
+      draw: true,
+      lines: {
+        include: { numbers: true }
+      }
+    }
+  })
+
+  return NextResponse.json({ data: created }, { status: 201 })
+}

@@ -29,8 +29,7 @@ Abre http://localhost:3000 en el navegador.
 
 Copia `.env.example` a `.env` y completa:
 
-- `DATABASE_URL` (Postgres)
-- `BLOB_READ_WRITE_TOKEN` (Vercel Blob)
+- `DATABASE_URL` (SQLite local)
 
 ## Prisma
 
@@ -38,6 +37,33 @@ Configura `DATABASE_URL` en `.env` (puedes copiar `.env.example`).
 
 ```bash
 npx prisma generate
+```
+
+## API local (Next.js)
+
+Endpoints disponibles:
+
+- `GET /api/groups`
+- `GET /api/draws`
+- `GET /api/tickets`
+- `POST /api/tickets`
+
+Ejemplo de payload para crear boleto:
+
+```json
+{
+  "groupId": "grp_123",
+  "drawId": "draw_123",
+  "priceCents": 1200,
+  "notes": "Boleto compartido",
+  "lines": [
+    {
+      "mainNumbers": [4, 9, 13, 28, 33, 41],
+      "complement": 12,
+      "reintegro": 6
+    }
+  ]
+}
 ```
 
 ---
