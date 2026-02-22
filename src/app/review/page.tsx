@@ -65,6 +65,8 @@ type TicketCheck = {
   matchesStars: number;
   prizeCents?: number | null;
   prizeSource?: string | null;
+  winningComplementario?: number | null;
+  winningReintegro?: number | null;
   checkedAt: string;
 };
 
@@ -132,6 +134,19 @@ const toDateInput = (value?: string | null) => {
 const formatPrice = (priceCents?: number | null) => {
   if (priceCents === null || priceCents === undefined) return "Sin precio";
   return `${(priceCents / 100).toFixed(2)} EUR`;
+};
+
+const toNumberArray = (value: unknown): number[] => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) =>
+      typeof item === "number"
+        ? item
+        : typeof item === "string"
+        ? Number.parseInt(item, 10)
+        : NaN
+    )
+    .filter((item) => Number.isFinite(item));
 };
 
 const buildDrawLabel = (draw?: Draw | null) => {
@@ -432,18 +447,10 @@ export default function ReviewPage() {
                     .map((number) => number.value)
                 : [];
               const reintegro = firstLine?.reintegro ?? null;
-              const latestCheck = ticket.checks?.[0] ?? null;
-              const applicableDraws =
-                (ticket.checks ?? [])
-                  .map((check) => check.drawDate)
-                  .sort((a, b) => new Date(a).getTime() - new Date(b).getTime()) ??
-                [];
-              const drawDatesToShow =
-                applicableDraws.length > 0
-                  ? applicableDraws
-                  : ticket.draw?.drawDate
-                  ? [ticket.draw.drawDate]
-                  : [];
+              const checksSorted = [...(ticket.checks ?? [])].sort(
+                (a, b) => new Date(a.drawDate).getTime() - new Date(b.drawDate).getTime()
+              );
+              const latestCheck = checksSorted[checksSorted.length - 1] ?? null;
               return (
                 <div
                   key={ticket.id}
@@ -531,15 +538,164 @@ export default function ReviewPage() {
                           </span>
                         ) : null}
                       </div>
+                      <div className="mt-3 space-y-2">
+                        {checksSorted.length > 0 ? (
+                          checksSorted.map((check) => {
+                            const winningMain = toNumberArray(check.winningNumbers);
+                            const winningStars = toNumberArray(check.winningStars);
+                            const reintegroHit =
+                              reintegro !== null &&
+                              check.winningReintegro !== null &&
+                              reintegro === check.winningReintegro;
+                            return (
+                              <div
+                                key={`${ticket.id}-cmp-${check.id}`}
+                                className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-3"
+                              >
+                                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                  Comparativa · {formatDrawChip(check.drawDate)}
+                                </p>
+                                <div className="mt-2 flex flex-wrap items-center gap-2">
+                                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                    Apostado
+                                  </span>
+                                  {mainNumbers.map((value, index) => {
+                                    const hit = winningMain.includes(value);
+                                    return (
+                                      <span
+                                        key={`${ticket.id}-bet-main-${check.id}-${index}`}
+                                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                                          hit
+                                            ? "bg-emerald-500 text-white"
+                                            : "bg-slate-800 text-white"
+                                        }`}
+                                      >
+                                        {value}
+                                      </span>
+                                    );
+                                  })}
+                                  {stars.map((value, index) => {
+                                    const hit = winningStars.includes(value);
+                                    return (
+                                      <span
+                                        key={`${ticket.id}-bet-star-${check.id}-${index}`}
+                                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                                          hit
+                                            ? "bg-emerald-200 text-emerald-900"
+                                            : "bg-[#f9c784] text-slate-900"
+                                        }`}
+                                      >
+                                        {value}
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                                <div className="mt-2 flex flex-wrap items-center gap-2">
+                                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                    Salido
+                                  </span>
+                                  {winningMain.length > 0 ? (
+                                    winningMain.map((value, index) => {
+                                      const hit = mainNumbers.includes(value);
+                                      return (
+                                        <span
+                                          key={`${ticket.id}-win-main-${check.id}-${index}`}
+                                          className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                                            hit
+                                              ? "bg-emerald-500 text-white"
+                                              : "bg-slate-200 text-slate-700"
+                                          }`}
+                                        >
+                                          {value}
+                                        </span>
+                                      );
+                                    })
+                                  ) : (
+                                    <span className="text-xs text-slate-400">
+                                      Sin resultado cargado
+                                    </span>
+                                  )}
+                                  {winningStars.map((value, index) => {
+                                    const hit = stars.includes(value);
+                                    return (
+                                      <span
+                                        key={`${ticket.id}-win-star-${check.id}-${index}`}
+                                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                                          hit
+                                            ? "bg-emerald-200 text-emerald-900"
+                                            : "bg-slate-200 text-slate-700"
+                                        }`}
+                                      >
+                                        {value}
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                                {ticket.draw?.type === "PRIMITIVA" ? (
+                                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                                    <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                      Reintegro
+                                    </span>
+                                    <span
+                                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                                        reintegroHit
+                                          ? "bg-emerald-500 text-white"
+                                          : "bg-slate-800 text-white"
+                                      }`}
+                                    >
+                                      Apostado {reintegro ?? "-"}
+                                    </span>
+                                    <span
+                                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                                        reintegroHit
+                                          ? "bg-emerald-500 text-white"
+                                          : "bg-slate-200 text-slate-700"
+                                      }`}
+                                    >
+                                      Salido {check.winningReintegro ?? "-"}
+                                    </span>
+                                  </div>
+                                ) : null}
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-3">
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                              Comparativa · pendiente
+                            </p>
+                            <div className="mt-2 flex flex-wrap items-center gap-2">
+                              <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                Apostado
+                              </span>
+                              {mainNumbers.map((value, index) => (
+                                <span
+                                  key={`${ticket.id}-bet-main-pending-${index}`}
+                                  className="rounded-full bg-slate-800 px-3 py-1 text-xs font-semibold text-white"
+                                >
+                                  {value}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                       <div className="mt-3 flex flex-wrap gap-2">
-                        {drawDatesToShow.map((drawDate) => (
-                          <span
-                            key={`${ticket.id}-draw-${drawDate}`}
-                            className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-700"
-                          >
-                            {formatDrawChip(drawDate)}
+                        {checksSorted.length > 0 ? (
+                          checksSorted.map((check) => (
+                            <span
+                              key={`${ticket.id}-draw-${check.drawDate}`}
+                              className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-700"
+                            >
+                              {formatDrawChip(check.drawDate)} · {check.matchesMain}
+                              {check.matchesStars ? `+${check.matchesStars}*` : ""}
+                            </span>
+                          ))
+                        ) : ticket.draw?.drawDate ? (
+                          <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-700">
+                            {formatDrawChip(ticket.draw.drawDate)} · sin comprobar
                           </span>
-                        ))}
+                        ) : null}
                       </div>
                     </div>
                     <button

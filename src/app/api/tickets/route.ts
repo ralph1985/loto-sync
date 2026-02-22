@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 
 import { prisma } from '@/lib/prisma'
 
@@ -125,6 +126,43 @@ const validateTicket = (input: TicketInput, drawType: 'PRIMITIVA' | 'EUROMILLONE
   return issues
 }
 
+const toDateKey = (value: Date) => value.toISOString().slice(0, 10)
+
+const extractPrimitivaExtras = (payload: Prisma.JsonValue) => {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return { complementario: null as number | null, reintegro: null as number | null }
+  }
+  const root = payload as Record<string, unknown>
+  const data =
+    root.data && typeof root.data === 'object' && !Array.isArray(root.data)
+      ? (root.data as Record<string, unknown>)
+      : root
+  const resultData =
+    data.resultData && typeof data.resultData === 'object' && !Array.isArray(data.resultData)
+      ? (data.resultData as Record<string, unknown>)
+      : null
+
+  const complementarioRaw = resultData?.complementario
+  const reintegroRaw = resultData?.reintegro
+  const complementario =
+    typeof complementarioRaw === 'number'
+      ? complementarioRaw
+      : typeof complementarioRaw === 'string'
+        ? Number.parseInt(complementarioRaw, 10)
+        : null
+  const reintegro =
+    typeof reintegroRaw === 'number'
+      ? reintegroRaw
+      : typeof reintegroRaw === 'string'
+        ? Number.parseInt(reintegroRaw, 10)
+        : null
+
+  return {
+    complementario: Number.isFinite(complementario as number) ? complementario : null,
+    reintegro: Number.isFinite(reintegro as number) ? reintegro : null
+  }
+}
+
 export async function GET() {
   const tickets = await prisma.ticket.findMany({
     orderBy: { createdAt: 'desc' },
@@ -143,7 +181,43 @@ export async function GET() {
     }
   })
 
-  return NextResponse.json({ data: tickets })
+  const primitiveCheckDateSet = new Set<string>()
+  tickets.forEach((ticket) => {
+    if (ticket.draw?.type !== 'PRIMITIVA') return
+    ticket.checks.forEach((check) => {
+      primitiveCheckDateSet.add(toDateKey(check.drawDate))
+    })
+  })
+
+  const primitiveDates = Array.from(primitiveCheckDateSet)
+  const primitiveCaches = primitiveDates.length
+    ? await prisma.resultCache.findMany({
+        where: {
+          game: 'PRIMITIVA',
+          drawDate: {
+            in: primitiveDates.map((date) => new Date(`${date}T00:00:00.000Z`))
+          }
+        }
+      })
+    : []
+
+  const cacheByDate = new Map(
+    primitiveCaches.map((cache) => [toDateKey(cache.drawDate as Date), extractPrimitivaExtras(cache.payload)])
+  )
+
+  const enriched = tickets.map((ticket) => ({
+    ...ticket,
+    checks: ticket.checks.map((check) => {
+      const extras = ticket.draw?.type === 'PRIMITIVA' ? cacheByDate.get(toDateKey(check.drawDate)) : null
+      return {
+        ...check,
+        winningComplementario: extras?.complementario ?? null,
+        winningReintegro: extras?.reintegro ?? null
+      }
+    })
+  }))
+
+  return NextResponse.json({ data: enriched })
 }
 
 export async function POST(request: Request) {
