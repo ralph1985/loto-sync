@@ -42,6 +42,9 @@ type Ticket = {
   id: string;
   status: TicketStatus;
   createdAt: string;
+  priceCents?: number | null;
+  playsJoker?: boolean;
+  jokerNumber?: string | null;
   group?: Group | null;
   draw?: Draw | null;
   lines?: TicketLine[];
@@ -89,6 +92,11 @@ const formatDate = (value?: string | null) => {
 const formatDateTime = (value?: string | null) => {
   if (!value) return "Sin fecha";
   return new Date(value).toLocaleString("es-ES");
+};
+
+const formatPrice = (priceCents?: number | null) => {
+  if (priceCents === null || priceCents === undefined) return "Sin precio";
+  return `${(priceCents / 100).toFixed(2)} EUR`;
 };
 
 const buildDrawLabel = (draw?: Draw | null) => {
@@ -311,6 +319,14 @@ export default function ReviewPage() {
                       <p className="text-sm text-slate-500">
                         {formatDateTime(ticket.createdAt)} · {lineCount} linea(s)
                       </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {formatPrice(ticket.priceCents)}
+                        {ticket.draw?.type === "PRIMITIVA"
+                          ? ticket.playsJoker
+                            ? ` · Joker ${ticket.jokerNumber ?? "-"}`
+                            : " · Sin Joker"
+                          : ""}
+                      </p>
                       <div className="mt-2">
                         <span
                           className={`inline-flex rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ${
@@ -387,6 +403,14 @@ export default function ReviewPage() {
                 </h3>
                 <p className="text-sm text-slate-500">
                   {formatDateTime(selectedTicket.createdAt)}
+                </p>
+                <p className="text-xs text-slate-500">
+                  {formatPrice(selectedTicket.priceCents)} ·{" "}
+                  {selectedTicket.draw?.type === "PRIMITIVA"
+                    ? selectedTicket.playsJoker
+                      ? `Joker ${selectedTicket.jokerNumber ?? "-"}`
+                      : "Sin Joker"
+                    : "Joker no aplica"}
                 </p>
               </div>
               <button

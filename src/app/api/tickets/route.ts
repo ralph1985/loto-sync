@@ -15,6 +15,8 @@ type TicketInput = {
   drawType?: 'PRIMITIVA' | 'EUROMILLONES'
   drawDate?: string
   priceCents?: number
+  playsJoker?: boolean
+  jokerNumber?: string
   notes?: string
   lines: TicketLineInput[]
 }
@@ -60,6 +62,29 @@ const validateTicket = (input: TicketInput, drawType: 'PRIMITIVA' | 'EUROMILLONE
   }
   if (input.priceCents !== undefined && input.priceCents < 0) {
     issues.push('priceCents no puede ser negativo.')
+  }
+  if (input.priceCents !== undefined && !Number.isInteger(input.priceCents)) {
+    issues.push('priceCents debe ser un entero.')
+  }
+  if (typeof input.playsJoker !== 'undefined' && typeof input.playsJoker !== 'boolean') {
+    issues.push('playsJoker debe ser true o false.')
+  }
+
+  const jokerNumber = input.jokerNumber?.trim()
+  if (jokerNumber && !/^\d{7}$/.test(jokerNumber)) {
+    issues.push('jokerNumber debe tener 7 digitos.')
+  }
+  if (drawType !== 'PRIMITIVA' && input.playsJoker) {
+    issues.push('Joker solo aplica a Primitiva.')
+  }
+  if (drawType !== 'PRIMITIVA' && jokerNumber) {
+    issues.push('jokerNumber solo aplica a Primitiva.')
+  }
+  if (drawType === 'PRIMITIVA' && input.playsJoker && !jokerNumber) {
+    issues.push('jokerNumber es obligatorio cuando playsJoker es true.')
+  }
+  if (drawType === 'PRIMITIVA' && !input.playsJoker && jokerNumber) {
+    issues.push('No puedes enviar jokerNumber si playsJoker es false.')
   }
 
   input.lines.forEach((line, index) => {
@@ -195,6 +220,8 @@ export async function POST(request: Request) {
       drawId: draw.id,
       status: 'PENDIENTE',
       priceCents: payload.priceCents ?? null,
+      playsJoker: payload.playsJoker ?? false,
+      jokerNumber: payload.jokerNumber?.trim() || null,
       notes: payload.notes ?? null,
       lines: {
         create: payload.lines.map((line, index) => ({

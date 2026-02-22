@@ -36,9 +36,15 @@ type Ticket = {
   id: string;
   status: "PENDIENTE" | "COMPROBADO" | "PREMIO";
   createdAt: string;
+  priceCents?: number | null;
+  playsJoker?: boolean;
+  jokerNumber?: string | null;
   group?: Group | null;
   draw?: Draw | null;
   lines?: TicketLine[];
+  receipt?: {
+    blobUrl: string;
+  } | null;
 };
 
 type LineState = {
@@ -106,6 +112,11 @@ const formatDate = (value?: string | null) => {
   return new Date(value).toLocaleDateString("es-ES");
 };
 
+const formatPrice = (priceCents?: number | null) => {
+  if (priceCents === null || priceCents === undefined) return "Sin precio";
+  return `${(priceCents / 100).toFixed(2)} EUR`;
+};
+
 const buildDrawLabel = (draw?: Draw | null) => {
   if (!draw) return "Sorteo";
   const fallback = DRAW_TYPES.find((item) => item.id === draw.type)?.label;
@@ -138,6 +149,12 @@ const TicketDetailModal = ({
             </h3>
             <p className="text-sm text-slate-500">
               {formatDate(ticket.createdAt)}
+            </p>
+            <p className="text-xs text-slate-500">
+              {formatPrice(ticket.priceCents)} ·{" "}
+              {ticket.playsJoker
+                ? `Joker ${ticket.jokerNumber ?? "(sin numero)"}`
+                : "Sin Joker"}
             </p>
           </div>
           <button
@@ -239,6 +256,9 @@ export default function Home() {
   const [drawType, setDrawType] = useState<DrawType>("PRIMITIVA");
   const [drawDate, setDrawDate] = useState<string>("");
   const [groupId, setGroupId] = useState<string>("");
+  const [priceInput, setPriceInput] = useState<string>("");
+  const [playsJoker, setPlaysJoker] = useState(false);
+  const [jokerNumber, setJokerNumber] = useState<string>("");
   const [lines, setLines] = useState<LineState[]>([createEmptyLine()]);
   const [notes, setNotes] = useState<string>("");
   const [receipt, setReceipt] = useState<File | null>(null);
@@ -295,6 +315,13 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    if (drawType !== "PRIMITIVA") {
+      setPlaysJoker(false);
+      setJokerNumber("");
+    }
+  }, [drawType]);
+
+  useEffect(() => {
     let isActive = true;
 
     const loadTickets = async () => {
@@ -342,6 +369,24 @@ export default function Home() {
 
     if (receipt && !receipt.type.startsWith("image/")) {
       issues.push("El resguardo debe ser una imagen.");
+    }
+
+    if (priceInput.trim()) {
+      const normalized = priceInput.replace(",", ".");
+      const parsed = Number.parseFloat(normalized);
+      if (Number.isNaN(parsed)) {
+        issues.push("El precio debe ser un numero.");
+      } else if (parsed < 0) {
+        issues.push("El precio no puede ser negativo.");
+      } else if (Math.abs(parsed * 100 - Math.round(parsed * 100)) > 1e-6) {
+        issues.push("El precio debe tener como maximo 2 decimales.");
+      }
+    }
+
+    if (drawType === "PRIMITIVA" && playsJoker) {
+      if (!/^\d{7}$/.test(jokerNumber.trim())) {
+        issues.push("El numero de Joker debe tener 7 digitos.");
+      }
     }
 
     const lineResults = lines.map((line) => {
@@ -403,7 +448,7 @@ export default function Home() {
         issues.length === 0 &&
         lineResults.every((line) => line.issues.length === 0),
     };
-  }, [drawDate, drawType, groupId, lines, receipt]);
+  }, [drawDate, drawType, groupId, jokerNumber, lines, playsJoker, priceInput, receipt]);
 
   const handleLineChange = (index: number, patch: Partial<LineState>) => {
     setLines((current) =>
@@ -426,6 +471,15 @@ export default function Home() {
     setSaving(true);
 
     try {
+      const normalizedPrice = priceInput.trim().replace(",", ".");
+      const parsedPrice = normalizedPrice
+        ? Number.parseFloat(normalizedPrice)
+        : null;
+      const priceCents =
+        parsedPrice === null || Number.isNaN(parsedPrice)
+          ? undefined
+          : Math.round(parsedPrice * 100);
+
       const response = await fetch("/api/tickets", {
         method: "POST",
         headers: {
@@ -435,6 +489,12 @@ export default function Home() {
           groupId,
           drawType,
           drawDate,
+          priceCents,
+          playsJoker: drawType === "PRIMITIVA" ? playsJoker : undefined,
+          jokerNumber:
+            drawType === "PRIMITIVA" && playsJoker
+              ? jokerNumber.trim()
+              : undefined,
           notes: notes.trim() || undefined,
           lines: lines.map((line) => ({
             mainNumbers: toIntArray(line.mainInput),
@@ -486,6 +546,9 @@ export default function Home() {
       setSaveSuccess(successMessage);
       setLines([createEmptyLine()]);
       setNotes("");
+      setPriceInput("");
+      setPlaysJoker(false);
+      setJokerNumber("");
       setReceipt(null);
       setSubmitted(false);
       const refreshResponse = await fetch("/api/tickets");
@@ -585,7 +648,7 @@ export default function Home() {
                   {loadError}
                 </div>
               ) : null}
-              <div className="mt-5 grid gap-4 md:grid-cols-3">
+              <div className="mt-5 grid gap-4 md:grid-cols-4">
                 <div className="flex flex-col gap-2">
                   <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Sorteo
@@ -638,7 +701,48 @@ export default function Home() {
                     className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
                   />
                 </div>
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Precio (EUR)
+                  </label>
+                  <input
+                    value={priceInput}
+                    onChange={(event) => setPriceInput(event.target.value)}
+                    placeholder="Ej: 2.00"
+                    inputMode="decimal"
+                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
+                  />
+                </div>
               </div>
+              {drawType === "PRIMITIVA" ? (
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={playsJoker}
+                      onChange={(event) => setPlaysJoker(event.target.checked)}
+                      className="h-4 w-4 rounded border-slate-300"
+                    />
+                    Jugar Joker
+                  </label>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Numero Joker
+                    </label>
+                    <input
+                      value={jokerNumber}
+                      onChange={(event) =>
+                        setJokerNumber(event.target.value.replace(/\D/g, "").slice(0, 7))
+                      }
+                      placeholder="7 digitos"
+                      inputMode="numeric"
+                      disabled={!playsJoker}
+                      className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none disabled:opacity-60"
+                    />
+                  </div>
+                </div>
+              ) : null}
             </section>
 
             <section className="animate-fade-up rounded-3xl border border-white/70 bg-white/90 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
@@ -875,6 +979,34 @@ export default function Home() {
                     : "Sin definir"}
                 </p>
               </div>
+              <div>
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  Precio
+                </span>
+                <p className="mt-1 font-semibold text-slate-900">
+                  {(() => {
+                    if (!priceInput.trim()) return "Sin definir";
+                    const parsed = Number.parseFloat(
+                      priceInput.replace(",", ".")
+                    );
+                    return Number.isNaN(parsed)
+                      ? "Precio invalido"
+                      : `${parsed.toFixed(2)} EUR`;
+                  })()}
+                </p>
+              </div>
+              <div>
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  Joker
+                </span>
+                <p className="mt-1 font-semibold text-slate-900">
+                  {drawType === "PRIMITIVA"
+                    ? playsJoker
+                      ? jokerNumber || "Pendiente"
+                      : "No"
+                    : "No aplica"}
+                </p>
+              </div>
             </div>
 
             <div className="mt-6 space-y-4">
@@ -1027,7 +1159,14 @@ export default function Home() {
                           : null}
                       </div>
                       <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
-                        <span>{lineCount} linea(s)</span>
+                        <span>
+                          {lineCount} linea(s) · {formatPrice(ticket.priceCents)}
+                          {ticket.draw?.type === "PRIMITIVA"
+                            ? ticket.playsJoker
+                              ? ` · Joker ${ticket.jokerNumber ?? "-"}`
+                              : " · Sin Joker"
+                            : ""}
+                        </span>
                         <div className="flex items-center gap-2">
                           <button
                             type="button"

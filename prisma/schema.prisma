@@ -58,6 +58,8 @@ model Ticket {
   draw       Draw         @relation(fields: [drawId], references: [id])
   status     TicketStatus @default(PENDIENTE)
   priceCents Int?
+  playsJoker Boolean      @default(false)
+  jokerNumber String?
   notes      String?
   lines      TicketLine[]
   receipt    Receipt?

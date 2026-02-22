@@ -63,6 +63,8 @@ Ejemplo de payload para crear boleto:
   "drawType": "PRIMITIVA",
   "drawDate": "2026-01-30",
   "priceCents": 1200,
+  "playsJoker": true,
+  "jokerNumber": "1234567",
   "notes": "Boleto compartido",
   "lines": [
     {
