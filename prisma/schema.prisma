@@ -33,8 +33,32 @@ model Group {
   name      String
   kind      GroupKind?
   tickets   Ticket[]
+  movements GroupMovement[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+enum GroupMovementType {
+  OPENING
+  ADJUSTMENT
+  CONTRIBUTION
+  TICKET_EXPENSE
+  PRIZE
+}
+
+model GroupMovement {
+  id           String            @id @default(cuid())
+  groupId      String
+  group        Group             @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  type         GroupMovementType
+  amountCents  Int
+  occurredAt   DateTime          @default(now())
+  note         String?
+  relatedTicketId String?
+  createdAt    DateTime          @default(now())
+
+  @@index([groupId, occurredAt])
+  @@index([relatedTicketId])
 }
 
 model Draw {

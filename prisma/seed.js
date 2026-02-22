@@ -49,6 +49,35 @@ async function main() {
       ]
     })
   }
+
+  const amigos = await prisma.group.findFirst({
+    where: { name: 'Amigos' },
+    select: { id: true }
+  })
+
+  if (amigos) {
+    const openingDate = new Date('2026-01-06T00:00:00.000Z')
+    const existingOpening = await prisma.groupMovement.findFirst({
+      where: {
+        groupId: amigos.id,
+        type: 'OPENING',
+        amountCents: 2000,
+        occurredAt: openingDate
+      }
+    })
+
+    if (!existingOpening) {
+      await prisma.groupMovement.create({
+        data: {
+          groupId: amigos.id,
+          type: 'OPENING',
+          amountCents: 2000,
+          occurredAt: openingDate,
+          note: 'Saldo inicial 2026'
+        }
+      })
+    }
+  }
 }
 
 main()

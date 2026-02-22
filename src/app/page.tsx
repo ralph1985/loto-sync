@@ -8,6 +8,7 @@ type DrawType = "PRIMITIVA" | "EUROMILLONES";
 type Group = {
   id: string;
   name: string;
+  balanceCents?: number;
 };
 
 type Draw = {
@@ -556,6 +557,11 @@ export default function Home() {
         const payload = await refreshResponse.json();
         setTickets(payload.data ?? []);
       }
+      const refreshGroupsResponse = await fetch("/api/groups");
+      if (refreshGroupsResponse.ok) {
+        const groupsPayload = await refreshGroupsResponse.json();
+        setGroups(groupsPayload.data ?? []);
+      }
     } catch (error) {
       setSaveError(
         error instanceof Error ? error.message : "No se pudo guardar el boleto."
@@ -575,6 +581,8 @@ export default function Home() {
     : null;
   const selectedDrawType = drawType;
   const latestTickets = tickets.slice(0, 5);
+  const selectedGroupBalanceCents =
+    groups.find((group) => group.id === groupId)?.balanceCents ?? 0;
 
   const handleCopy = async (ticket: Ticket) => {
     const firstLine = ticket.lines?.[0];
@@ -971,6 +979,14 @@ export default function Home() {
               </div>
               <div>
                 <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  Bote grupo
+                </span>
+                <p className="mt-1 font-semibold text-slate-900">
+                  {groupId ? formatPrice(selectedGroupBalanceCents) : "Sin definir"}
+                </p>
+              </div>
+              <div>
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                   Fecha
                 </span>
                 <p className="mt-1 font-semibold text-slate-900">
@@ -1062,6 +1078,29 @@ export default function Home() {
                   )}
                 </div>
               ))}
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-white/70 bg-white/90 p-6 text-sm text-slate-600 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+            <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+              Bote por grupo
+            </h4>
+            <div className="mt-3 space-y-2">
+              {groups.length > 0 ? (
+                groups.map((group) => (
+                  <div
+                    key={group.id}
+                    className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-3 py-2"
+                  >
+                    <span>{group.name}</span>
+                    <span className="font-semibold">
+                      {formatPrice(group.balanceCents ?? 0)}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-slate-500">Sin grupos.</p>
+              )}
             </div>
           </div>
 

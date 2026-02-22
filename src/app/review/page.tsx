@@ -9,6 +9,7 @@ type TicketStatus = "PENDIENTE" | "COMPROBADO" | "PREMIO";
 type Group = {
   id: string;
   name: string;
+  balanceCents?: number;
 };
 
 type Draw = {
@@ -173,6 +174,11 @@ export default function ReviewPage() {
     });
   }, [tickets, statusFilter, groupFilter, drawTypeFilter]);
 
+  const selectedGroupBalanceCents = useMemo(() => {
+    if (groupFilter === "ALL") return null;
+    return groups.find((group) => group.id === groupFilter)?.balanceCents ?? 0;
+  }, [groupFilter, groups]);
+
   return (
     <div className="relative min-h-screen bg-[#f7f2ea] text-slate-900">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
@@ -269,6 +275,22 @@ export default function ReviewPage() {
                   ))}
                 </select>
               </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-3xl border border-white/70 bg-white/85 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">Bote por grupo</h2>
+              <p className="text-sm text-slate-500">
+                Saldo calculado por movimientos (entradas y gastos de boletos).
+              </p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700">
+              {groupFilter === "ALL"
+                ? "Selecciona un grupo para ver su bote actual."
+                : `Bote actual: ${formatPrice(selectedGroupBalanceCents)}`}
             </div>
           </div>
         </section>

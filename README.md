@@ -40,6 +40,10 @@ Configura `DATABASE_URL` en `.env` (puedes copiar `.env.example`).
 
 ```bash
 npx prisma generate
+npx prisma db push
+node prisma/seed.js
+# opcional: crear movimientos de gasto para tickets historicos
+node prisma/backfill-group-movements.js
 ```
 
 ## API local (Next.js)
@@ -54,6 +58,8 @@ Endpoints disponibles:
 - `GET /api/uploads/<path>` (serve ficheros locales)
 - `GET /api/results/latest?game=PRIMITIVA|EUROMILLONES`
 - `GET /api/results/verify?ticketId=...`
+
+`GET /api/groups` incluye `balanceCents` calculado por grupo.
 
 Ejemplo de payload para crear boleto:
 
@@ -75,6 +81,11 @@ Ejemplo de payload para crear boleto:
   ]
 }
 ```
+
+Notas de saldo (bote):
+
+- Al crear un ticket con `priceCents > 0`, se registra un movimiento `TICKET_EXPENSE`.
+- El saldo de cada grupo se calcula sumando movimientos (`OPENING`, `CONTRIBUTION`, `PRIZE`, etc.).
 
 ## Storage local
 
