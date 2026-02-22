@@ -70,6 +70,12 @@ const STATUS_OPTIONS: { value: "ALL" | TicketStatus; label: string }[] = [
   { value: "PREMIO", label: "Premio" },
 ];
 
+const DRAW_TYPE_OPTIONS: { value: "ALL" | DrawType; label: string }[] = [
+  { value: "ALL", label: "Todos" },
+  { value: "PRIMITIVA", label: "Primitiva" },
+  { value: "EUROMILLONES", label: "Euromillones" },
+];
+
 const DRAW_LABELS: Record<DrawType, string> = {
   PRIMITIVA: "Primitiva",
   EUROMILLONES: "Euromillones",
@@ -97,6 +103,7 @@ export default function ReviewPage() {
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<"ALL" | TicketStatus>("ALL");
   const [groupFilter, setGroupFilter] = useState<string>("ALL");
+  const [drawTypeFilter, setDrawTypeFilter] = useState<"ALL" | DrawType>("ALL");
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [verifying, setVerifying] = useState(false);
   const [verifyError, setVerifyError] = useState<string | null>(null);
@@ -152,9 +159,11 @@ export default function ReviewPage() {
       const statusOk = statusFilter === "ALL" || ticket.status === statusFilter;
       const groupOk =
         groupFilter === "ALL" || ticket.group?.id === groupFilter;
-      return statusOk && groupOk;
+      const drawTypeOk =
+        drawTypeFilter === "ALL" || ticket.draw?.type === drawTypeFilter;
+      return statusOk && groupOk && drawTypeOk;
     });
-  }, [tickets, statusFilter, groupFilter]);
+  }, [tickets, statusFilter, groupFilter, drawTypeFilter]);
 
   return (
     <div className="relative min-h-screen bg-[#f7f2ea] text-slate-900">
@@ -196,7 +205,7 @@ export default function ReviewPage() {
                 Usa los filtros para revisar estados específicos.
               </p>
             </div>
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid gap-3 md:grid-cols-3">
               <div className="flex flex-col gap-2">
                 <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Grupo
@@ -234,6 +243,24 @@ export default function ReviewPage() {
                   ))}
                 </select>
               </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Sorteo
+                </label>
+                <select
+                  value={drawTypeFilter}
+                  onChange={(event) =>
+                    setDrawTypeFilter(event.target.value as "ALL" | DrawType)
+                  }
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
+                >
+                  {DRAW_TYPE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
         </section>
@@ -254,6 +281,19 @@ export default function ReviewPage() {
           ) : (
             filteredTickets.map((ticket) => {
               const lineCount = ticket.lines?.length ?? 0;
+              const firstLine = ticket.lines?.[0];
+              const mainNumbers = firstLine
+                ? firstLine.numbers
+                    .filter((number) => number.kind === "MAIN")
+                    .sort((a, b) => a.position - b.position)
+                    .map((number) => number.value)
+                : [];
+              const stars = firstLine
+                ? firstLine.numbers
+                    .filter((number) => number.kind === "STAR")
+                    .sort((a, b) => a.position - b.position)
+                    .map((number) => number.value)
+                : [];
               return (
                 <div
                   key={ticket.id}
@@ -270,6 +310,32 @@ export default function ReviewPage() {
                       <p className="text-sm text-slate-500">
                         {formatDateTime(ticket.createdAt)} · {lineCount} linea(s)
                       </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {mainNumbers.length > 0 ? (
+                          mainNumbers.map((value, index) => (
+                            <span
+                              key={`${ticket.id}-main-${index}`}
+                              className="rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white"
+                            >
+                              {value}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-xs text-slate-400">
+                            Sin numeros
+                          </span>
+                        )}
+                        {stars.length > 0
+                          ? stars.map((value, index) => (
+                              <span
+                                key={`${ticket.id}-star-${index}`}
+                                className="rounded-full bg-[#f9c784] px-3 py-1 text-xs font-semibold text-slate-900"
+                              >
+                                {value}
+                              </span>
+                            ))
+                          : null}
+                      </div>
                     </div>
                     <button
                       type="button"
