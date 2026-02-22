@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 type DrawType = "PRIMITIVA" | "EUROMILLONES";
@@ -128,6 +129,9 @@ const buildDrawLabel = (draw?: Draw | null) => {
 };
 
 export default function ReviewPage() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
@@ -135,6 +139,7 @@ export default function ReviewPage() {
   const [statusFilter, setStatusFilter] = useState<"ALL" | TicketStatus>("ALL");
   const [groupFilter, setGroupFilter] = useState<string>("ALL");
   const [drawTypeFilter, setDrawTypeFilter] = useState<"ALL" | DrawType>("ALL");
+  const [filtersHydrated, setFiltersHydrated] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [verifying, setVerifying] = useState(false);
   const [verifyError, setVerifyError] = useState<string | null>(null);
@@ -201,6 +206,45 @@ export default function ReviewPage() {
     setManualPrizeInput("");
     setPrizeError(null);
   }, [selectedTicket]);
+
+  useEffect(() => {
+    const status = searchParams.get("status");
+    const group = searchParams.get("group");
+    const drawType = searchParams.get("drawType");
+
+    setStatusFilter(
+      status && STATUS_OPTIONS.some((option) => option.value === status)
+        ? (status as "ALL" | TicketStatus)
+        : "ALL"
+    );
+    setGroupFilter(group ?? "ALL");
+    setDrawTypeFilter(
+      drawType && DRAW_TYPE_OPTIONS.some((option) => option.value === drawType)
+        ? (drawType as "ALL" | DrawType)
+        : "ALL"
+    );
+    setFiltersHydrated(true);
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!filtersHydrated) return;
+    const params = new URLSearchParams();
+    if (statusFilter !== "ALL") params.set("status", statusFilter);
+    if (groupFilter !== "ALL") params.set("group", groupFilter);
+    if (drawTypeFilter !== "ALL") params.set("drawType", drawTypeFilter);
+    const next = params.toString();
+    const current = searchParams.toString();
+    if (next === current) return;
+    router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false });
+  }, [
+    drawTypeFilter,
+    filtersHydrated,
+    groupFilter,
+    pathname,
+    router,
+    searchParams,
+    statusFilter,
+  ]);
 
   const filteredTickets = useMemo(() => {
     return tickets.filter((ticket) => {
@@ -376,6 +420,7 @@ export default function ReviewPage() {
                     .sort((a, b) => a.position - b.position)
                     .map((number) => number.value)
                 : [];
+              const reintegro = firstLine?.reintegro ?? null;
               return (
                 <div
                   key={ticket.id}
@@ -438,6 +483,11 @@ export default function ReviewPage() {
                               </span>
                             ))
                           : null}
+                        {ticket.draw?.type === "PRIMITIVA" ? (
+                          <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">
+                            R {reintegro ?? "-"}
+                          </span>
+                        ) : null}
                       </div>
                     </div>
                     <button
