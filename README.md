@@ -32,6 +32,7 @@ Copia `.env.example` a `.env` y completa:
 - `DATABASE_URL` (SQLite local)
 - `LOTERIAS_API_KEY` (API terceros para resultados)
 - `LOTERIAS_API_BASE` (opcional, por defecto loteriasapi.com)
+- Cache local de resultados usa SQLite (`ResultCache`) con TTL de 10 min y rate limit básico.
 
 ## Prisma
 

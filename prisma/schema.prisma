@@ -104,3 +104,16 @@ model Receipt {
   sizeBytes Int?
   createdAt DateTime @default(now())
 }
+
+model ResultCache {
+  id        String   @id @default(cuid())
+  game      DrawType
+  drawDate  DateTime?
+  payload   Json
+  fetchedAt DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([game, drawDate])
+  @@index([game, fetchedAt])
+}
