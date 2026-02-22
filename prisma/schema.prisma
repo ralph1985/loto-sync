@@ -55,10 +55,13 @@ model GroupMovement {
   occurredAt   DateTime          @default(now())
   note         String?
   relatedTicketId String?
+  relatedCheckId String?
   createdAt    DateTime          @default(now())
 
   @@index([groupId, occurredAt])
   @@index([relatedTicketId])
+  @@index([relatedCheckId])
+  @@unique([relatedCheckId, type])
 }
 
 model Draw {
@@ -87,11 +90,33 @@ model Ticket {
   notes      String?
   lines      TicketLine[]
   receipt    Receipt?
+  checks     TicketCheck[]
   createdAt  DateTime     @default(now())
   updatedAt  DateTime     @updatedAt
 
   @@index([groupId, drawId])
   @@index([status])
+}
+
+model TicketCheck {
+  id             String       @id @default(cuid())
+  ticketId       String
+  ticket         Ticket       @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  drawDate       DateTime
+  status         TicketStatus @default(COMPROBADO)
+  reason         String?
+  winningNumbers Json
+  winningStars   Json?
+  matchesMain    Int          @default(0)
+  matchesStars   Int          @default(0)
+  prizeCents     Int?
+  prizeSource    String?
+  checkedAt      DateTime     @default(now())
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([ticketId, drawDate])
+  @@index([ticketId, checkedAt])
 }
 
 model TicketLine {

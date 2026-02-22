@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 type DrawType = "PRIMITIVA" | "EUROMILLONES";
 type TicketStatus = "PENDIENTE" | "COMPROBADO" | "PREMIO";
@@ -50,15 +50,32 @@ type Ticket = {
   draw?: Draw | null;
   lines?: TicketLine[];
   receipt?: Receipt | null;
+  checks?: TicketCheck[];
+};
+
+type TicketCheck = {
+  id: string;
+  drawDate: string;
+  status: TicketStatus;
+  reason?: string | null;
+  winningNumbers?: number[] | null;
+  winningStars?: number[] | null;
+  matchesMain: number;
+  matchesStars: number;
+  prizeCents?: number | null;
+  prizeSource?: string | null;
+  checkedAt: string;
 };
 
 type VerifyResponse = {
-  status: "PENDIENTE" | "COMPROBADO";
+  status: TicketStatus;
   reason?: string;
   matches?: {
     main: number;
     stars: number;
   };
+  check?: TicketCheck;
+  ticketStatus?: TicketStatus;
   result?: {
     game: DrawType;
     drawDate: string;
@@ -95,6 +112,11 @@ const formatDateTime = (value?: string | null) => {
   return new Date(value).toLocaleString("es-ES");
 };
 
+const toDateInput = (value?: string | null) => {
+  if (!value) return "";
+  return new Date(value).toISOString().slice(0, 10);
+};
+
 const formatPrice = (priceCents?: number | null) => {
   if (priceCents === null || priceCents === undefined) return "Sin precio";
   return `${(priceCents / 100).toFixed(2)} EUR`;
@@ -117,6 +139,30 @@ export default function ReviewPage() {
   const [verifying, setVerifying] = useState(false);
   const [verifyError, setVerifyError] = useState<string | null>(null);
   const [verifyResult, setVerifyResult] = useState<VerifyResponse | null>(null);
+  const [checkDrawDate, setCheckDrawDate] = useState<string>("");
+  const [manualPrizeInput, setManualPrizeInput] = useState<string>("");
+  const [savingPrize, setSavingPrize] = useState(false);
+  const [prizeError, setPrizeError] = useState<string | null>(null);
+
+  const loadData = useCallback(async () => {
+    const [ticketsResponse, groupsResponse] = await Promise.all([
+      fetch("/api/tickets"),
+      fetch("/api/groups"),
+    ]);
+
+    if (!ticketsResponse.ok || !groupsResponse.ok) {
+      throw new Error("No se pudieron cargar los boletos.");
+    }
+
+    const ticketsPayload = await ticketsResponse.json();
+    const groupsPayload = await groupsResponse.json();
+    const nextTickets = ticketsPayload.data ?? [];
+    setTickets(nextTickets);
+    setSelectedTicket((current) =>
+      current ? nextTickets.find((ticket: Ticket) => ticket.id === current.id) ?? null : current
+    );
+    setGroups(groupsPayload.data ?? []);
+  }, []);
 
   useEffect(() => {
     let isActive = true;
@@ -126,22 +172,8 @@ export default function ReviewPage() {
       setError(null);
 
       try {
-        const [ticketsResponse, groupsResponse] = await Promise.all([
-          fetch("/api/tickets"),
-          fetch("/api/groups"),
-        ]);
-
-        if (!ticketsResponse.ok || !groupsResponse.ok) {
-          throw new Error("No se pudieron cargar los boletos.");
-        }
-
-        const ticketsPayload = await ticketsResponse.json();
-        const groupsPayload = await groupsResponse.json();
-
         if (!isActive) return;
-
-        setTickets(ticketsPayload.data ?? []);
-        setGroups(groupsPayload.data ?? []);
+        await loadData();
       } catch (loadError) {
         if (!isActive) return;
         setError(
@@ -161,7 +193,14 @@ export default function ReviewPage() {
     return () => {
       isActive = false;
     };
-  }, []);
+  }, [loadData]);
+
+  useEffect(() => {
+    if (!selectedTicket) return;
+    setCheckDrawDate(toDateInput(selectedTicket.draw?.drawDate));
+    setManualPrizeInput("");
+    setPrizeError(null);
+  }, [selectedTicket]);
 
   const filteredTickets = useMemo(() => {
     return tickets.filter((ticket) => {
@@ -178,6 +217,18 @@ export default function ReviewPage() {
     if (groupFilter === "ALL") return null;
     return groups.find((group) => group.id === groupFilter)?.balanceCents ?? 0;
   }, [groupFilter, groups]);
+
+  const activeCheck: TicketCheck | null =
+    verifyResult?.check ?? selectedTicket?.checks?.[0] ?? null;
+
+  const winningMainNumbers = useMemo(
+    () => new Set((activeCheck?.winningNumbers ?? []).map((value) => Number(value))),
+    [activeCheck]
+  );
+  const winningStars = useMemo(
+    () => new Set((activeCheck?.winningStars ?? []).map((value) => Number(value))),
+    [activeCheck]
+  );
 
   return (
     <div className="relative min-h-screen bg-[#f7f2ea] text-slate-900">
@@ -447,35 +498,50 @@ export default function ReviewPage() {
             <div className="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-3">
               <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
                 <span>Comprobacion de premio (API externa)</span>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    setVerifying(true);
-                    setVerifyError(null);
-                    setVerifyResult(null);
-                    try {
-                      const response = await fetch(
-                        `/api/results/verify?ticketId=${selectedTicket.id}`
-                      );
-                      const payload = await response.json();
-                      if (!response.ok) {
-                        throw new Error(payload?.error || "Error al comprobar.");
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    value={checkDrawDate}
+                    onChange={(event) => setCheckDrawDate(event.target.value)}
+                    className="rounded-full border border-slate-200 px-3 py-1 text-[11px] text-slate-600"
+                  />
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setVerifying(true);
+                      setVerifyError(null);
+                      setVerifyResult(null);
+                      try {
+                        const query = new URLSearchParams({
+                          ticketId: selectedTicket.id,
+                        });
+                        if (checkDrawDate) {
+                          query.set("drawDate", checkDrawDate);
+                        }
+                        const response = await fetch(
+                          `/api/results/verify?${query.toString()}`
+                        );
+                        const payload = await response.json();
+                        if (!response.ok) {
+                          throw new Error(payload?.error || "Error al comprobar.");
+                        }
+                        setVerifyResult(payload.data);
+                        await loadData();
+                      } catch (error) {
+                        setVerifyError(
+                          error instanceof Error
+                            ? error.message
+                            : "Error al comprobar."
+                        );
+                      } finally {
+                        setVerifying(false);
                       }
-                      setVerifyResult(payload.data);
-                    } catch (error) {
-                      setVerifyError(
-                        error instanceof Error
-                          ? error.message
-                          : "Error al comprobar."
-                      );
-                    } finally {
-                      setVerifying(false);
-                    }
-                  }}
-                  className="rounded-full border border-slate-200 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500 transition hover:border-slate-400 hover:text-slate-700"
-                >
-                  {verifying ? "Comprobando..." : "Comprobar"}
-                </button>
+                    }}
+                    className="rounded-full border border-slate-200 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500 transition hover:border-slate-400 hover:text-slate-700"
+                  >
+                    {verifying ? "Comprobando..." : "Comprobar"}
+                  </button>
+                </div>
               </div>
               {verifyError ? (
                 <div className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
@@ -491,6 +557,87 @@ export default function ReviewPage() {
                           ? ` + ${verifyResult.matches?.stars} estrellas`
                           : ""
                       }`}
+                </div>
+              ) : null}
+              <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                  <span>Premio manual (EUR):</span>
+                  <input
+                    value={manualPrizeInput}
+                    onChange={(event) => setManualPrizeInput(event.target.value)}
+                    placeholder="0.00"
+                    inputMode="decimal"
+                    className="w-24 rounded-full border border-slate-300 px-3 py-1 text-[11px] text-slate-700"
+                  />
+                  <button
+                    type="button"
+                    disabled={savingPrize}
+                    onClick={async () => {
+                      setPrizeError(null);
+                      const parsed = Number.parseFloat(
+                        manualPrizeInput.replace(",", ".")
+                      );
+                      if (Number.isNaN(parsed) || parsed < 0) {
+                        setPrizeError("Introduce un importe valido.");
+                        return;
+                      }
+                      setSavingPrize(true);
+                      try {
+                        const response = await fetch("/api/results/prize", {
+                          method: "POST",
+                          headers: {
+                            "Content-Type": "application/json",
+                          },
+                          body: JSON.stringify({
+                            ticketId: selectedTicket.id,
+                            drawDate: checkDrawDate || undefined,
+                            prizeCents: Math.round(parsed * 100),
+                          }),
+                        });
+                        const payload = await response.json();
+                        if (!response.ok) {
+                          throw new Error(payload?.error || "No se pudo guardar.");
+                        }
+                        await loadData();
+                      } catch (error) {
+                        setPrizeError(
+                          error instanceof Error
+                            ? error.message
+                            : "No se pudo guardar."
+                        );
+                      } finally {
+                        setSavingPrize(false);
+                      }
+                    }}
+                    className="rounded-full border border-slate-300 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600"
+                  >
+                    {savingPrize ? "Guardando..." : "Guardar premio"}
+                  </button>
+                </div>
+                {prizeError ? (
+                  <p className="mt-2 text-xs text-rose-700">{prizeError}</p>
+                ) : null}
+              </div>
+              {(selectedTicket.checks?.length ?? 0) > 0 ? (
+                <div className="mt-3 rounded-2xl border border-slate-200 bg-white px-3 py-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Historial de comprobaciones
+                  </p>
+                  <div className="mt-2 space-y-1 text-xs text-slate-600">
+                    {(selectedTicket.checks ?? []).map((check) => (
+                      <div
+                        key={check.id}
+                        className="flex flex-wrap items-center justify-between gap-2"
+                      >
+                        <span>
+                          {formatDate(check.drawDate)} · {check.status} ·{" "}
+                          {check.matchesMain} aciertos
+                          {check.matchesStars ? ` + ${check.matchesStars} estrellas` : ""}
+                        </span>
+                        <span>{formatPrice(check.prizeCents ?? null)}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ) : null}
             </div>
@@ -522,7 +669,11 @@ export default function ReviewPage() {
                           {main.map((value, index) => (
                             <span
                               key={`${line.id}-main-${index}`}
-                              className="rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white"
+                              className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                                winningMainNumbers.has(value)
+                                  ? "bg-emerald-500 text-white"
+                                  : "bg-slate-900 text-white"
+                              }`}
                             >
                               {value}
                             </span>
@@ -533,7 +684,11 @@ export default function ReviewPage() {
                             {stars.map((value, index) => (
                               <span
                                 key={`${line.id}-star-${index}`}
-                                className="rounded-full bg-[#f9c784] px-3 py-1 text-xs font-semibold text-slate-900"
+                                className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                                  winningStars.has(value)
+                                    ? "bg-emerald-200 text-emerald-900"
+                                    : "bg-[#f9c784] text-slate-900"
+                                }`}
                               >
                                 {value}
                               </span>

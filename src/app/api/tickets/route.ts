@@ -136,7 +136,10 @@ export async function GET() {
           numbers: true
         }
       },
-      receipt: true
+      receipt: true,
+      checks: {
+        orderBy: { drawDate: 'desc' }
+      }
     }
   })
 
@@ -254,7 +257,10 @@ export async function POST(request: Request) {
         lines: {
           include: { numbers: true }
         },
-        receipt: true
+        receipt: true,
+        checks: {
+          orderBy: { drawDate: 'desc' }
+        }
       }
     })
 

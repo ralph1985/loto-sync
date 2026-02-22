@@ -58,6 +58,7 @@ Endpoints disponibles:
 - `GET /api/uploads/<path>` (serve ficheros locales)
 - `GET /api/results/latest?game=PRIMITIVA|EUROMILLONES`
 - `GET /api/results/verify?ticketId=...`
+- `POST /api/results/prize` (manual: `ticketId`, `drawDate` opcional, `prizeCents`)
 
 `GET /api/groups` incluye `balanceCents` calculado por grupo.
 
@@ -86,6 +87,7 @@ Notas de saldo (bote):
 
 - Al crear un ticket con `priceCents > 0`, se registra un movimiento `TICKET_EXPENSE`.
 - El saldo de cada grupo se calcula sumando movimientos (`OPENING`, `CONTRIBUTION`, `PRIZE`, etc.).
+- Al registrar premio manual (`/api/results/prize`), se crea/actualiza movimiento `PRIZE`.
 
 ## Storage local
 
