@@ -60,7 +60,8 @@ Ejemplo de payload para crear boleto:
 ```json
 {
   "groupId": "grp_123",
-  "drawId": "draw_123",
+  "drawType": "PRIMITIVA",
+  "drawDate": "2026-01-30",
   "priceCents": 1200,
   "notes": "Boleto compartido",
   "lines": [

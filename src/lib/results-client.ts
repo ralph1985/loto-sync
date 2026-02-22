@@ -25,15 +25,39 @@ const GAME_MAP: Record<DrawType, string> = {
   EUROMILLONES: 'euromillones'
 }
 
-const normalizeResult = (game: DrawType, payload: any): NormalizedResult => {
-  const data = payload?.data ?? payload
-  const drawDate = data?.date ?? data?.drawDate
+type RawResultPayload = {
+  data?: {
+    date?: string
+    drawDate?: string
+    numbers?: unknown[]
+    stars?: unknown[]
+  }
+  date?: string
+  drawDate?: string
+  numbers?: unknown[]
+  stars?: unknown[]
+}
+
+const normalizeResult = (
+  game: DrawType,
+  payload: RawResultPayload
+): NormalizedResult => {
+  const data = payload.data ?? payload
+  const drawDateRaw = data.date ?? data.drawDate
+  const drawDate =
+    typeof drawDateRaw === 'string' ? drawDateRaw : new Date().toISOString()
+  const numbers = Array.isArray(data.numbers)
+    ? data.numbers.filter((value): value is number => typeof value === 'number')
+    : []
+  const stars = Array.isArray(data.stars)
+    ? data.stars.filter((value): value is number => typeof value === 'number')
+    : []
 
   return {
     game,
     drawDate,
-    numbers: data?.numbers ?? [],
-    stars: data?.stars ?? undefined,
+    numbers,
+    stars: stars.length > 0 ? stars : undefined,
     source: 'loteriasapi'
   }
 }

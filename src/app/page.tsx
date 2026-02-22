@@ -237,8 +237,8 @@ const TicketDetailModal = ({
 
 export default function Home() {
   const [drawType, setDrawType] = useState<DrawType>("PRIMITIVA");
+  const [drawDate, setDrawDate] = useState<string>("");
   const [groupId, setGroupId] = useState<string>("");
-  const [drawId, setDrawId] = useState<string>("");
   const [lines, setLines] = useState<LineState[]>([createEmptyLine()]);
   const [notes, setNotes] = useState<string>("");
   const [receipt, setReceipt] = useState<File | null>(null);
@@ -247,7 +247,6 @@ export default function Home() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [groups, setGroups] = useState<Group[]>([]);
-  const [draws, setDraws] = useState<Draw[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -264,22 +263,16 @@ export default function Home() {
       setLoadError(null);
 
       try {
-        const [groupsResponse, drawsResponse] = await Promise.all([
-          fetch("/api/groups"),
-          fetch("/api/draws"),
-        ]);
-
-        if (!groupsResponse.ok || !drawsResponse.ok) {
+        const groupsResponse = await fetch("/api/groups");
+        if (!groupsResponse.ok) {
           throw new Error("No se pudieron cargar los datos iniciales.");
         }
 
         const groupsPayload = await groupsResponse.json();
-        const drawsPayload = await drawsResponse.json();
 
         if (!isActive) return;
 
         setGroups(groupsPayload.data ?? []);
-        setDraws(drawsPayload.data ?? []);
       } catch (error) {
         if (!isActive) return;
         setLoadError(
@@ -337,21 +330,14 @@ export default function Home() {
     };
   }, []);
 
-  useEffect(() => {
-    const draw = draws.find((item) => item.id === drawId);
-    if (draw && draw.type !== drawType) {
-      setDrawType(draw.type);
-    }
-  }, [drawId, drawType, draws]);
-
   const validation = useMemo(() => {
     const issues: string[] = [];
 
     if (!groupId) {
       issues.push("Selecciona un grupo.");
     }
-    if (!drawId) {
-      issues.push("Selecciona el sorteo.");
+    if (!drawDate) {
+      issues.push("Selecciona la fecha del sorteo.");
     }
 
     if (receipt && !receipt.type.startsWith("image/")) {
@@ -417,7 +403,7 @@ export default function Home() {
         issues.length === 0 &&
         lineResults.every((line) => line.issues.length === 0),
     };
-  }, [drawId, drawType, groupId, lines, receipt]);
+  }, [drawDate, drawType, groupId, lines, receipt]);
 
   const handleLineChange = (index: number, patch: Partial<LineState>) => {
     setLines((current) =>
@@ -447,7 +433,8 @@ export default function Home() {
         },
         body: JSON.stringify({
           groupId,
-          drawId,
+          drawType,
+          drawDate,
           notes: notes.trim() || undefined,
           lines: lines.map((line) => ({
             mainNumbers: toIntArray(line.mainInput),
@@ -515,8 +502,15 @@ export default function Home() {
     }
   };
 
-  const selectedDraw = drawId ? draws.find((item) => item.id === drawId) : null;
-  const selectedDrawType = selectedDraw?.type ?? drawType;
+  const selectedDraw: Draw | null = drawDate
+    ? {
+        id: `${drawType}-${drawDate}`,
+        type: drawType,
+        drawDate,
+        label: `${DRAW_TYPES.find((item) => item.id === drawType)?.label ?? "Sorteo"} · ${formatDate(drawDate)}`,
+      }
+    : null;
+  const selectedDrawType = drawType;
   const latestTickets = tickets.slice(0, 5);
 
   const handleCopy = async (ticket: Ticket) => {
@@ -597,32 +591,18 @@ export default function Home() {
                     Sorteo
                   </label>
                   <select
-                    value={drawId}
-                    onChange={(event) => setDrawId(event.target.value)}
-                    disabled={loadingData || !!loadError}
-                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none disabled:opacity-60"
+                    value={drawType}
+                    onChange={(event) => setDrawType(event.target.value as DrawType)}
+                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
                   >
-                    <option value="">
-                      {loadingData ? "Cargando..." : "Selecciona sorteo"}
-                    </option>
-                    {draws.map((draw) => {
-                      const drawLabel =
-                        draw.label ??
-                        `${DRAW_TYPES.find((item) => item.id === draw.type)?.label ?? "Sorteo"} · ${new Date(
-                          draw.drawDate
-                        ).toLocaleDateString("es-ES")}`;
-                      return (
-                        <option key={draw.id} value={draw.id}>
-                          {drawLabel}
-                        </option>
-                      );
-                    })}
+                    {DRAW_TYPES.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.label}
+                      </option>
+                    ))}
                   </select>
                   <div className="text-xs text-slate-500">
-                    {selectedDraw
-                      ? DRAW_TYPES.find((item) => item.id === selectedDraw.type)
-                          ?.description
-                      : "Selecciona un sorteo para ver sus reglas."}
+                    {DRAW_TYPES.find((item) => item.id === drawType)?.description}
                   </div>
                 </div>
 
@@ -649,16 +629,13 @@ export default function Home() {
 
                 <div className="flex flex-col gap-2">
                   <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Tipo de sorteo
+                    Fecha sorteo
                   </label>
                   <input
-                    type="text"
-                    value={
-                      DRAW_TYPES.find((item) => item.id === selectedDrawType)
-                        ?.label ?? "Sin definir"
-                    }
-                    readOnly
-                    className="rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm text-slate-700 focus:outline-none"
+                    type="date"
+                    value={drawDate}
+                    onChange={(event) => setDrawDate(event.target.value)}
+                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
                   />
                 </div>
               </div>
