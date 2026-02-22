@@ -281,6 +281,7 @@ export default function ReviewPage() {
           ) : (
             filteredTickets.map((ticket) => {
               const lineCount = ticket.lines?.length ?? 0;
+              const hasReceipt = Boolean(ticket.receipt?.blobUrl);
               const firstLine = ticket.lines?.[0];
               const mainNumbers = firstLine
                 ? firstLine.numbers
@@ -310,6 +311,19 @@ export default function ReviewPage() {
                       <p className="text-sm text-slate-500">
                         {formatDateTime(ticket.createdAt)} · {lineCount} linea(s)
                       </p>
+                      <div className="mt-2">
+                        <span
+                          className={`inline-flex rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ${
+                            hasReceipt
+                              ? "bg-emerald-100 text-emerald-700"
+                              : "bg-amber-100 text-amber-700"
+                          }`}
+                        >
+                          {hasReceipt
+                            ? "Con resguardo adjunto"
+                            : "Sin resguardo adjunto"}
+                        </span>
+                      </div>
                       <div className="mt-3 flex flex-wrap gap-2">
                         {mainNumbers.length > 0 ? (
                           mainNumbers.map((value, index) => (
