@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { prisma } from '@/lib/prisma'
-import { fetchLatestResult } from '@/lib/results-client'
+import { fetchResultForDrawDate } from '@/lib/results-client'
 
 const toDateOnly = (value: string) => new Date(value).toISOString().slice(0, 10)
 
@@ -34,17 +34,29 @@ export async function GET(request: Request) {
   }
 
   try {
-    const result = await fetchLatestResult(ticket.draw.type)
     const ticketDrawDate = ticket.draw.drawDate
       ? toDateOnly(ticket.draw.drawDate.toISOString())
       : null
+    const result = ticketDrawDate
+      ? await fetchResultForDrawDate(ticket.draw.type, ticketDrawDate)
+      : await fetchResultForDrawDate(ticket.draw.type, new Date().toISOString().slice(0, 10))
     const resultDrawDate = result.drawDate ? toDateOnly(result.drawDate) : null
 
     if (!ticketDrawDate || ticketDrawDate !== resultDrawDate) {
       return NextResponse.json({
         data: {
           status: 'PENDIENTE',
-          reason: 'El resultado aun no coincide con la fecha del sorteo.',
+          reason: `El resultado recibido (${resultDrawDate ?? 'sin fecha'}) no coincide con la fecha del sorteo (${ticketDrawDate ?? 'sin fecha'}).`,
+          result
+        }
+      })
+    }
+
+    if (!result.numbers || result.numbers.length === 0) {
+      return NextResponse.json({
+        data: {
+          status: 'PENDIENTE',
+          reason: 'No hay combinacion disponible para esa fecha en la API de resultados.',
           result
         }
       })
