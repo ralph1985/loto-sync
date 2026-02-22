@@ -447,7 +447,6 @@ export default function ReviewPage() {
               const stars = getStarNumbers(firstLine);
               const reintegro = firstLine?.reintegro ?? null;
               const checksSorted = sortChecksByDate(ticket.checks);
-              const latestCheck = checksSorted.at(-1) ?? null;
               const totalPrizeCents = checksSorted.reduce(
                 (sum, check) => sum + (check.prizeCents ?? 0),
                 0
@@ -495,27 +494,13 @@ export default function ReviewPage() {
                         </p>
                       </div>
 
-                      <div className="grid gap-2 sm:grid-cols-3">
+                      <div className="grid gap-2 sm:grid-cols-2">
                         <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
                           <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                             Precio
                           </p>
                           <p className="text-sm font-semibold text-slate-900">
                             {formatPrice(ticket.priceCents)}
-                          </p>
-                        </div>
-                        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
-                          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                            Último acierto
-                          </p>
-                          <p className="text-sm font-semibold text-slate-900">
-                            {latestCheck
-                              ? `${latestCheck.matchesMain}${
-                                  latestCheck.matchesStars
-                                    ? ` + ${latestCheck.matchesStars}*`
-                                    : ""
-                                }`
-                              : "Sin comprobar"}
                           </p>
                         </div>
                         <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
