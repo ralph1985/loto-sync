@@ -451,6 +451,10 @@ export default function ReviewPage() {
                 (a, b) => new Date(a.drawDate).getTime() - new Date(b.drawDate).getTime()
               );
               const latestCheck = checksSorted[checksSorted.length - 1] ?? null;
+              const totalPrizeCents = checksSorted.reduce(
+                (sum, check) => sum + (check.prizeCents ?? 0),
+                0
+              );
               return (
                 <div
                   key={ticket.id}
@@ -500,9 +504,9 @@ export default function ReviewPage() {
                               Sin comprobar
                             </span>
                           )}
-                          {(latestCheck?.prizeCents ?? 0) > 0 ? (
+                          {totalPrizeCents > 0 ? (
                             <span className="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
-                              Premio {formatPrice(latestCheck?.prizeCents ?? null)}
+                              Premio {formatPrice(totalPrizeCents)}
                             </span>
                           ) : null}
                         </div>
@@ -689,6 +693,9 @@ export default function ReviewPage() {
                             >
                               {formatDrawChip(check.drawDate)} · {check.matchesMain}
                               {check.matchesStars ? `+${check.matchesStars}*` : ""}
+                              {(check.prizeCents ?? 0) > 0
+                                ? ` · ${formatPrice(check.prizeCents ?? null)}`
+                                : ""}
                             </span>
                           ))
                         ) : ticket.draw?.drawDate ? (
