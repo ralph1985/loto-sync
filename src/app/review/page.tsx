@@ -108,6 +108,17 @@ const formatDate = (value?: string | null) => {
   return new Date(value).toLocaleDateString("es-ES");
 };
 
+const formatDrawChip = (value?: string | null) => {
+  if (!value) return "Sin fecha";
+  const date = new Date(value);
+  const weekday = date.toLocaleDateString("es-ES", { weekday: "short" });
+  const day = date.toLocaleDateString("es-ES", {
+    day: "2-digit",
+    month: "2-digit",
+  });
+  return `${weekday.replace(".", "")} ${day}`;
+};
+
 const formatDateTime = (value?: string | null) => {
   if (!value) return "Sin fecha";
   return new Date(value).toLocaleString("es-ES");
@@ -422,6 +433,17 @@ export default function ReviewPage() {
                 : [];
               const reintegro = firstLine?.reintegro ?? null;
               const latestCheck = ticket.checks?.[0] ?? null;
+              const applicableDraws =
+                (ticket.checks ?? [])
+                  .map((check) => check.drawDate)
+                  .sort((a, b) => new Date(a).getTime() - new Date(b).getTime()) ??
+                [];
+              const drawDatesToShow =
+                applicableDraws.length > 0
+                  ? applicableDraws
+                  : ticket.draw?.drawDate
+                  ? [ticket.draw.drawDate]
+                  : [];
               return (
                 <div
                   key={ticket.id}
@@ -508,6 +530,16 @@ export default function ReviewPage() {
                             R {reintegro ?? "-"}
                           </span>
                         ) : null}
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {drawDatesToShow.map((drawDate) => (
+                          <span
+                            key={`${ticket.id}-draw-${drawDate}`}
+                            className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-700"
+                          >
+                            {formatDrawChip(drawDate)}
+                          </span>
+                        ))}
                       </div>
                     </div>
                     <button
