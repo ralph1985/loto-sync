@@ -421,6 +421,7 @@ export default function ReviewPage() {
                     .map((number) => number.value)
                 : [];
               const reintegro = firstLine?.reintegro ?? null;
+              const latestCheck = ticket.checks?.[0] ?? null;
               return (
                 <div
                   key={ticket.id}
@@ -446,17 +447,36 @@ export default function ReviewPage() {
                           : ""}
                       </p>
                       <div className="mt-2">
-                        <span
-                          className={`inline-flex rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ${
-                            hasReceipt
-                              ? "bg-emerald-100 text-emerald-700"
-                              : "bg-amber-100 text-amber-700"
-                          }`}
-                        >
-                          {hasReceipt
-                            ? "Con resguardo adjunto"
-                            : "Sin resguardo adjunto"}
-                        </span>
+                        <div className="flex flex-wrap gap-2">
+                          <span
+                            className={`inline-flex rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ${
+                              hasReceipt
+                                ? "bg-emerald-100 text-emerald-700"
+                                : "bg-amber-100 text-amber-700"
+                            }`}
+                          >
+                            {hasReceipt
+                              ? "Con resguardo adjunto"
+                              : "Sin resguardo adjunto"}
+                          </span>
+                          {latestCheck ? (
+                            <span className="inline-flex rounded-full bg-sky-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-sky-700">
+                              Aciertos {latestCheck.matchesMain}
+                              {latestCheck.matchesStars
+                                ? ` + ${latestCheck.matchesStars}*`
+                                : ""}
+                            </span>
+                          ) : (
+                            <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+                              Sin comprobar
+                            </span>
+                          )}
+                          {(latestCheck?.prizeCents ?? 0) > 0 ? (
+                            <span className="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
+                              Premio {formatPrice(latestCheck?.prizeCents ?? null)}
+                            </span>
+                          ) : null}
+                        </div>
                       </div>
                       <div className="mt-3 flex flex-wrap gap-2">
                         {mainNumbers.length > 0 ? (
