@@ -1,6 +1,4 @@
 "use client";
-
-import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -351,30 +349,18 @@ export default function ReviewPage() {
       </div>
 
       <main className="relative mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 pb-16 pt-8 md:px-10 md:pt-12">
-        <header className="flex flex-col gap-4 rounded-3xl border border-white/70 bg-white/85 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur md:flex-row md:items-center md:justify-between">
+        <header className="flex flex-col gap-2 rounded-3xl border border-white/70 bg-white/85 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur sm:p-6">
           <div className="space-y-2">
             <span className="inline-flex w-fit items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700">
               Revisión
             </span>
-            <h1 className="text-3xl font-semibold leading-tight text-slate-900 md:text-4xl">
+            <h1 className="text-2xl font-semibold leading-tight text-slate-900 sm:text-3xl md:text-4xl">
               Revisión de boletos por grupo
             </h1>
             <p className="max-w-2xl text-sm text-slate-600">
               Resumen compacto arriba y comparativas semanales desplegables por boleto.
             </p>
           </div>
-          <Link
-            className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold uppercase tracking-wide text-slate-700 transition hover:border-slate-400"
-            href="/"
-          >
-            Volver a alta
-          </Link>
-          <Link
-            className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold uppercase tracking-wide text-slate-700 transition hover:border-slate-400"
-            href="/results"
-          >
-            Alta resultado
-          </Link>
         </header>
 
         <section className="rounded-3xl border border-white/70 bg-white/90 p-5 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur">
@@ -478,7 +464,7 @@ export default function ReviewPage() {
               return (
                 <article
                   key={ticket.id}
-                  className={`rounded-3xl border bg-white/95 p-5 shadow-[0_16px_44px_rgba(15,23,42,0.08)] ${
+                  className={`rounded-3xl border bg-white/95 p-3 shadow-[0_16px_44px_rgba(15,23,42,0.08)] sm:p-4 ${
                     isActiveTicket ? "border-emerald-300" : "border-white/70"
                   }`}
                 >
@@ -543,7 +529,7 @@ export default function ReviewPage() {
                         </div>
                       </div>
 
-                      <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                      <div className="rounded-2xl border border-slate-200 bg-white p-2.5 sm:p-3">
                         <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                           Números apostados
                         </p>
@@ -576,7 +562,7 @@ export default function ReviewPage() {
                         </div>
                       </div>
 
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-2.5 sm:p-3">
                         <button
                           type="button"
                           onClick={() =>
@@ -616,7 +602,7 @@ export default function ReviewPage() {
                               return (
                                 <div
                                   key={`${ticket.id}-cmp-${check.id}`}
-                                  className="rounded-xl border border-slate-200 bg-white p-3"
+                                  className="rounded-xl border border-slate-200 bg-white p-2.5 sm:p-3"
                                 >
                                   <div className="mb-2 flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600">
                                     <span>{formatDrawChip(check.drawDate)}</span>
@@ -750,7 +736,7 @@ export default function ReviewPage() {
                           setVerifyResult(null);
                           setVerifyError(null);
                         }}
-                        className="rounded-full border border-slate-200 bg-white px-5 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
+                        className="rounded-full border border-slate-200 bg-white px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
                       >
                         Ver detalle
                       </button>

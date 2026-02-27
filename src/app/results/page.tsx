@@ -1,6 +1,4 @@
 "use client";
-
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 const parseNumbers = (value: string) =>
@@ -39,6 +37,7 @@ type StoredResult = {
 };
 
 export default function ResultsPage() {
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [gameFilter, setGameFilter] = useState<"ALL" | "PRIMITIVA" | "EUROMILLONES">(
     "ALL"
   );
@@ -210,157 +209,28 @@ export default function ResultsPage() {
   return (
     <div className="relative bg-[#f7f2ea] text-slate-900">
       <main className="relative mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 pb-24 pt-10 md:px-10 md:pt-14">
-        <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold text-slate-900">
-              Alta manual de resultado
-            </h1>
+            <h1 className="text-3xl font-semibold text-slate-900">Resultados guardados</h1>
             <p className="text-sm text-slate-600">
-              Registra un sorteo de Primitiva en la base local.
+              Historico de sorteos cargados.
             </p>
           </div>
-          <div className="flex gap-2">
-            <Link
-              href="/review"
-              className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600"
-            >
-              Ir a review
-            </Link>
-            <Link
-              href="/"
-              className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600"
-            >
-              Ir a alta
-            </Link>
-          </div>
+          <button
+            type="button"
+            onClick={() => setShowCreateModal(true)}
+            className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600"
+          >
+            Alta manual
+          </button>
         </header>
 
         <section className="rounded-3xl border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.08)]">
-          <form
-            className="flex flex-col gap-4"
-            onSubmit={async (event) => {
-              event.preventDefault();
-              setError(null);
-              setSuccess(null);
-              if (!validation.isValid || saving) return;
-
-              setSaving(true);
-              try {
-                const response = await fetch("/api/results/import", {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                  },
-                  body: JSON.stringify(validation.payload),
-                });
-                const payload = await response.json();
-                if (!response.ok) {
-                  const issues = Array.isArray(payload?.issues)
-                    ? payload.issues.join(" ")
-                    : payload?.error;
-                  throw new Error(issues || "No se pudo guardar el resultado.");
-                }
-
-                setSuccess("Resultado guardado correctamente.");
-                setDrawDate("");
-                setNumbersInput("");
-                setComplementarioInput("");
-                setReintegroInput("");
-                await loadStoredResults();
-              } catch (submitError) {
-                setError(
-                  submitError instanceof Error
-                    ? submitError.message
-                    : "No se pudo guardar el resultado."
-                );
-              } finally {
-                setSaving(false);
-              }
-            }}
-          >
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Fecha sorteo
-                </label>
-                <input
-                  type="date"
-                  value={drawDate}
-                  onChange={(event) => setDrawDate(event.target.value)}
-                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm"
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Números (6)
-                </label>
-                <input
-                  value={numbersInput}
-                  onChange={(event) => setNumbersInput(event.target.value)}
-                  placeholder="Ej: 4 7 8 22 40 49"
-                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm"
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Complementario
-                </label>
-                <input
-                  value={complementarioInput}
-                  onChange={(event) => setComplementarioInput(event.target.value)}
-                  placeholder="Ej: 44"
-                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm"
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Reintegro
-                </label>
-                <input
-                  value={reintegroInput}
-                  onChange={(event) => setReintegroInput(event.target.value)}
-                  placeholder="Ej: 2"
-                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm"
-                />
-              </div>
+          {success ? (
+            <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+              {success}
             </div>
-
-            {validation.issues.length > 0 ? (
-              <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700">
-                {validation.issues.map((issue, index) => (
-                  <p key={index}>{issue}</p>
-                ))}
-              </div>
-            ) : null}
-
-            {error ? (
-              <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                {error}
-              </div>
-            ) : null}
-            {success ? (
-              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-                {success}
-              </div>
-            ) : null}
-
-            <div className="flex justify-end">
-              <button
-                type="submit"
-                disabled={!validation.isValid || saving}
-                className={`rounded-full px-6 py-3 text-sm font-semibold uppercase tracking-wide ${
-                  validation.isValid && !saving
-                    ? "bg-slate-900 text-white"
-                    : "cursor-not-allowed bg-slate-200 text-slate-500"
-                }`}
-              >
-                {saving ? "Guardando..." : "Guardar resultado"}
-              </button>
-            </div>
-          </form>
-        </section>
-
-        <section className="rounded-3xl border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.08)]">
+          ) : null}
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-lg font-semibold text-slate-900">Resultados guardados</h2>
             <div className="flex flex-wrap items-center gap-2">
@@ -468,6 +338,148 @@ export default function ResultsPage() {
           )}
         </section>
       </main>
+
+      {showCreateModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+            onClick={() => setShowCreateModal(false)}
+          />
+          <section className="relative z-10 w-full max-w-2xl rounded-3xl border border-slate-200 bg-white p-4 shadow-[0_30px_80px_rgba(15,23,42,0.35)] sm:p-6">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">Alta manual</h2>
+                <p className="text-sm text-slate-500">Primitiva (lunes, jueves o sábado).</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCreateModal(false)}
+                className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600"
+              >
+                Cerrar
+              </button>
+            </div>
+
+            <form
+              className="flex flex-col gap-4"
+              onSubmit={async (event) => {
+                event.preventDefault();
+                setError(null);
+                setSuccess(null);
+                if (!validation.isValid || saving) return;
+
+                setSaving(true);
+                try {
+                  const response = await fetch("/api/results/import", {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify(validation.payload),
+                  });
+                  const payload = await response.json();
+                  if (!response.ok) {
+                    const issues = Array.isArray(payload?.issues)
+                      ? payload.issues.join(" ")
+                      : payload?.error;
+                    throw new Error(issues || "No se pudo guardar el resultado.");
+                  }
+
+                  setSuccess("Resultado guardado correctamente.");
+                  setDrawDate("");
+                  setNumbersInput("");
+                  setComplementarioInput("");
+                  setReintegroInput("");
+                  setShowCreateModal(false);
+                  await loadStoredResults();
+                } catch (submitError) {
+                  setError(
+                    submitError instanceof Error
+                      ? submitError.message
+                      : "No se pudo guardar el resultado."
+                  );
+                } finally {
+                  setSaving(false);
+                }
+              }}
+            >
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Fecha sorteo
+                  </label>
+                  <input
+                    type="date"
+                    value={drawDate}
+                    onChange={(event) => setDrawDate(event.target.value)}
+                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Números (6)
+                  </label>
+                  <input
+                    value={numbersInput}
+                    onChange={(event) => setNumbersInput(event.target.value)}
+                    placeholder="Ej: 4 7 8 22 40 49"
+                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Complementario
+                  </label>
+                  <input
+                    value={complementarioInput}
+                    onChange={(event) => setComplementarioInput(event.target.value)}
+                    placeholder="Ej: 44"
+                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Reintegro
+                  </label>
+                  <input
+                    value={reintegroInput}
+                    onChange={(event) => setReintegroInput(event.target.value)}
+                    placeholder="Ej: 2"
+                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm"
+                  />
+                </div>
+              </div>
+
+              {validation.issues.length > 0 ? (
+                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700">
+                  {validation.issues.map((issue, index) => (
+                    <p key={index}>{issue}</p>
+                  ))}
+                </div>
+              ) : null}
+              {error ? (
+                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                  {error}
+                </div>
+              ) : null}
+
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={!validation.isValid || saving}
+                  className={`rounded-full px-6 py-3 text-sm font-semibold uppercase tracking-wide ${
+                    validation.isValid && !saving
+                      ? "bg-slate-900 text-white"
+                      : "cursor-not-allowed bg-slate-200 text-slate-500"
+                  }`}
+                >
+                  {saving ? "Guardando..." : "Guardar resultado"}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      ) : null}
     </div>
   );
 }
