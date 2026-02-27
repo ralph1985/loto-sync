@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 
+import { ApiAuthError, requireSessionUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 type DrawType = 'PRIMITIVA' | 'EUROMILLONES'
@@ -83,37 +84,45 @@ const parsePayload = (payload: unknown) => {
 }
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url)
-  const gameParam = searchParams.get('game')
-  const game = gameParam ? normalizeGame(gameParam) : null
-  if (gameParam && !game) {
-    return NextResponse.json(
-      { error: 'game debe ser PRIMITIVA o EUROMILLONES.' },
-      { status: 400 }
-    )
-  }
-
-  const cacheEntries = await prisma.resultCache.findMany({
-    where: game ? { game } : undefined,
-    orderBy: [{ drawDate: 'desc' }, { fetchedAt: 'desc' }],
-    take: 200
-  })
-
-  const data = cacheEntries.map((entry) => {
-    const parsed = parsePayload(entry.payload)
-    return {
-      id: entry.id,
-      game: entry.game,
-      drawDate:
-        parsed.drawDate ??
-        (entry.drawDate ? entry.drawDate.toISOString().slice(0, 10) : null),
-      numbers: parsed.numbers,
-      stars: parsed.stars,
-      complementario: parsed.complementario,
-      reintegro: parsed.reintegro,
-      fetchedAt: entry.fetchedAt.toISOString()
+  try {
+    await requireSessionUser()
+    const { searchParams } = new URL(request.url)
+    const gameParam = searchParams.get('game')
+    const game = gameParam ? normalizeGame(gameParam) : null
+    if (gameParam && !game) {
+      return NextResponse.json(
+        { error: 'game debe ser PRIMITIVA o EUROMILLONES.' },
+        { status: 400 }
+      )
     }
-  })
 
-  return NextResponse.json({ data })
+    const cacheEntries = await prisma.resultCache.findMany({
+      where: game ? { game } : undefined,
+      orderBy: [{ drawDate: 'desc' }, { fetchedAt: 'desc' }],
+      take: 200
+    })
+
+    const data = cacheEntries.map((entry) => {
+      const parsed = parsePayload(entry.payload)
+      return {
+        id: entry.id,
+        game: entry.game,
+        drawDate:
+          parsed.drawDate ??
+          (entry.drawDate ? entry.drawDate.toISOString().slice(0, 10) : null),
+        numbers: parsed.numbers,
+        stars: parsed.stars,
+        complementario: parsed.complementario,
+        reintegro: parsed.reintegro,
+        fetchedAt: entry.fetchedAt.toISOString()
+      }
+    })
+
+    return NextResponse.json({ data })
+  } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status })
+    }
+    return NextResponse.json({ error: 'No se pudieron cargar resultados.' }, { status: 500 })
+  }
 }

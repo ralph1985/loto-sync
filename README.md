@@ -51,7 +51,12 @@ node prisma/backfill-group-movements.js
 
 Endpoints disponibles:
 
+- `POST /api/auth/login` (login con `name` + `password`)
+- `GET/DELETE /api/auth/session` (sesion de usuario actual / logout)
+- `GET/POST /api/users` (listar/crear usuarios, API interna)
 - `GET /api/groups`
+- `GET/POST /api/groups/:groupId/members`
+- `GET/POST /api/groups/:groupId/invitations`
 - `GET /api/draws`
 - `GET /api/tickets`
 - `POST /api/tickets`
@@ -64,6 +69,12 @@ Endpoints disponibles:
 - `POST /api/results/prize` (manual: `ticketId`, `drawDate` opcional, `prizeCents`)
 
 `GET /api/groups` incluye `balanceCents` calculado por grupo.
+
+Gestion de usuarios (local):
+
+- La app exige login para acceder a cualquier pantalla de negocio (`/login` publico).
+- Las contraseñas se guardan como hash MD5 (solo para entorno local de este proyecto).
+- No hay alta de usuarios desde el frontal de la app.
 
 Ejemplo de payload para crear boleto:
 

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 
+import { ApiAuthError, requireGroupAccess, requireSessionUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { fetchResultForDrawDate } from '@/lib/results-client'
 
@@ -21,26 +22,29 @@ type Payload = {
 }
 
 export async function POST(request: Request) {
-  const payload = (await request.json()) as Payload
-  const ticketId = payload.ticketId?.trim()
-  if (!ticketId) {
-    return NextResponse.json({ error: 'ticketId es obligatorio.' }, { status: 400 })
-  }
-
-  const ticket = await prisma.ticket.findUnique({
-    where: { id: ticketId },
-    include: {
-      draw: true,
-      lines: {
-        include: { numbers: true }
-      },
-      checks: true
+  try {
+    const user = await requireSessionUser()
+    const payload = (await request.json()) as Payload
+    const ticketId = payload.ticketId?.trim()
+    if (!ticketId) {
+      return NextResponse.json({ error: 'ticketId es obligatorio.' }, { status: 400 })
     }
-  })
 
-  if (!ticket || !ticket.draw) {
-    return NextResponse.json({ error: 'ticketId no existe.' }, { status: 404 })
-  }
+    const ticket = await prisma.ticket.findUnique({
+      where: { id: ticketId },
+      include: {
+        draw: true,
+        lines: {
+          include: { numbers: true }
+        },
+        checks: true
+      },
+    })
+
+    if (!ticket || !ticket.draw) {
+      return NextResponse.json({ error: 'ticketId no existe.' }, { status: 404 })
+    }
+    await requireGroupAccess(user.id, ticket.groupId)
 
   const line = ticket.lines[0]
   const mainNumbers = line
@@ -58,10 +62,10 @@ export async function POST(request: Request) {
     ? ticket.checks.map((check) => toDateOnly(check.drawDate.toISOString()))
     : [toDateOnly(ticket.draw.drawDate.toISOString())]
 
-  let updated = 0
-  const details: Array<{ drawDate: string; status: string; matchesMain: number; matchesStars: number }> = []
+    let updated = 0
+    const details: Array<{ drawDate: string; status: string; matchesMain: number; matchesStars: number }> = []
 
-  for (const drawDate of dates) {
+    for (const drawDate of dates) {
     const parsedDrawDate = toDayStart(drawDate)
     const result = await fetchResultForDrawDate(ticket.draw.type, drawDate)
     const resultDrawDate = result.drawDate ? toDateOnly(result.drawDate) : null
@@ -125,31 +129,37 @@ export async function POST(request: Request) {
       })
     })
 
-    details.push({
-      drawDate,
-      status: hasValidResult ? 'COMPROBADO' : 'PENDIENTE',
-      matchesMain,
-      matchesStars
-    })
-    updated += 1
-  }
-
-  const checks = await prisma.ticketCheck.findMany({
-    where: { ticketId },
-    select: { prizeCents: true }
-  })
-  const nextStatus = computeTicketStatus(checks)
-  await prisma.ticket.update({
-    where: { id: ticketId },
-    data: { status: nextStatus }
-  })
-
-  return NextResponse.json({
-    data: {
-      ticketId,
-      updated,
-      ticketStatus: nextStatus,
-      details
+      details.push({
+        drawDate,
+        status: hasValidResult ? 'COMPROBADO' : 'PENDIENTE',
+        matchesMain,
+        matchesStars
+      })
+      updated += 1
     }
-  })
+
+    const checks = await prisma.ticketCheck.findMany({
+      where: { ticketId },
+      select: { prizeCents: true }
+    })
+    const nextStatus = computeTicketStatus(checks)
+    await prisma.ticket.update({
+      where: { id: ticketId },
+      data: { status: nextStatus }
+    })
+
+    return NextResponse.json({
+      data: {
+        ticketId,
+        updated,
+        ticketStatus: nextStatus,
+        details
+      }
+    })
+  } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status })
+    }
+    return NextResponse.json({ error: 'Error al recomprobar ticket.' }, { status: 500 })
+  }
 }

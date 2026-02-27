@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 
+import { ApiAuthError, requireGroupAccess, requireSessionUser } from '@/lib/auth'
+import { writeAuditLog } from '@/lib/audit'
 import { prisma } from '@/lib/prisma'
 
 const toDayStart = (value: string) => new Date(`${value}T00:00:00.000Z`)
@@ -25,43 +27,46 @@ type PrizePayload = {
 }
 
 export async function POST(request: Request) {
-  const payload = (await request.json()) as PrizePayload
-  const ticketId = payload.ticketId?.trim()
-  const drawDateValue = payload.drawDate?.trim()
-  const prizeCents = payload.prizeCents
+  try {
+    const actor = await requireSessionUser()
+    const payload = (await request.json()) as PrizePayload
+    const ticketId = payload.ticketId?.trim()
+    const drawDateValue = payload.drawDate?.trim()
+    const prizeCents = payload.prizeCents
 
-  if (!ticketId) {
-    return NextResponse.json({ error: 'ticketId es obligatorio.' }, { status: 400 })
-  }
-  if (prizeCents === undefined || !Number.isInteger(prizeCents) || prizeCents < 0) {
-    return NextResponse.json(
-      { error: 'prizeCents debe ser un entero mayor o igual que 0.' },
-      { status: 400 }
-    )
-  }
-
-  const ticket = await prisma.ticket.findUnique({
-    where: { id: ticketId },
-    include: {
-      draw: true
+    if (!ticketId) {
+      return NextResponse.json({ error: 'ticketId es obligatorio.' }, { status: 400 })
     }
-  })
+    if (prizeCents === undefined || !Number.isInteger(prizeCents) || prizeCents < 0) {
+      return NextResponse.json(
+        { error: 'prizeCents debe ser un entero mayor o igual que 0.' },
+        { status: 400 }
+      )
+    }
 
-  if (!ticket || !ticket.draw) {
-    return NextResponse.json({ error: 'ticketId no existe.' }, { status: 404 })
-  }
+    const ticket = await prisma.ticket.findUnique({
+      where: { id: ticketId },
+      include: {
+        draw: true
+      }
+    })
 
-  const drawDate = drawDateValue
-    ? toDayStart(drawDateValue)
-    : ticket.draw.drawDate
-      ? toDayStart(ticket.draw.drawDate.toISOString().slice(0, 10))
-      : null
+    if (!ticket || !ticket.draw) {
+      return NextResponse.json({ error: 'ticketId no existe.' }, { status: 404 })
+    }
+    await requireGroupAccess(actor.id, ticket.groupId)
 
-  if (!drawDate || Number.isNaN(drawDate.getTime())) {
-    return NextResponse.json({ error: 'drawDate no es valida.' }, { status: 400 })
-  }
+    const drawDate = drawDateValue
+      ? toDayStart(drawDateValue)
+      : ticket.draw.drawDate
+        ? toDayStart(ticket.draw.drawDate.toISOString().slice(0, 10))
+        : null
 
-  const data = await prisma.$transaction(async (tx) => {
+    if (!drawDate || Number.isNaN(drawDate.getTime())) {
+      return NextResponse.json({ error: 'drawDate no es valida.' }, { status: 400 })
+    }
+
+    const data = await prisma.$transaction(async (tx) => {
     const check = await tx.ticketCheck.upsert({
       where: {
         ticketId_drawDate: {
@@ -132,11 +137,28 @@ export async function POST(request: Request) {
       data: { status: nextStatus }
     })
 
-    return {
-      check,
-      ticketStatus: nextStatus
-    }
-  })
+      return {
+        check,
+        ticketStatus: nextStatus
+      }
+    })
 
-  return NextResponse.json({ data })
+    await writeAuditLog({
+      actorId: actor.id,
+      entityType: 'TICKET_CHECK',
+      entityId: data.check.id,
+      action: 'SET_PRIZE',
+      payload: {
+        ticketId,
+        prizeCents
+      }
+    })
+
+    return NextResponse.json({ data })
+  } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status })
+    }
+    return NextResponse.json({ error: 'Error al guardar premio.' }, { status: 500 })
+  }
 }

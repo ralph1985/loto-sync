@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 
+import { ApiAuthError, requireSessionUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import {
   fetchResultForDrawDate,
@@ -197,42 +198,50 @@ const syncChecksForImportedDate = async (
 }
 
 export async function POST(request: Request) {
-  const payload = (await request.json()) as ImportPayload
-  const game = normalizeGame(payload.game)
-  if (!game) {
-    return NextResponse.json(
-      { error: 'game debe ser PRIMITIVA o EUROMILLONES.' },
-      { status: 400 }
-    )
-  }
-
-  if (!Array.isArray(payload.results) || payload.results.length === 0) {
-    return NextResponse.json(
-      { error: 'results debe incluir al menos un sorteo.' },
-      { status: 400 }
-    )
-  }
-
-  const { issues, normalized } = validateResults(game, payload.results)
-  if (issues.length > 0) {
-    return NextResponse.json(
-      { error: 'Validacion fallida.', issues },
-      { status: 400 }
-    )
-  }
-
-  const imported = await importResults(game, normalized)
-  const uniqueDates = [...new Set(normalized.map((item) => item.date))]
-  let syncedChecks = 0
-  for (const date of uniqueDates) {
-    syncedChecks += await syncChecksForImportedDate(game, date)
-  }
-
-  return NextResponse.json({
-    data: {
-      game,
-      imported,
-      syncedChecks
+  try {
+    await requireSessionUser()
+    const payload = (await request.json()) as ImportPayload
+    const game = normalizeGame(payload.game)
+    if (!game) {
+      return NextResponse.json(
+        { error: 'game debe ser PRIMITIVA o EUROMILLONES.' },
+        { status: 400 }
+      )
     }
-  })
+
+    if (!Array.isArray(payload.results) || payload.results.length === 0) {
+      return NextResponse.json(
+        { error: 'results debe incluir al menos un sorteo.' },
+        { status: 400 }
+      )
+    }
+
+    const { issues, normalized } = validateResults(game, payload.results)
+    if (issues.length > 0) {
+      return NextResponse.json(
+        { error: 'Validacion fallida.', issues },
+        { status: 400 }
+      )
+    }
+
+    const imported = await importResults(game, normalized)
+    const uniqueDates = [...new Set(normalized.map((item) => item.date))]
+    let syncedChecks = 0
+    for (const date of uniqueDates) {
+      syncedChecks += await syncChecksForImportedDate(game, date)
+    }
+
+    return NextResponse.json({
+      data: {
+        game,
+        imported,
+        syncedChecks
+      }
+    })
+  } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status })
+    }
+    return NextResponse.json({ error: 'Error al importar resultados.' }, { status: 500 })
+  }
 }

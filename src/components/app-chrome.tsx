@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState, type ReactNode } from "react";
 
 type NavItem = {
   href: string;
@@ -23,10 +23,84 @@ const isItemActive = (pathname: string, href: string) => {
 };
 
 export function AppChrome({ children }: { children: ReactNode }) {
+  const router = useRouter();
   const pathname = usePathname();
+  const [session, setSession] = useState<{ id: string; name: string } | null>(null);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [userError, setUserError] = useState<string | null>(null);
+
+  const loadSession = async () => {
+    const response = await fetch("/api/auth/session");
+    if (!response.ok) {
+      if (response.status === 401) {
+        setSession(null);
+        return;
+      }
+      throw new Error("No se pudo cargar la sesión.");
+    }
+    const payload = await response.json();
+    setSession(payload.data ? { id: payload.data.id, name: payload.data.name } : null);
+  };
+
+  useEffect(() => {
+    if (pathname === "/login") return;
+    let isActive = true;
+    (async () => {
+      try {
+        await loadSession();
+      } catch {
+        if (!isActive) return;
+        setUserError("No se pudo inicializar la sesión.");
+      }
+    })();
+
+    return () => {
+      isActive = false;
+    };
+  }, [pathname]);
+
+  if (pathname === "/login") {
+    return <div className="min-h-screen">{children}</div>;
+  }
 
   return (
     <div className="min-h-screen">
+      <button
+        type="button"
+        onClick={() => setPanelOpen((current) => !current)}
+        className="fixed left-4 top-4 z-[100] rounded-full border border-slate-300 bg-white/90 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-700 shadow-[0_10px_30px_rgba(15,23,42,0.25)] backdrop-blur transition hover:border-slate-500"
+      >
+        {session ? session.name : "Usuario"}
+      </button>
+
+      {panelOpen ? (
+        <div className="fixed left-4 top-16 z-[100] w-[min(320px,calc(100vw-2rem))] rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_20px_50px_rgba(15,23,42,0.25)]">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            Sesión activa
+          </p>
+          <p className="mt-1 text-sm font-semibold text-slate-900">
+            {session?.name ?? "Sin sesión"}
+          </p>
+
+          <button
+            type="button"
+            onClick={async () => {
+              await fetch("/api/auth/session", { method: "DELETE" });
+              setPanelOpen(false);
+              router.replace("/login");
+              router.refresh();
+            }}
+            className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700"
+          >
+            Cerrar sesión
+          </button>
+
+          {userError ? (
+            <p className="mt-2 text-xs text-rose-600">{userError}</p>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className="pb-20">{children}</div>
 
       <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/95 px-2 py-2 backdrop-blur">

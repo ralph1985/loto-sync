@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 
+import { ApiAuthError, requireGroupAccess, requireSessionUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { fetchResultForDrawDate } from '@/lib/results-client'
 
@@ -21,35 +22,37 @@ const computeTicketStatus = (
 }
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url)
-  const ticketId = searchParams.get('ticketId')
-  const drawDateQuery = searchParams.get('drawDate')
-
-  if (!ticketId) {
-    return NextResponse.json(
-      { error: 'ticketId es obligatorio.' },
-      { status: 400 }
-    )
-  }
-
-  const ticket = await prisma.ticket.findUnique({
-    where: { id: ticketId },
-    include: {
-      draw: true,
-      lines: {
-        include: { numbers: true }
-      }
-    }
-  })
-
-  if (!ticket || !ticket.draw) {
-    return NextResponse.json(
-      { error: 'ticketId no existe o no tiene sorteo.' },
-      { status: 404 }
-    )
-  }
-
   try {
+    const user = await requireSessionUser()
+    const { searchParams } = new URL(request.url)
+    const ticketId = searchParams.get('ticketId')
+    const drawDateQuery = searchParams.get('drawDate')
+
+    if (!ticketId) {
+      return NextResponse.json(
+        { error: 'ticketId es obligatorio.' },
+        { status: 400 }
+      )
+    }
+
+    const ticket = await prisma.ticket.findUnique({
+      where: { id: ticketId },
+      include: {
+        draw: true,
+        lines: {
+          include: { numbers: true }
+        }
+      }
+    })
+
+    if (!ticket || !ticket.draw) {
+      return NextResponse.json(
+        { error: 'ticketId no existe o no tiene sorteo.' },
+        { status: 404 }
+      )
+    }
+    await requireGroupAccess(user.id, ticket.groupId)
+
     const ticketDrawDate = drawDateQuery
       ? toDateOnly(drawDateQuery)
       : ticket.draw.drawDate
@@ -172,6 +175,9 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ data: payload })
   } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status })
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Error al verificar.' },
       { status: 500 }

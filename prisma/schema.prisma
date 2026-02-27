@@ -29,13 +29,15 @@ enum LineNumberKind {
 }
 
 model Group {
-  id        String   @id @default(cuid())
-  name      String
-  kind      GroupKind?
-  tickets   Ticket[]
-  movements GroupMovement[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String            @id @default(cuid())
+  name        String
+  kind        GroupKind?
+  tickets     Ticket[]
+  movements   GroupMovement[]
+  members     GroupMember[]
+  invitations GroupInvitation[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
 }
 
 enum GroupMovementType {
@@ -44,6 +46,74 @@ enum GroupMovementType {
   CONTRIBUTION
   TICKET_EXPENSE
   PRIZE
+}
+
+enum GroupMemberRole {
+  OWNER
+  MEMBER
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+}
+
+model User {
+  id                  String            @id @default(cuid())
+  name                String            @unique
+  passwordHash        String
+  memberships         GroupMember[]
+  invitationsSent     GroupInvitation[] @relation("InvitationInviter")
+  invitationsReceived GroupInvitation[] @relation("InvitationInvitee")
+  auditLogs           AuditLog[]
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+}
+
+model GroupMember {
+  id        String          @id @default(cuid())
+  groupId   String
+  group     Group           @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      GroupMemberRole @default(MEMBER)
+  createdAt DateTime        @default(now())
+
+  @@unique([groupId, userId])
+  @@index([userId])
+}
+
+model GroupInvitation {
+  id        String           @id @default(cuid())
+  groupId   String
+  group     Group            @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  inviterId String
+  inviter   User             @relation("InvitationInviter", fields: [inviterId], references: [id], onDelete: Cascade)
+  inviteeId String?
+  invitee   User?            @relation("InvitationInvitee", fields: [inviteeId], references: [id], onDelete: SetNull)
+  role      GroupMemberRole  @default(MEMBER)
+  status    InvitationStatus @default(PENDING)
+  note      String?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@index([groupId, status])
+  @@index([inviteeId, status])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  entityType String
+  entityId   String
+  action     String
+  payload    Json?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId, createdAt])
+  @@index([actorId, createdAt])
 }
 
 model GroupMovement {

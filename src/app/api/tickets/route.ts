@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
 
+import { ApiAuthError, requireGroupAccess, requireSessionUser } from '@/lib/auth'
+import { writeAuditLog } from '@/lib/audit'
 import { prisma } from '@/lib/prisma'
 
 type TicketLineInput = {
@@ -164,22 +166,34 @@ const extractPrimitivaExtras = (payload: Prisma.JsonValue) => {
 }
 
 export async function GET() {
-  const tickets = await prisma.ticket.findMany({
-    orderBy: { createdAt: 'desc' },
-    include: {
-      group: true,
-      draw: true,
-      lines: {
-        include: {
-          numbers: true
+  try {
+    const user = await requireSessionUser()
+
+    const tickets = await prisma.ticket.findMany({
+      where: {
+        group: {
+          members: {
+            some: {
+              userId: user.id
+            }
+          }
         }
       },
-      receipt: true,
-      checks: {
-        orderBy: { drawDate: 'desc' }
+      orderBy: { createdAt: 'desc' },
+      include: {
+        group: true,
+        draw: true,
+        lines: {
+          include: {
+            numbers: true
+          }
+        },
+        receipt: true,
+        checks: {
+          orderBy: { drawDate: 'desc' }
+        }
       }
-    }
-  })
+    })
 
   const primitiveCheckDateSet = new Set<string>()
   tickets.forEach((ticket) => {
@@ -205,23 +219,31 @@ export async function GET() {
     primitiveCaches.map((cache) => [toDateKey(cache.drawDate as Date), extractPrimitivaExtras(cache.payload)])
   )
 
-  const enriched = tickets.map((ticket) => ({
-    ...ticket,
-    checks: ticket.checks.map((check) => {
-      const extras = ticket.draw?.type === 'PRIMITIVA' ? cacheByDate.get(toDateKey(check.drawDate)) : null
-      return {
-        ...check,
-        winningComplementario: extras?.complementario ?? null,
-        winningReintegro: extras?.reintegro ?? null
-      }
-    })
-  }))
+    const enriched = tickets.map((ticket) => ({
+      ...ticket,
+      checks: ticket.checks.map((check) => {
+        const extras = ticket.draw?.type === 'PRIMITIVA' ? cacheByDate.get(toDateKey(check.drawDate)) : null
+        return {
+          ...check,
+          winningComplementario: extras?.complementario ?? null,
+          winningReintegro: extras?.reintegro ?? null
+        }
+      })
+    }))
 
-  return NextResponse.json({ data: enriched })
+    return NextResponse.json({ data: enriched })
+  } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status })
+    }
+    return NextResponse.json({ error: 'No se pudieron cargar boletos.' }, { status: 500 })
+  }
 }
 
 export async function POST(request: Request) {
-  const payload = (await request.json()) as TicketInput
+  try {
+    const user = await requireSessionUser()
+    const payload = (await request.json()) as TicketInput
 
   let draw:
     | {
@@ -273,25 +295,26 @@ export async function POST(request: Request) {
     })
   }
 
-  const groupExists = await prisma.group.findUnique({
-    where: { id: payload.groupId }
-  })
-  if (!groupExists) {
-    return NextResponse.json(
-      { error: 'groupId no existe.' },
-      { status: 400 }
-    )
-  }
+    const groupExists = await prisma.group.findUnique({
+      where: { id: payload.groupId }
+    })
+    if (!groupExists) {
+      return NextResponse.json(
+        { error: 'groupId no existe.' },
+        { status: 400 }
+      )
+    }
+    await requireGroupAccess(user.id, payload.groupId)
 
-  const issues = validateTicket(payload, draw.type)
-  if (issues.length > 0) {
-    return NextResponse.json(
-      { error: 'Validacion fallida.', issues },
-      { status: 400 }
-    )
-  }
+    const issues = validateTicket(payload, draw.type)
+    if (issues.length > 0) {
+      return NextResponse.json(
+        { error: 'Validacion fallida.', issues },
+        { status: 400 }
+      )
+    }
 
-  const created = await prisma.$transaction(async (tx) => {
+    const created = await prisma.$transaction(async (tx) => {
     const ticket = await tx.ticket.create({
       data: {
         groupId: payload.groupId,
@@ -352,8 +375,28 @@ export async function POST(request: Request) {
       })
     }
 
-    return ticket
-  })
+      return ticket
+    })
 
-  return NextResponse.json({ data: created }, { status: 201 })
+    await writeAuditLog({
+      actorId: user.id,
+      entityType: 'TICKET',
+      entityId: created.id,
+      action: 'CREATE',
+      payload: {
+        groupId: payload.groupId,
+        drawType: draw.type
+      }
+    })
+
+    return NextResponse.json({ data: created }, { status: 201 })
+  } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status })
+    }
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'No se pudo guardar el boleto.' },
+      { status: 500 }
+    )
+  }
 }
