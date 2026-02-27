@@ -28,7 +28,16 @@ const normalizeGame = (value?: string) => {
 const isValidDate = (value: string) =>
   /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(new Date(`${value}T00:00:00.000Z`).getTime())
 
-const validateResults = (items: ImportPayload['results']) => {
+const isValidPrimitivaWeekday = (value: string) => {
+  const date = new Date(`${value}T00:00:00.000Z`)
+  const weekday = date.getUTCDay()
+  return weekday === 1 || weekday === 4 || weekday === 6
+}
+
+const validateResults = (
+  game: 'PRIMITIVA' | 'EUROMILLONES',
+  items: ImportPayload['results']
+) => {
   const issues: string[] = []
   const normalized: ImportResultInput[] = []
 
@@ -37,6 +46,10 @@ const validateResults = (items: ImportPayload['results']) => {
     const date = item?.date?.trim()
     if (!date || !isValidDate(date)) {
       issues.push(`${prefix}.date no es valida (YYYY-MM-DD).`)
+      return
+    }
+    if (game === 'PRIMITIVA' && !isValidPrimitivaWeekday(date)) {
+      issues.push(`${prefix}.date debe caer en lunes, jueves o sabado.`)
       return
     }
 
@@ -200,7 +213,7 @@ export async function POST(request: Request) {
     )
   }
 
-  const { issues, normalized } = validateResults(payload.results)
+  const { issues, normalized } = validateResults(game, payload.results)
   if (issues.length > 0) {
     return NextResponse.json(
       { error: 'Validacion fallida.', issues },

@@ -20,6 +20,13 @@ const toIsoDate = (value: Date) => {
   return `${year}-${month}-${day}`;
 };
 
+const isValidPrimitivaDrawDate = (value: string) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime())) return false;
+  return DRAW_WEEKDAYS.has(date.getUTCDay());
+};
+
 type StoredResult = {
   id: string;
   game: "PRIMITIVA" | "EUROMILLONES";
@@ -79,6 +86,8 @@ export default function ResultsPage() {
 
     if (!drawDate) {
       issues.push("La fecha del sorteo es obligatoria.");
+    } else if (!isValidPrimitivaDrawDate(drawDate)) {
+      issues.push("La fecha de Primitiva debe ser lunes, jueves o sábado.");
     }
     if (numbers.length !== 6) {
       issues.push("Debes indicar 6 números para Primitiva.");
