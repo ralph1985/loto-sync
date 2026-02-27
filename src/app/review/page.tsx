@@ -156,7 +156,7 @@ const buildDrawLabel = (draw?: Draw | null) => {
 
 const sortChecksByDate = (checks?: TicketCheck[]) =>
   [...(checks ?? [])].sort(
-    (a, b) => new Date(a.drawDate).getTime() - new Date(b.drawDate).getTime()
+    (a, b) => new Date(b.drawDate).getTime() - new Date(a.drawDate).getTime()
   );
 
 const getMainNumbers = (line?: TicketLine) =>
@@ -189,6 +189,7 @@ export default function ReviewPage() {
   const [groupFilter, setGroupFilter] = useState<string>("ALL");
   const [drawTypeFilter, setDrawTypeFilter] = useState<"ALL" | DrawType>("ALL");
   const [filtersHydrated, setFiltersHydrated] = useState(false);
+  const [expandedTickets, setExpandedTickets] = useState<Record<string, boolean>>({});
 
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
 
@@ -316,8 +317,21 @@ export default function ReviewPage() {
     return groups.find((group) => group.id === groupFilter)?.balanceCents ?? 0;
   }, [groupFilter, groups]);
 
+  const activeTicketId = useMemo(() => {
+    const pending = filteredTickets.find((ticket) => ticket.status === "PENDIENTE");
+    return pending?.id ?? filteredTickets[0]?.id ?? null;
+  }, [filteredTickets]);
+
+  useEffect(() => {
+    if (!activeTicketId) {
+      setExpandedTickets({});
+      return;
+    }
+    setExpandedTickets({ [activeTicketId]: true });
+  }, [activeTicketId]);
+
   const activeCheck: TicketCheck | null =
-    verifyResult?.check ?? sortChecksByDate(selectedTicket?.checks).at(-1) ?? null;
+    verifyResult?.check ?? sortChecksByDate(selectedTicket?.checks).at(0) ?? null;
 
   const winningMainNumbers = useMemo(
     () => new Set(toNumberArray(activeCheck?.winningNumbers)),
@@ -454,6 +468,8 @@ export default function ReviewPage() {
               const stars = getStarNumbers(firstLine);
               const reintegro = firstLine?.reintegro ?? null;
               const checksSorted = sortChecksByDate(ticket.checks);
+              const isComparativesExpanded = expandedTickets[ticket.id] ?? false;
+              const isActiveTicket = ticket.id === activeTicketId;
               const totalPrizeCents = checksSorted.reduce(
                 (sum, check) => sum + (check.prizeCents ?? 0),
                 0
@@ -462,7 +478,9 @@ export default function ReviewPage() {
               return (
                 <article
                   key={ticket.id}
-                  className="rounded-3xl border border-white/70 bg-white/95 p-5 shadow-[0_16px_44px_rgba(15,23,42,0.08)]"
+                  className={`rounded-3xl border bg-white/95 p-5 shadow-[0_16px_44px_rgba(15,23,42,0.08)] ${
+                    isActiveTicket ? "border-emerald-300" : "border-white/70"
+                  }`}
                 >
                   <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
                     <div className="space-y-3">
@@ -470,6 +488,11 @@ export default function ReviewPage() {
                         <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">
                           {ticket.group?.name ?? "Grupo"}
                         </span>
+                        {isActiveTicket ? (
+                          <span className="rounded-full bg-emerald-100 px-3 py-1 text-emerald-700">
+                            Activo
+                          </span>
+                        ) : null}
                         <span
                           className={`rounded-full px-3 py-1 ${
                             ticket.status === "PREMIO"
@@ -554,13 +577,33 @@ export default function ReviewPage() {
                       </div>
 
                       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                        <div className="mb-2 flex items-center justify-between">
-                          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setExpandedTickets((current) => ({
+                              ...current,
+                              [ticket.id]: !(current[ticket.id] ?? false),
+                            }))
+                          }
+                          className="mb-2 flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-left transition hover:border-slate-300 hover:bg-slate-50"
+                        >
+                          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
                             Comparativas semanales ({checksSorted.length})
-                          </p>
-                        </div>
+                          </span>
+                          <span className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500">
+                            {isComparativesExpanded ? "Plegar" : "Desplegar"}
+                            <span
+                              className={`inline-block transition-transform ${
+                                isComparativesExpanded ? "rotate-180" : ""
+                              }`}
+                              aria-hidden="true"
+                            >
+                              ▾
+                            </span>
+                          </span>
+                        </button>
 
-                        {checksSorted.length > 0 ? (
+                        {isComparativesExpanded && checksSorted.length > 0 ? (
                           <div className="space-y-2">
                             {checksSorted.map((check) => {
                               const winningMain = toNumberArray(check.winningNumbers);
@@ -693,9 +736,9 @@ export default function ReviewPage() {
                               );
                             })}
                           </div>
-                        ) : (
+                        ) : isComparativesExpanded ? (
                           <p className="text-xs text-slate-500">Sin comprobaciones todavía.</p>
-                        )}
+                        ) : null}
                       </div>
                     </div>
 
