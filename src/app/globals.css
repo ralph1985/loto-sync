@@ -51,6 +51,10 @@ html[data-theme="dark"] [class*="bg-slate-100"] {
   background-color: #1e293b !important;
 }
 
+html[data-theme="dark"] [class*="bg-slate-200"] {
+  background-color: #334155 !important;
+}
+
 html[data-theme="dark"] [class*="border-slate-100"],
 html[data-theme="dark"] [class*="border-slate-200"],
 html[data-theme="dark"] [class*="border-white"] {
@@ -65,12 +69,66 @@ html[data-theme="dark"] [class*="text-slate-700"] {
   color: #cbd5e1 !important;
 }
 
+html[data-theme="dark"] [class*="text-slate-800"] {
+  color: #e2e8f0 !important;
+}
+
 html[data-theme="dark"] [class*="text-slate-600"],
 html[data-theme="dark"] [class*="text-slate-500"] {
   color: #94a3b8 !important;
 }
 
 html[data-theme="dark"] [class*="text-slate-400"] {
+  color: #64748b !important;
+}
+
+html[data-theme="dark"] [class*="text-emerald-700"],
+html[data-theme="dark"] [class*="text-emerald-800"],
+html[data-theme="dark"] [class*="text-emerald-900"] {
+  color: #86efac !important;
+}
+
+html[data-theme="dark"] [class*="text-rose-700"] {
+  color: #fda4af !important;
+}
+
+html[data-theme="dark"] [class*="text-amber-700"],
+html[data-theme="dark"] [class*="text-amber-800"] {
+  color: #fcd34d !important;
+}
+
+html[data-theme="dark"] [class*="text-sky-700"] {
+  color: #7dd3fc !important;
+}
+
+html[data-theme="dark"] [class*="bg-emerald-50"],
+html[data-theme="dark"] [class*="bg-emerald-100"] {
+  background-color: #064e3b !important;
+}
+
+html[data-theme="dark"] [class*="bg-rose-50"] {
+  background-color: #4c0519 !important;
+}
+
+html[data-theme="dark"] [class*="bg-amber-50"],
+html[data-theme="dark"] [class*="bg-amber-100"] {
+  background-color: #451a03 !important;
+}
+
+html[data-theme="dark"] [class*="bg-sky-100"] {
+  background-color: #0c4a6e !important;
+}
+
+html[data-theme="dark"] input,
+html[data-theme="dark"] textarea,
+html[data-theme="dark"] select {
+  background-color: #0f172a !important;
+  color: #e2e8f0 !important;
+  border-color: #334155 !important;
+}
+
+html[data-theme="dark"] input::placeholder,
+html[data-theme="dark"] textarea::placeholder {
   color: #64748b !important;
 }
 
