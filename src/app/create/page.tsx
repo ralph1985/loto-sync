@@ -316,6 +316,13 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    if (loadingData) return;
+    if (groups.length === 1 && !groupId) {
+      setGroupId(groups[0].id);
+    }
+  }, [groupId, groups, loadingData]);
+
+  useEffect(() => {
     if (drawType !== "PRIMITIVA") {
       setPlaysJoker(false);
       setJokerNumber("");

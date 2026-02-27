@@ -300,6 +300,13 @@ export default function ReviewPage() {
     statusFilter,
   ]);
 
+  useEffect(() => {
+    if (!filtersHydrated) return;
+    if (groups.length === 1 && groupFilter === "ALL") {
+      setGroupFilter(groups[0].id);
+    }
+  }, [filtersHydrated, groupFilter, groups]);
+
   const filteredTickets = useMemo(() => {
     return tickets.filter((ticket) => {
       const statusOk = statusFilter === "ALL" || ticket.status === statusFilter;
