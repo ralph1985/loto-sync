@@ -4,6 +4,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 type DrawType = "PRIMITIVA" | "EUROMILLONES";
 type TicketStatus = "PENDIENTE" | "COMPROBADO" | "PREMIO";
+type MovementType =
+  | "OPENING"
+  | "ADJUSTMENT"
+  | "CONTRIBUTION"
+  | "TICKET_EXPENSE"
+  | "PRIZE";
 
 type Group = {
   id: string;
@@ -85,6 +91,15 @@ type VerifyResponse = {
   };
 };
 
+type GroupMovement = {
+  id: string;
+  type: MovementType;
+  amountCents: number;
+  occurredAt: string;
+  note?: string | null;
+  runningBalanceCents: number;
+};
+
 const STATUS_OPTIONS: { value: "ALL" | TicketStatus; label: string }[] = [
   { value: "ALL", label: "Todos" },
   { value: "PENDIENTE", label: "Pendiente" },
@@ -96,6 +111,15 @@ const DRAW_TYPE_OPTIONS: { value: "ALL" | DrawType; label: string }[] = [
   { value: "ALL", label: "Todos" },
   { value: "PRIMITIVA", label: "Primitiva" },
   { value: "EUROMILLONES", label: "Euromillones" },
+];
+
+const MOVEMENT_TYPE_OPTIONS: { value: "ALL" | MovementType; label: string }[] = [
+  { value: "ALL", label: "Todos" },
+  { value: "OPENING", label: "Saldo inicial" },
+  { value: "CONTRIBUTION", label: "Aportación" },
+  { value: "TICKET_EXPENSE", label: "Gasto boleto" },
+  { value: "PRIZE", label: "Premio" },
+  { value: "ADJUSTMENT", label: "Ajuste" },
 ];
 
 const DRAW_LABELS: Record<DrawType, string> = {
@@ -200,6 +224,13 @@ export default function ReviewPage() {
   const [manualPrizeInput, setManualPrizeInput] = useState<string>("");
   const [savingPrize, setSavingPrize] = useState(false);
   const [prizeError, setPrizeError] = useState<string | null>(null);
+  const [movementTypeFilter, setMovementTypeFilter] = useState<"ALL" | MovementType>(
+    "ALL"
+  );
+  const [groupMovements, setGroupMovements] = useState<GroupMovement[]>([]);
+  const [loadingMovements, setLoadingMovements] = useState(false);
+  const [movementsError, setMovementsError] = useState<string | null>(null);
+  const [showMovementsModal, setShowMovementsModal] = useState(false);
 
   const loadData = useCallback(async () => {
     const [ticketsResponse, groupsResponse] = await Promise.all([
@@ -322,6 +353,46 @@ export default function ReviewPage() {
     return groups.find((group) => group.id === groupFilter)?.balanceCents ?? 0;
   }, [groupFilter, groups]);
 
+  useEffect(() => {
+    if (groupFilter === "ALL") {
+      setGroupMovements([]);
+      setMovementsError(null);
+      setShowMovementsModal(false);
+      return;
+    }
+
+    let isActive = true;
+    const loadMovements = async () => {
+      setLoadingMovements(true);
+      setMovementsError(null);
+      try {
+        const query =
+          movementTypeFilter === "ALL" ? "" : `?type=${movementTypeFilter}`;
+        const response = await fetch(`/api/groups/${groupFilter}/movements${query}`);
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload?.error || "No se pudo cargar historial de bote.");
+        }
+        if (!isActive) return;
+        setGroupMovements(payload.data ?? []);
+      } catch (movementLoadError) {
+        if (!isActive) return;
+        setMovementsError(
+          movementLoadError instanceof Error
+            ? movementLoadError.message
+            : "No se pudo cargar historial de bote."
+        );
+      } finally {
+        if (isActive) setLoadingMovements(false);
+      }
+    };
+
+    loadMovements();
+    return () => {
+      isActive = false;
+    };
+  }, [groupFilter, movementTypeFilter, tickets]);
+
   const activeTicketId = useMemo(() => {
     const pending = filteredTickets.find((ticket) => ticket.status === "PENDIENTE");
     return pending?.id ?? filteredTickets[0]?.id ?? null;
@@ -437,6 +508,15 @@ export default function ReviewPage() {
                   ? "Selecciona grupo"
                   : formatPrice(selectedGroupBalanceCents)}
               </p>
+              {groupFilter !== "ALL" ? (
+                <button
+                  type="button"
+                  onClick={() => setShowMovementsModal(true)}
+                  className="mt-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600"
+                >
+                  Ver historial
+                </button>
+              ) : null}
             </div>
           </div>
         </section>
@@ -755,6 +835,102 @@ export default function ReviewPage() {
           )}
         </section>
       </main>
+
+      {showMovementsModal && groupFilter !== "ALL" ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-10">
+          <div
+            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+            onClick={() => setShowMovementsModal(false)}
+          />
+          <div className="relative w-full max-w-3xl rounded-3xl border border-slate-200 bg-white p-4 shadow-[0_30px_80px_rgba(15,23,42,0.35)] sm:p-6">
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">Historial de bote</h3>
+                <p className="text-sm text-slate-500">
+                  {groups.find((group) => group.id === groupFilter)?.name ?? "Grupo"}
+                </p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">
+                  Bote pendiente: {formatPrice(selectedGroupBalanceCents)}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <select
+                  value={movementTypeFilter}
+                  onChange={(event) =>
+                    setMovementTypeFilter(event.target.value as "ALL" | MovementType)
+                  }
+                  className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600"
+                >
+                  {MOVEMENT_TYPE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setShowMovementsModal(false)}
+                  className="rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+
+            <div className="max-h-[60vh] overflow-y-auto pr-1">
+              {movementsError ? (
+                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                  {movementsError}
+                </div>
+              ) : loadingMovements ? (
+                <p className="text-sm text-slate-500">Cargando historial...</p>
+              ) : groupMovements.length === 0 ? (
+                <p className="text-sm text-slate-500">No hay movimientos para este filtro.</p>
+              ) : (
+                <div className="space-y-2">
+                  {groupMovements.map((movement) => {
+                    const isPositive = movement.amountCents >= 0;
+                    const typeLabel =
+                      MOVEMENT_TYPE_OPTIONS.find((item) => item.value === movement.type)?.label ??
+                      movement.type;
+                    return (
+                      <div
+                        key={movement.id}
+                        className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                          <span className="font-semibold uppercase tracking-wide text-slate-500">
+                            {typeLabel}
+                          </span>
+                          <span className="text-slate-400">
+                            {formatDateTime(movement.occurredAt)}
+                          </span>
+                        </div>
+                        <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
+                          <span
+                            className={`text-sm font-semibold ${
+                              isPositive ? "text-emerald-700" : "text-rose-700"
+                            }`}
+                          >
+                            {isPositive ? "+" : ""}
+                            {formatPrice(movement.amountCents)}
+                          </span>
+                          <span className="text-xs font-semibold text-slate-500">
+                            Balance: {formatPrice(movement.runningBalanceCents)}
+                          </span>
+                        </div>
+                        {movement.note ? (
+                          <p className="mt-1 text-xs text-slate-500">{movement.note}</p>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {selectedTicket ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-10">

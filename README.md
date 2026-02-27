@@ -55,6 +55,7 @@ Endpoints disponibles:
 - `GET/DELETE /api/auth/session` (sesion de usuario actual / logout)
 - `GET/POST /api/users` (listar/crear usuarios, API interna)
 - `GET /api/groups`
+- `GET /api/groups/:groupId/movements` (historial de bote, filtro opcional `type`)
 - `GET/POST /api/groups/:groupId/members`
 - `GET/POST /api/groups/:groupId/invitations`
 - `GET /api/draws`
