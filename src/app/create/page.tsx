@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 type DrawType = "PRIMITIVA" | "EUROMILLONES";
@@ -254,6 +255,7 @@ const TicketDetailModal = ({
 };
 
 export default function Home() {
+  const router = useRouter();
   const [drawType, setDrawType] = useState<DrawType>("PRIMITIVA");
   const [drawDate, setDrawDate] = useState<string>("");
   const [groupId, setGroupId] = useState<string>("");
@@ -275,8 +277,47 @@ export default function Home() {
   const [ticketsError, setTicketsError] = useState<string | null>(null);
   const [copiedTicketId, setCopiedTicketId] = useState<string | null>(null);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+  const [canAccessCreate, setCanAccessCreate] = useState<boolean | null>(null);
 
   useEffect(() => {
+    let isActive = true;
+
+    (async () => {
+      try {
+        const response = await fetch("/api/auth/session");
+        if (!isActive) return;
+        if (!response.ok) {
+          router.replace("/login");
+          setCanAccessCreate(false);
+          return;
+        }
+        const payload = await response.json();
+        const memberships = Array.isArray(payload?.data?.memberships)
+          ? payload.data.memberships
+          : [];
+        const hasCreatePermission = memberships.some(
+          (membership: { role?: string }) => membership.role === "OWNER"
+        );
+        if (!hasCreatePermission) {
+          router.replace("/review");
+          setCanAccessCreate(false);
+          return;
+        }
+        setCanAccessCreate(true);
+      } catch {
+        if (!isActive) return;
+        router.replace("/review");
+        setCanAccessCreate(false);
+      }
+    })();
+
+    return () => {
+      isActive = false;
+    };
+  }, [router]);
+
+  useEffect(() => {
+    if (canAccessCreate !== true) return;
     let isActive = true;
 
     const load = async () => {
@@ -313,7 +354,7 @@ export default function Home() {
     return () => {
       isActive = false;
     };
-  }, []);
+  }, [canAccessCreate]);
 
   useEffect(() => {
     if (loadingData) return;
@@ -330,6 +371,7 @@ export default function Home() {
   }, [drawType]);
 
   useEffect(() => {
+    if (canAccessCreate !== true) return;
     let isActive = true;
 
     const loadTickets = async () => {
@@ -363,7 +405,7 @@ export default function Home() {
     return () => {
       isActive = false;
     };
-  }, []);
+  }, [canAccessCreate]);
 
   const validation = useMemo(() => {
     const issues: string[] = [];
@@ -622,6 +664,10 @@ export default function Home() {
       setCopiedTicketId(null);
     }
   };
+
+  if (canAccessCreate !== true) {
+    return null;
+  }
 
   return (
     <div className="relative min-h-screen bg-[#f7f2ea] text-slate-900">

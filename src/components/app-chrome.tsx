@@ -25,9 +25,18 @@ const isItemActive = (pathname: string, href: string) => {
 export function AppChrome({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [session, setSession] = useState<{ id: string; name: string } | null>(null);
+  const [session, setSession] = useState<{
+    id: string;
+    name: string;
+    memberships?: Array<{ role: "OWNER" | "MEMBER" }>;
+  } | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
   const [userError, setUserError] = useState<string | null>(null);
+  const canCreateTickets =
+    session?.memberships?.some((membership) => membership.role === "OWNER") ?? false;
+  const visibleNavItems = NAV_ITEMS.filter(
+    (item) => item.href !== "/create" || canCreateTickets
+  );
 
   const loadSession = async () => {
     const response = await fetch("/api/auth/session");
@@ -39,7 +48,15 @@ export function AppChrome({ children }: { children: ReactNode }) {
       throw new Error("No se pudo cargar la sesión.");
     }
     const payload = await response.json();
-    setSession(payload.data ? { id: payload.data.id, name: payload.data.name } : null);
+    setSession(
+      payload.data
+        ? {
+            id: payload.data.id,
+            name: payload.data.name,
+            memberships: payload.data.memberships ?? [],
+          }
+        : null
+    );
   };
 
   useEffect(() => {
@@ -104,8 +121,11 @@ export function AppChrome({ children }: { children: ReactNode }) {
       <div className="pb-20">{children}</div>
 
       <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/95 px-2 py-2 backdrop-blur">
-        <div className="mx-auto grid max-w-3xl grid-cols-3 gap-2">
-          {NAV_ITEMS.map((item) => {
+        <div
+          className="mx-auto grid max-w-3xl gap-2"
+          style={{ gridTemplateColumns: `repeat(${visibleNavItems.length}, minmax(0, 1fr))` }}
+        >
+          {visibleNavItems.map((item) => {
             const active = isItemActive(pathname, item.href);
             return (
               <Link

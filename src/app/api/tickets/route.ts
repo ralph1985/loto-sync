@@ -304,7 +304,7 @@ export async function POST(request: Request) {
         { status: 400 }
       )
     }
-    await requireGroupAccess(user.id, payload.groupId)
+    await requireGroupAccess(user.id, payload.groupId, { ownerOnly: true })
 
     const issues = validateTicket(payload, draw.type)
     if (issues.length > 0) {
