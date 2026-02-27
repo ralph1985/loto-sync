@@ -208,8 +208,8 @@ export default function ResultsPage() {
   );
 
   return (
-    <div className="relative min-h-screen bg-[#f7f2ea] text-slate-900">
-      <main className="relative mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 pb-16 pt-10 md:px-10 md:pt-14">
+    <div className="relative bg-[#f7f2ea] text-slate-900">
+      <main className="relative mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 pb-24 pt-10 md:px-10 md:pt-14">
         <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-3xl font-semibold text-slate-900">
@@ -361,15 +361,15 @@ export default function ResultsPage() {
         </section>
 
         <section className="rounded-3xl border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.08)]">
-          <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-lg font-semibold text-slate-900">Resultados guardados</h2>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <select
                 value={gameFilter}
                 onChange={(event) =>
                   setGameFilter(event.target.value as "ALL" | "PRIMITIVA" | "EUROMILLONES")
                 }
-                className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600"
+                className="max-w-full rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600"
               >
                 <option value="ALL">Todos</option>
                 <option value="PRIMITIVA">Primitiva</option>

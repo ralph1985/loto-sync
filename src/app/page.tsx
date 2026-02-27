@@ -624,13 +624,13 @@ export default function Home() {
         <div className="absolute bottom-[-160px] left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-[#f5a1b0]/30 blur-[120px]" />
       </div>
 
-      <main className="relative mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 pb-16 pt-10 md:flex-row md:gap-10 md:px-10 md:pt-16">
+      <main className="relative mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pb-16 pt-6 sm:pt-8 md:px-8 lg:flex-row lg:gap-10 lg:px-10 lg:pt-16">
         <section className="flex flex-1 flex-col gap-6">
           <header className="animate-fade-up space-y-3">
             <span className="inline-flex w-fit items-center gap-2 rounded-full bg-white/70 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700">
               Nuevo boleto
             </span>
-            <h1 className="text-4xl font-semibold leading-tight text-slate-900 md:text-5xl">
+            <h1 className="text-3xl font-semibold leading-tight text-slate-900 sm:text-4xl md:text-5xl">
               Alta rapida para tu grupo de loteria.
             </h1>
             <p className="max-w-xl text-base text-slate-600">
@@ -646,7 +646,7 @@ export default function Home() {
           </header>
 
           <form className="flex flex-col gap-6" onSubmit={handleSubmit}>
-            <section className="animate-fade-up rounded-3xl border border-white/70 bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+            <section className="animate-fade-up rounded-3xl border border-white/70 bg-white/80 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur sm:p-6">
               <h2 className="text-lg font-semibold text-slate-900">Seleccion</h2>
               <p className="mt-1 text-sm text-slate-500">
                 Define sorteo, grupo y fecha del boleto.
@@ -656,7 +656,7 @@ export default function Home() {
                   {loadError}
                 </div>
               ) : null}
-              <div className="mt-5 grid gap-4 md:grid-cols-4">
+              <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="flex flex-col gap-2">
                   <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Sorteo
@@ -724,7 +724,7 @@ export default function Home() {
                 </div>
               </div>
               {drawType === "PRIMITIVA" ? (
-                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
                   <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
                     <input
                       type="checkbox"
@@ -753,7 +753,7 @@ export default function Home() {
               ) : null}
             </section>
 
-            <section className="animate-fade-up rounded-3xl border border-white/70 bg-white/90 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+            <section className="animate-fade-up rounded-3xl border border-white/70 bg-white/90 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur sm:p-6">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h2 className="text-lg font-semibold text-slate-900">Numeros</h2>
@@ -797,7 +797,7 @@ export default function Home() {
                         )}
                       </div>
 
-                      <div className="mt-3 grid gap-3 md:grid-cols-2">
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
                         <div className="flex flex-col gap-2">
                           <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                             Numeros principales
@@ -831,7 +831,7 @@ export default function Home() {
                             />
                           </div>
                         ) : (
-                          <div className="grid gap-3 md:grid-cols-2">
+                          <div className="grid gap-3 sm:grid-cols-2">
                             <div className="flex flex-col gap-2">
                               <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                                 Complementario
@@ -875,12 +875,12 @@ export default function Home() {
               </div>
             </section>
 
-            <section className="animate-fade-up rounded-3xl border border-white/70 bg-white/90 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+            <section className="animate-fade-up rounded-3xl border border-white/70 bg-white/90 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur sm:p-6">
               <h2 className="text-lg font-semibold text-slate-900">Resguardo</h2>
               <p className="mt-1 text-sm text-slate-500">
                 Opcional, pero recomendable para comprobaciones.
               </p>
-              <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center">
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
                 <input
                   type="file"
                   accept="image/*"
@@ -895,7 +895,7 @@ export default function Home() {
               </div>
             </section>
 
-            <section className="animate-fade-up rounded-3xl border border-white/70 bg-white/90 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+            <section className="animate-fade-up rounded-3xl border border-white/70 bg-white/90 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur sm:p-6">
               <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Notas
               </label>
@@ -908,8 +908,8 @@ export default function Home() {
               />
             </section>
 
-            <section className="animate-fade-up rounded-3xl border border-white/70 bg-white/90 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
-              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <section className="animate-fade-up rounded-3xl border border-white/70 bg-white/90 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur sm:p-6">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="text-sm text-slate-500">
                   {selectedDraw ? selectedDraw.label ?? "Sorteo" : "Sorteo"} ·{" "}
                   {lines.length} linea(s)
@@ -948,8 +948,8 @@ export default function Home() {
           </form>
         </section>
 
-        <aside className="animate-fade-up flex w-full max-w-md flex-col gap-6 self-start md:sticky md:top-12">
-          <div className="rounded-3xl border border-white/70 bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+        <aside className="animate-fade-up flex w-full flex-col gap-4 self-start lg:sticky lg:top-12 lg:max-w-md">
+          <div className="rounded-3xl border border-white/70 bg-white/80 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur sm:p-6">
             <h3 className="text-lg font-semibold text-slate-900">Resumen</h3>
             <p className="mt-1 text-sm text-slate-500">
               Vista rapida antes de guardar.
@@ -1081,7 +1081,30 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="rounded-3xl border border-white/70 bg-white/90 p-6 text-sm text-slate-600 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+          <details className="rounded-3xl border border-white/70 bg-white/90 p-4 text-sm text-slate-600 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur lg:hidden">
+            <summary className="cursor-pointer list-none text-sm font-semibold uppercase tracking-wide text-slate-400">
+              Bote por grupo
+            </summary>
+            <div className="mt-3 space-y-2">
+              {groups.length > 0 ? (
+                groups.map((group) => (
+                  <div
+                    key={`mobile-${group.id}`}
+                    className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-3 py-2"
+                  >
+                    <span>{group.name}</span>
+                    <span className="font-semibold">
+                      {formatPrice(group.balanceCents ?? 0)}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-slate-500">Sin grupos.</p>
+              )}
+            </div>
+          </details>
+
+          <div className="hidden rounded-3xl border border-white/70 bg-white/90 p-6 text-sm text-slate-600 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur lg:block">
             <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
               Bote por grupo
             </h4>
@@ -1104,7 +1127,19 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="rounded-3xl border border-white/70 bg-white/90 p-6 text-sm text-slate-600 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+          <details className="rounded-3xl border border-white/70 bg-white/90 p-4 text-sm text-slate-600 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur lg:hidden">
+            <summary className="cursor-pointer list-none text-sm font-semibold uppercase tracking-wide text-slate-400">
+              Checklist MVP
+            </summary>
+            <ul className="mt-3 space-y-2">
+              <li>Seleccion sorteo + grupo</li>
+              <li>Validaciones por tipo de sorteo</li>
+              <li>Alta con multiples lineas</li>
+              <li>Resguardo opcional</li>
+            </ul>
+          </details>
+
+          <div className="hidden rounded-3xl border border-white/70 bg-white/90 p-6 text-sm text-slate-600 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur lg:block">
             <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
               Checklist MVP
             </h4>
@@ -1116,7 +1151,7 @@ export default function Home() {
             </ul>
           </div>
 
-          <div className="rounded-3xl border border-white/70 bg-white/90 p-6 text-sm text-slate-600 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+          <div className="rounded-3xl border border-white/70 bg-white/90 p-4 text-sm text-slate-600 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur sm:p-6">
             <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
               Boletos recientes
             </h4>
