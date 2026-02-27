@@ -8,6 +8,14 @@ export type NormalizedResult = {
   source: 'loteriasapi'
 }
 
+export type ImportResultInput = {
+  date: string
+  numbers: number[]
+  stars?: number[]
+  complementario?: number | null
+  reintegro?: number | null
+}
+
 import { prisma } from '@/lib/prisma'
 
 type CacheEntry = {
@@ -24,6 +32,8 @@ const GAME_MAP: Record<DrawType, string> = {
   PRIMITIVA: 'primitiva',
   EUROMILLONES: 'euromillones'
 }
+
+const isApiFallbackEnabled = () => process.env.LOTERIAS_API_FALLBACK === 'true'
 
 type RawResultPayload = {
   success?: boolean
@@ -215,6 +225,7 @@ export const fetchLatestResult = async (
 }
 
 const toDateOnly = (value: string) => new Date(value).toISOString().slice(0, 10)
+const toDayStart = (value: string) => new Date(`${value}T00:00:00.000Z`)
 
 const findCacheForDrawDate = async (
   game: DrawType,
@@ -284,11 +295,10 @@ export const fetchResultForDrawDate = async (
 
   const dbCached = await findCacheForDrawDate(game, drawDate)
   if (dbCached) {
-    const isFresh = Date.now() - dbCached.fetchedAt.getTime() < CACHE_TTL_MS
     const normalized = normalizeResult(game, dbCached.payload, {
       fallbackDrawDate: drawDate
     })
-    if (isFresh && normalized.numbers.length > 0) {
+    if (normalized.numbers.length > 0) {
       cache.set(cacheKey, {
         data: normalized,
         expiresAt: Date.now() + CACHE_TTL_MS
@@ -297,9 +307,23 @@ export const fetchResultForDrawDate = async (
     }
   }
 
+  if (!isApiFallbackEnabled()) {
+    return {
+      game,
+      drawDate,
+      numbers: [],
+      source: 'loteriasapi'
+    }
+  }
+
   const apiKey = process.env.LOTERIAS_API_KEY
   if (!apiKey) {
-    throw new Error('LOTERIAS_API_KEY no configurada.')
+    return {
+      game,
+      drawDate,
+      numbers: [],
+      source: 'loteriasapi'
+    }
   }
 
   const baseUrl = process.env.LOTERIAS_API_BASE || 'https://api.loteriasapi.com/api/v1'
@@ -358,4 +382,57 @@ export const fetchResultForDrawDate = async (
     numbers: [],
     source: 'loteriasapi'
   }
+}
+
+export const importResults = async (
+  game: DrawType,
+  items: ImportResultInput[]
+) => {
+  let imported = 0
+
+  for (const item of items) {
+    const drawDate = toDateOnly(item.date)
+    const payload = {
+      success: true,
+      data: {
+        game: {
+          slug: GAME_MAP[game],
+          name: game === 'PRIMITIVA' ? 'La Primitiva' : 'Euromillones'
+        },
+        drawDate,
+        combination: item.numbers,
+        stars: item.stars ?? [],
+        resultData: {
+          complementario: item.complementario ?? null,
+          reintegro: item.reintegro ?? null
+        }
+      },
+      source: 'manual-json'
+    }
+
+    await prisma.resultCache.upsert({
+      where: {
+        game_drawDate: {
+          game,
+          drawDate: toDayStart(drawDate)
+        }
+      },
+      update: {
+        payload,
+        fetchedAt: new Date()
+      },
+      create: {
+        game,
+        drawDate: toDayStart(drawDate),
+        payload,
+        fetchedAt: new Date()
+      }
+    })
+
+    cache.delete(`${game}:${drawDate}`)
+    cache.delete(`${game}:latest`)
+    imported += 1
+  }
+
+  return imported
 }

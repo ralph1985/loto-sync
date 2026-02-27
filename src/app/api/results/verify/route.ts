@@ -100,7 +100,7 @@ export async function GET(request: Request) {
       : !hasValidResult
         ? resultDrawDate && ticketDrawDate !== resultDrawDate
           ? `El resultado recibido (${resultDrawDate}) no coincide con la fecha del sorteo (${ticketDrawDate}).`
-          : 'No hay combinacion disponible para esa fecha en la API de resultados.'
+          : 'No hay resultado disponible para esa fecha en la base local.'
         : null
 
     const payload = await prisma.$transaction(async (tx) => {

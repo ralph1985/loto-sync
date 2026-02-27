@@ -32,6 +32,7 @@ Copia `.env.example` a `.env` y completa:
 - `DATABASE_URL` (SQLite local)
 - `LOTERIAS_API_KEY` (API terceros para resultados)
 - `LOTERIAS_API_BASE` (opcional, por defecto loteriasapi.com)
+- `LOTERIAS_API_FALLBACK` (opcional: `true` para permitir fallback a API externa si falta resultado local)
 - Cache local de resultados usa SQLite (`ResultCache`) con TTL de 10 min y rate limit básico.
 
 ## Prisma
@@ -58,6 +59,8 @@ Endpoints disponibles:
 - `GET /api/uploads/<path>` (serve ficheros locales)
 - `GET /api/results/latest?game=PRIMITIVA|EUROMILLONES`
 - `GET /api/results/verify?ticketId=...`
+- `POST /api/results/recheck` (recomprueba todas las semanas de un ticket: `ticketId`)
+- `POST /api/results/import` (importa resultados locales: `game`, `results[]`)
 - `POST /api/results/prize` (manual: `ticketId`, `drawDate` opcional, `prizeCents`)
 
 `GET /api/groups` incluye `balanceCents` calculado por grupo.
@@ -88,6 +91,22 @@ Notas de saldo (bote):
 - Al crear un ticket con `priceCents > 0`, se registra un movimiento `TICKET_EXPENSE`.
 - El saldo de cada grupo se calcula sumando movimientos (`OPENING`, `CONTRIBUTION`, `PRIZE`, etc.).
 - Al registrar premio manual (`/api/results/prize`), se crea/actualiza movimiento `PRIZE`.
+
+Ejemplo de importación de resultados locales:
+
+```json
+{
+  "game": "LA_PRIMITIVA",
+  "results": [
+    {
+      "date": "2026-02-21",
+      "numbers": [15, 17, 20, 34, 35, 41],
+      "complementario": 8,
+      "reintegro": 1
+    }
+  ]
+}
+```
 
 ## Storage local
 

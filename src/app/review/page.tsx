@@ -193,6 +193,7 @@ export default function ReviewPage() {
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
 
   const [verifying, setVerifying] = useState(false);
+  const [rechecking, setRechecking] = useState(false);
   const [verifyError, setVerifyError] = useState<string | null>(null);
   const [verifyResult, setVerifyResult] = useState<VerifyResponse | null>(null);
   const [checkDrawDate, setCheckDrawDate] = useState<string>("");
@@ -353,6 +354,12 @@ export default function ReviewPage() {
             href="/"
           >
             Volver a alta
+          </Link>
+          <Link
+            className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold uppercase tracking-wide text-slate-700 transition hover:border-slate-400"
+            href="/results"
+          >
+            Alta resultado
           </Link>
         </header>
 
@@ -752,7 +759,7 @@ export default function ReviewPage() {
 
             <div className="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-3">
               <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
-                <span>Comprobación de premio</span>
+                <span>Comprobación de premio (base local)</span>
                 <div className="flex items-center gap-2">
                   <input
                     type="date"
@@ -762,6 +769,7 @@ export default function ReviewPage() {
                   />
                   <button
                     type="button"
+                    disabled={rechecking}
                     onClick={async () => {
                       setVerifying(true);
                       setVerifyError(null);
@@ -793,6 +801,41 @@ export default function ReviewPage() {
                     className="rounded-full border border-slate-200 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500 transition hover:border-slate-400 hover:text-slate-700"
                   >
                     {verifying ? "Comprobando..." : "Comprobar"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={verifying}
+                    onClick={async () => {
+                      setRechecking(true);
+                      setVerifyError(null);
+                      try {
+                        const response = await fetch("/api/results/recheck", {
+                          method: "POST",
+                          headers: {
+                            "Content-Type": "application/json",
+                          },
+                          body: JSON.stringify({
+                            ticketId: selectedTicket.id,
+                          }),
+                        });
+                        const payload = await response.json();
+                        if (!response.ok) {
+                          throw new Error(payload?.error || "No se pudo recomprobar.");
+                        }
+                        await loadData();
+                      } catch (recheckError) {
+                        setVerifyError(
+                          recheckError instanceof Error
+                            ? recheckError.message
+                            : "No se pudo recomprobar."
+                        );
+                      } finally {
+                        setRechecking(false);
+                      }
+                    }}
+                    className="rounded-full border border-slate-200 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500 transition hover:border-slate-400 hover:text-slate-700"
+                  >
+                    {rechecking ? "Recomprobando..." : "Recomprobar semanas"}
                   </button>
                 </div>
               </div>
