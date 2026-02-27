@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server'
 
-import { importResults, type ImportResultInput } from '@/lib/results-client'
+import { prisma } from '@/lib/prisma'
+import {
+  fetchResultForDrawDate,
+  importResults,
+  type ImportResultInput
+} from '@/lib/results-client'
 
 type ImportPayload = {
   game?: string
@@ -52,6 +57,132 @@ const validateResults = (items: ImportPayload['results']) => {
   return { issues, normalized }
 }
 
+const toDateOnly = (value: string) => new Date(value).toISOString().slice(0, 10)
+const toDayStart = (value: string) => new Date(`${value}T00:00:00.000Z`)
+
+const computeTicketStatus = (
+  checks: Array<{
+    status: 'PENDIENTE' | 'COMPROBADO' | 'PREMIO'
+    prizeCents: number | null
+  }>
+) => {
+  if (checks.some((check) => check.status === 'PREMIO' || (check.prizeCents ?? 0) > 0)) {
+    return 'PREMIO' as const
+  }
+  if (checks.some((check) => check.status === 'COMPROBADO')) {
+    return 'COMPROBADO' as const
+  }
+  return 'PENDIENTE' as const
+}
+
+const syncChecksForImportedDate = async (
+  game: 'PRIMITIVA' | 'EUROMILLONES',
+  drawDate: string
+) => {
+  const parsedDrawDate = toDayStart(drawDate)
+  const result = await fetchResultForDrawDate(game, drawDate)
+  const resultDrawDate = result.drawDate ? toDateOnly(result.drawDate) : null
+  const hasValidResult = resultDrawDate === drawDate && result.numbers.length > 0
+
+  const tickets = await prisma.ticket.findMany({
+    where: {
+      draw: { type: game },
+      OR: [
+        { checks: { some: { drawDate: parsedDrawDate } } },
+        { draw: { drawDate: parsedDrawDate } }
+      ]
+    },
+    include: {
+      lines: {
+        include: {
+          numbers: true
+        }
+      },
+      checks: {
+        where: {
+          drawDate: parsedDrawDate
+        },
+        select: {
+          prizeCents: true
+        }
+      }
+    }
+  })
+
+  let updated = 0
+  for (const ticket of tickets) {
+    const line = ticket.lines[0]
+    const mainNumbers = line
+      ? line.numbers
+          .filter((number) => number.kind === 'MAIN')
+          .map((number) => number.value)
+      : []
+    const starNumbers = line
+      ? line.numbers
+          .filter((number) => number.kind === 'STAR')
+          .map((number) => number.value)
+      : []
+
+    const matchesMain = hasValidResult
+      ? mainNumbers.filter((value) => result.numbers.includes(value)).length
+      : 0
+    const matchesStars =
+      hasValidResult && result.stars
+        ? starNumbers.filter((value) => result.stars?.includes(value)).length
+        : 0
+
+    const existing = ticket.checks[0]
+    const checkStatus = (existing?.prizeCents ?? 0) > 0 ? 'PREMIO' : hasValidResult ? 'COMPROBADO' : 'PENDIENTE'
+    const reason = !line
+      ? 'El boleto no tiene lineas.'
+      : hasValidResult
+        ? null
+        : 'No hay resultado local para esa fecha.'
+
+    await prisma.ticketCheck.upsert({
+      where: {
+        ticketId_drawDate: {
+          ticketId: ticket.id,
+          drawDate: parsedDrawDate
+        }
+      },
+      update: {
+        status: checkStatus,
+        reason,
+        winningNumbers: result.numbers,
+        winningStars: result.stars ?? [],
+        matchesMain,
+        matchesStars,
+        checkedAt: new Date()
+      },
+      create: {
+        ticketId: ticket.id,
+        drawDate: parsedDrawDate,
+        status: checkStatus,
+        reason,
+        winningNumbers: result.numbers,
+        winningStars: result.stars ?? [],
+        matchesMain,
+        matchesStars,
+        checkedAt: new Date()
+      }
+    })
+
+    const allChecks = await prisma.ticketCheck.findMany({
+      where: { ticketId: ticket.id },
+      select: { status: true, prizeCents: true }
+    })
+    const nextStatus = computeTicketStatus(allChecks)
+    await prisma.ticket.update({
+      where: { id: ticket.id },
+      data: { status: nextStatus }
+    })
+    updated += 1
+  }
+
+  return updated
+}
+
 export async function POST(request: Request) {
   const payload = (await request.json()) as ImportPayload
   const game = normalizeGame(payload.game)
@@ -78,10 +209,17 @@ export async function POST(request: Request) {
   }
 
   const imported = await importResults(game, normalized)
+  const uniqueDates = [...new Set(normalized.map((item) => item.date))]
+  let syncedChecks = 0
+  for (const date of uniqueDates) {
+    syncedChecks += await syncChecksForImportedDate(game, date)
+  }
+
   return NextResponse.json({
     data: {
       game,
-      imported
+      imported,
+      syncedChecks
     }
   })
 }

@@ -60,7 +60,7 @@ Endpoints disponibles:
 - `GET /api/results/latest?game=PRIMITIVA|EUROMILLONES`
 - `GET /api/results/verify?ticketId=...`
 - `POST /api/results/recheck` (recomprueba todas las semanas de un ticket: `ticketId`)
-- `POST /api/results/import` (importa resultados locales: `game`, `results[]`)
+- `POST /api/results/import` (importa resultados locales: `game`, `results[]` y recomputa checks/tickets afectados)
 - `POST /api/results/prize` (manual: `ticketId`, `drawDate` opcional, `prizeCents`)
 
 `GET /api/groups` incluye `balanceCents` calculado por grupo.
