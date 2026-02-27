@@ -10,14 +10,15 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { href: "/", shortLabel: "Alta" },
-  { href: "/review", shortLabel: "Review" },
+  { href: "/review", shortLabel: "Panel" },
+  { href: "/create", shortLabel: "Alta" },
   { href: "/results", shortLabel: "Resultados" },
 ];
 
 const isItemActive = (pathname: string, href: string) => {
+  if (pathname === "/" && href === "/review") return true;
   if (href === pathname) return true;
-  if (href !== "/" && pathname.startsWith(`${href}/`)) return true;
+  if (pathname.startsWith(`${href}/`)) return true;
   return false;
 };
 
