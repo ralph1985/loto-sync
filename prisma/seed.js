@@ -1,5 +1,10 @@
 const { PrismaClient } = require('@prisma/client')
-const prisma = new PrismaClient()
+const { PrismaPg } = require('@prisma/adapter-pg')
+
+const databaseUrl =
+  process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/loto_sync?schema=public'
+const adapter = new PrismaPg({ connectionString: databaseUrl })
+const prisma = new PrismaClient({ adapter })
 
 async function main() {
   const existingGroups = await prisma.group.count()
