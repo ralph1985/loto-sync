@@ -1,6 +1,6 @@
 "use client";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 
 type DrawType = "PRIMITIVA" | "EUROMILLONES";
 type TicketStatus = "PENDIENTE" | "COMPROBADO" | "PREMIO";
@@ -197,7 +197,7 @@ const getStarNumbers = (line?: TicketLine) =>
         .map((number) => number.value)
     : [];
 
-export default function ReviewPage() {
+function ReviewPageContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -1243,5 +1243,13 @@ export default function ReviewPage() {
         </div>
       ) : null}
     </div>
+  );
+}
+
+export default function ReviewPage() {
+  return (
+    <Suspense fallback={<div className="px-4 py-6 text-sm text-slate-500">Cargando...</div>}>
+      <ReviewPageContent />
+    </Suspense>
   );
 }
