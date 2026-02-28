@@ -315,6 +315,13 @@ export async function POST(request: Request) {
     }
     await requireGroupAccess(user.id, payload.groupId, { ownerOnly: true })
 
+    if (!draw) {
+      return NextResponse.json(
+        { error: 'No se pudo resolver el sorteo.' },
+        { status: 400 }
+      )
+    }
+
     const issues = validateTicket(payload, draw.type)
     if (issues.length > 0) {
       return NextResponse.json(

@@ -4,4 +4,5 @@ set -e
 rm -rf .next
 rm -f tsconfig.tsbuildinfo
 
+npx tsc --noEmit
 npm run build
