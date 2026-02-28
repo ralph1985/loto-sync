@@ -32,11 +32,8 @@ La base de datos unica del proyecto es **Vercel Postgres**. SQLite local esta de
 Copia `.env.example` a `.env.local` y completa:
 
 - `DATABASE_URL` (Postgres de Vercel)
-- `LOTERIAS_API_KEY` (API terceros para resultados)
-- `LOTERIAS_API_BASE` (opcional, por defecto loteriasapi.com)
-- `LOTERIAS_API_FALLBACK` (opcional: `true` para permitir fallback a API externa si falta resultado local)
 - `DB_SYNC_TOKEN` y `REMOTE_SYNC_BASE_URL` (necesarios para backup remoto)
-- Cache de resultados usa tabla `ResultCache` (TTL de 10 min y rate limit básico).
+- Resultados y cache usan tabla `ResultCache` como fuente local principal.
 
 ## Prisma
 
@@ -71,6 +68,8 @@ Endpoints disponibles:
 - `POST /api/results/recheck` (recomprueba todas las semanas de un ticket: `ticketId`)
 - `POST /api/results/import` (importa resultados locales: `game`, `results[]` y recomputa checks/tickets afectados)
 - `POST /api/results/prize` (manual: `ticketId`, `drawDate` opcional, `prizeCents`)
+
+Nota: la comprobación de resultados se basa en la base de datos local (`ResultCache`). No se consulta API externa.
 
 `GET /api/groups` incluye `balanceCents` calculado por grupo.
 

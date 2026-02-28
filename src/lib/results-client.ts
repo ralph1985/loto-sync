@@ -5,7 +5,7 @@ export type NormalizedResult = {
   drawDate: string
   numbers: number[]
   stars?: number[]
-  source: 'loteriasapi'
+  source: 'local-db'
 }
 
 export type ImportResultInput = {
@@ -34,10 +34,17 @@ const GAME_MAP: Record<DrawType, string> = {
   EUROMILLONES: 'euromillones'
 }
 
-const isApiFallbackEnabled = () => process.env.LOTERIAS_API_FALLBACK === 'true'
-
-const asRawResultPayload = (value: Prisma.JsonValue): RawResultPayload =>
-  value && typeof value === 'object' ? (value as unknown as RawResultPayload) : {}
+const asRawResultPayload = (value: Prisma.JsonValue): RawResultPayload => {
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value)
+      return parsed && typeof parsed === 'object' ? (parsed as RawResultPayload) : {}
+    } catch {
+      return {}
+    }
+  }
+  return value && typeof value === 'object' ? (value as unknown as RawResultPayload) : {}
+}
 
 type RawResultPayload = {
   success?: boolean
@@ -132,7 +139,7 @@ const normalizeResult = (
     drawDate,
     numbers: uniqueNumbers,
     stars: uniqueStars.length > 0 ? uniqueStars : undefined,
-    source: 'loteriasapi'
+    source: 'local-db'
   }
 }
 
@@ -145,11 +152,6 @@ export const fetchLatestResult = async (
     return cached.data
   }
 
-  const apiKey = process.env.LOTERIAS_API_KEY
-  if (!apiKey) {
-    throw new Error('LOTERIAS_API_KEY no configurada.')
-  }
-
   const dbCached = await prisma.resultCache.findFirst({
     where: {
       game
@@ -158,9 +160,8 @@ export const fetchLatestResult = async (
   })
 
   if (dbCached) {
-    const isFresh = Date.now() - dbCached.fetchedAt.getTime() < CACHE_TTL_MS
     const normalized = normalizeResult(game, asRawResultPayload(dbCached.payload))
-    if (isFresh && normalized.numbers.length > 0) {
+    if (normalized.numbers.length > 0) {
       cache.set(cacheKey, {
         data: normalized,
         expiresAt: Date.now() + CACHE_TTL_MS
@@ -182,50 +183,12 @@ export const fetchLatestResult = async (
   }
 
   rateLimit.set(game, Date.now())
-
-  const baseUrl = process.env.LOTERIAS_API_BASE || 'https://api.loteriasapi.com/api/v1'
-  const response = await fetch(
-    `${baseUrl}/results/${GAME_MAP[game]}/latest`,
-    {
-      headers: {
-        Authorization: `Bearer ${apiKey}`
-      }
-    }
-  )
-
-  if (!response.ok) {
-    throw new Error('No se pudo obtener el resultado.')
+  return {
+    game,
+    drawDate: new Date().toISOString(),
+    numbers: [],
+    source: 'local-db'
   }
-
-  const payload = await response.json()
-  const normalized = normalizeResult(game, payload)
-
-  const drawDateValue = toDayStart(toDateOnly(normalized.drawDate))
-  await prisma.resultCache.upsert({
-    where: {
-      game_drawDate: {
-        game,
-        drawDate: drawDateValue
-      }
-    },
-    update: {
-      payload: payload as Prisma.InputJsonValue,
-      fetchedAt: new Date()
-    },
-    create: {
-      game,
-      drawDate: drawDateValue,
-      payload: payload as Prisma.InputJsonValue,
-      fetchedAt: new Date()
-    }
-  })
-
-  cache.set(cacheKey, {
-    data: normalized,
-    expiresAt: Date.now() + CACHE_TTL_MS
-  })
-
-  return normalized
 }
 
 const toDateOnly = (value: string) => new Date(value).toISOString().slice(0, 10)
@@ -248,43 +211,6 @@ const findCacheForDrawDate = async (
     },
     orderBy: { fetchedAt: 'desc' }
   })
-}
-
-const fetchWithDate = async (
-  game: DrawType,
-  drawDate: string,
-  apiKey: string,
-  baseUrl: string
-) => {
-  const gamePath = GAME_MAP[game]
-  const candidates = [
-    `${baseUrl}/results/${gamePath}/${drawDate}`,
-    `${baseUrl}/results/${gamePath}?date=${drawDate}`
-  ]
-
-  for (const url of candidates) {
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${apiKey}`
-      }
-    })
-    if (!response.ok) {
-      continue
-    }
-    const payload = (await response.json()) as RawResultPayload
-    if (payload?.success === true && payload?.data == null) {
-      continue
-    }
-    const normalized = normalizeResult(game, payload, {
-      fallbackDrawDate: drawDate
-    })
-    if (normalized.numbers.length === 0) {
-      continue
-    }
-    return { payload, normalized }
-  }
-
-  return null
 }
 
 export const fetchResultForDrawDate = async (
@@ -311,75 +237,11 @@ export const fetchResultForDrawDate = async (
     }
   }
 
-  if (!isApiFallbackEnabled()) {
-    return {
-      game,
-      drawDate,
-      numbers: [],
-      source: 'loteriasapi'
-    }
-  }
-
-  const apiKey = process.env.LOTERIAS_API_KEY
-  if (!apiKey) {
-    return {
-      game,
-      drawDate,
-      numbers: [],
-      source: 'loteriasapi'
-    }
-  }
-
-  const baseUrl = process.env.LOTERIAS_API_BASE || 'https://api.loteriasapi.com/api/v1'
-  const resultByDate = await fetchWithDate(game, drawDate, apiKey, baseUrl)
-  if (resultByDate) {
-    const drawDateValue = toDayStart(drawDate)
-
-    await prisma.resultCache.upsert({
-      where: {
-        game_drawDate: {
-          game,
-          drawDate: drawDateValue
-        }
-      },
-      update: {
-        payload: resultByDate.payload as Prisma.InputJsonValue,
-        fetchedAt: new Date()
-      },
-      create: {
-        game,
-        drawDate: drawDateValue,
-        payload: resultByDate.payload as Prisma.InputJsonValue,
-        fetchedAt: new Date()
-      }
-    })
-
-    cache.set(cacheKey, {
-      data: resultByDate.normalized,
-      expiresAt: Date.now() + CACHE_TTL_MS
-    })
-
-    return resultByDate.normalized
-  }
-
-  if (dbCached) {
-    const normalized = normalizeResult(game, asRawResultPayload(dbCached.payload), {
-      fallbackDrawDate: drawDate
-    })
-    if (normalized.numbers.length > 0) {
-      cache.set(cacheKey, {
-        data: normalized,
-        expiresAt: Date.now() + CACHE_TTL_MS
-      })
-      return normalized
-    }
-  }
-
   return {
     game,
     drawDate,
     numbers: [],
-    source: 'loteriasapi'
+    source: 'local-db'
   }
 }
 
