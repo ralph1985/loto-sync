@@ -8,6 +8,7 @@ const isPublicPath = (pathname: string) => {
   if (pathname.startsWith('/_next')) return true
   if (pathname.startsWith('/api/auth/login')) return true
   if (pathname.startsWith('/api/auth/session')) return true
+  if (pathname.startsWith('/api/admin/db-sync')) return true
   if (pathname === '/favicon.ico') return true
   return false
 }

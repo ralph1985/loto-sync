@@ -10,7 +10,11 @@
     "prisma:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:seed": "node prisma/seed.js",
-    "backup:db": "node scripts/backup-db.mjs"
+    "backup:db": "node scripts/backup-db.mjs",
+    "db:sync:up": "node scripts/sync-db-mirror.mjs up",
+    "db:sync:up:force": "node scripts/sync-db-mirror.mjs up --force",
+    "db:sync:down": "node scripts/sync-db-mirror.mjs down",
+    "db:sync:down:force": "node scripts/sync-db-mirror.mjs down --force"
   },
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "7.2.0",
