@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { Prisma } from '@prisma/client'
 
 import { ApiAuthError, requireGroupAccess, requireSessionUser } from '@/lib/auth'
 import { writeAuditLog } from '@/lib/audit'
@@ -67,8 +66,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'drawDate no es valida.' }, { status: 400 })
     }
 
-    const data = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-    const check = await tx.ticketCheck.upsert({
+    const data = await prisma.$transaction(async (tx: unknown) => {
+    const db = tx as typeof prisma
+    const check = await db.ticketCheck.upsert({
       where: {
         ticketId_drawDate: {
           ticketId,
@@ -97,7 +97,7 @@ export async function POST(request: Request) {
     })
 
     if (prizeCents > 0) {
-      await tx.groupMovement.upsert({
+      await db.groupMovement.upsert({
         where: {
           relatedCheckId_type: {
             relatedCheckId: check.id,
@@ -120,7 +120,7 @@ export async function POST(request: Request) {
         }
       })
     } else {
-      await tx.groupMovement.deleteMany({
+      await db.groupMovement.deleteMany({
         where: {
           relatedCheckId: check.id,
           type: 'PRIZE'
@@ -128,12 +128,12 @@ export async function POST(request: Request) {
       })
     }
 
-    const checks = await tx.ticketCheck.findMany({
+    const checks = await db.ticketCheck.findMany({
       where: { ticketId },
       select: { prizeCents: true }
     })
     const nextStatus = computeTicketStatus(checks)
-    await tx.ticket.update({
+    await db.ticket.update({
       where: { id: ticketId },
       data: { status: nextStatus }
     })

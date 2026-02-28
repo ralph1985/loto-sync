@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { Prisma } from '@prisma/client'
 
 import { ApiAuthError, requireGroupAccess, requireSessionUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
@@ -107,8 +106,9 @@ export async function GET(request: Request) {
           : 'No hay resultado disponible para esa fecha en la base local.'
         : null
 
-    const payload = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      const existing = await tx.ticketCheck.findUnique({
+    const payload = await prisma.$transaction(async (tx: unknown) => {
+      const db = tx as typeof prisma
+      const existing = await db.ticketCheck.findUnique({
         where: {
           ticketId_drawDate: {
             ticketId,
@@ -123,7 +123,7 @@ export async function GET(request: Request) {
           ? 'COMPROBADO'
           : 'PENDIENTE'
 
-      const check = await tx.ticketCheck.upsert({
+      const check = await db.ticketCheck.upsert({
         where: {
           ticketId_drawDate: {
             ticketId,
@@ -152,12 +152,12 @@ export async function GET(request: Request) {
         }
       })
 
-      const checks = await tx.ticketCheck.findMany({
+      const checks = await db.ticketCheck.findMany({
         where: { ticketId },
         select: { prizeCents: true }
       })
       const nextStatus = computeTicketStatus(checks)
-      await tx.ticket.update({
+      await db.ticket.update({
         where: { id: ticketId },
         data: { status: nextStatus }
       })
