@@ -91,11 +91,11 @@ export async function GET(request: Request) {
       : []
 
     const mainMatches = hasValidResult
-      ? mainNumbers.filter((value) => result.numbers.includes(value)).length
+      ? mainNumbers.filter((value: (typeof mainNumbers)[number]) => result.numbers.includes(value)).length
       : 0
     const starsMatches =
       hasValidResult && result.stars
-        ? starNumbers.filter((value) => result.stars?.includes(value)).length
+        ? starNumbers.filter((value: (typeof starNumbers)[number]) => result.stars?.includes(value)).length
         : 0
 
     const reason = !line

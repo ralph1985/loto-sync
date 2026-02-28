@@ -16,6 +16,7 @@ export type ImportResultInput = {
   reintegro?: number | null
 }
 
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 
 type CacheEntry = {
@@ -34,6 +35,9 @@ const GAME_MAP: Record<DrawType, string> = {
 }
 
 const isApiFallbackEnabled = () => process.env.LOTERIAS_API_FALLBACK === 'true'
+
+const asRawResultPayload = (value: Prisma.JsonValue): RawResultPayload =>
+  value && typeof value === 'object' ? (value as unknown as RawResultPayload) : {}
 
 type RawResultPayload = {
   success?: boolean
@@ -68,7 +72,7 @@ type RawResultPayload = {
 const coerceNumberArray = (value: unknown): number[] => {
   if (!Array.isArray(value)) return []
   return value
-    .map((item) =>
+    .map((item: (typeof value)[number]) =>
       typeof item === 'number'
         ? item
         : typeof item === 'string'
@@ -155,7 +159,7 @@ export const fetchLatestResult = async (
 
   if (dbCached) {
     const isFresh = Date.now() - dbCached.fetchedAt.getTime() < CACHE_TTL_MS
-    const normalized = normalizeResult(game, dbCached.payload)
+    const normalized = normalizeResult(game, asRawResultPayload(dbCached.payload))
     if (isFresh && normalized.numbers.length > 0) {
       cache.set(cacheKey, {
         data: normalized,
@@ -168,7 +172,7 @@ export const fetchLatestResult = async (
   const lastRequest = rateLimit.get(game)
   if (lastRequest && Date.now() - lastRequest < CACHE_RATE_LIMIT_MS) {
     if (dbCached) {
-      const normalized = normalizeResult(game, dbCached.payload)
+      const normalized = normalizeResult(game, asRawResultPayload(dbCached.payload))
       cache.set(cacheKey, {
         data: normalized,
         expiresAt: Date.now() + CACHE_TTL_MS
@@ -196,7 +200,7 @@ export const fetchLatestResult = async (
   const payload = await response.json()
   const normalized = normalizeResult(game, payload)
 
-  const drawDateValue = normalized.drawDate ? new Date(normalized.drawDate) : null
+  const drawDateValue = toDayStart(toDateOnly(normalized.drawDate))
   await prisma.resultCache.upsert({
     where: {
       game_drawDate: {
@@ -205,13 +209,13 @@ export const fetchLatestResult = async (
       }
     },
     update: {
-      payload,
+      payload: payload as Prisma.InputJsonValue,
       fetchedAt: new Date()
     },
     create: {
       game,
       drawDate: drawDateValue,
-      payload,
+      payload: payload as Prisma.InputJsonValue,
       fetchedAt: new Date()
     }
   })
@@ -295,7 +299,7 @@ export const fetchResultForDrawDate = async (
 
   const dbCached = await findCacheForDrawDate(game, drawDate)
   if (dbCached) {
-    const normalized = normalizeResult(game, dbCached.payload, {
+    const normalized = normalizeResult(game, asRawResultPayload(dbCached.payload), {
       fallbackDrawDate: drawDate
     })
     if (normalized.numbers.length > 0) {
@@ -329,12 +333,7 @@ export const fetchResultForDrawDate = async (
   const baseUrl = process.env.LOTERIAS_API_BASE || 'https://api.loteriasapi.com/api/v1'
   const resultByDate = await fetchWithDate(game, drawDate, apiKey, baseUrl)
   if (resultByDate) {
-    const normalizedDateOnly = resultByDate.normalized.drawDate
-      ? toDateOnly(resultByDate.normalized.drawDate)
-      : null
-    const drawDateValue = normalizedDateOnly
-      ? new Date(`${normalizedDateOnly}T00:00:00.000Z`)
-      : null
+    const drawDateValue = toDayStart(drawDate)
 
     await prisma.resultCache.upsert({
       where: {
@@ -344,13 +343,13 @@ export const fetchResultForDrawDate = async (
         }
       },
       update: {
-        payload: resultByDate.payload,
+        payload: resultByDate.payload as Prisma.InputJsonValue,
         fetchedAt: new Date()
       },
       create: {
         game,
         drawDate: drawDateValue,
-        payload: resultByDate.payload,
+        payload: resultByDate.payload as Prisma.InputJsonValue,
         fetchedAt: new Date()
       }
     })
@@ -364,7 +363,7 @@ export const fetchResultForDrawDate = async (
   }
 
   if (dbCached) {
-    const normalized = normalizeResult(game, dbCached.payload, {
+    const normalized = normalizeResult(game, asRawResultPayload(dbCached.payload), {
       fallbackDrawDate: drawDate
     })
     if (normalized.numbers.length > 0) {
@@ -418,13 +417,13 @@ export const importResults = async (
         }
       },
       update: {
-        payload,
+        payload: payload as Prisma.InputJsonValue,
         fetchedAt: new Date()
       },
       create: {
         game,
         drawDate: toDayStart(drawDate),
-        payload,
+        payload: payload as Prisma.InputJsonValue,
         fetchedAt: new Date()
       }
     })
