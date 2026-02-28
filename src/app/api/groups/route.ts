@@ -15,7 +15,7 @@ export async function GET() {
       }
     })
 
-    const groupIds = memberships.map((item) => item.groupId)
+    const groupIds = memberships.map((item: (typeof memberships)[number]) => item.groupId)
     if (groupIds.length === 0) {
       return NextResponse.json({ data: [] })
     }
@@ -42,12 +42,14 @@ export async function GET() {
       })
     ])
 
-    const roleByGroup = new Map(memberships.map((item) => [item.groupId, item.role]))
+    const roleByGroup = new Map(
+      memberships.map((item: (typeof memberships)[number]) => [item.groupId, item.role])
+    )
     const balanceByGroup = new Map(
-      balances.map((item) => [item.groupId, item._sum.amountCents ?? 0])
+      balances.map((item: (typeof balances)[number]) => [item.groupId, item._sum.amountCents ?? 0])
     )
 
-    const groupsWithBalance = groups.map((group) => ({
+    const groupsWithBalance = groups.map((group: (typeof groups)[number]) => ({
       ...group,
       role: roleByGroup.get(group.id) ?? 'MEMBER',
       balanceCents: balanceByGroup.get(group.id) ?? 0

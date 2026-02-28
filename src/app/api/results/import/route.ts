@@ -128,13 +128,13 @@ const syncChecksForImportedDate = async (
     const line = ticket.lines[0]
     const mainNumbers = line
       ? line.numbers
-          .filter((number) => number.kind === 'MAIN')
-          .map((number) => number.value)
+          .filter((number: (typeof line.numbers)[number]) => number.kind === 'MAIN')
+          .map((number: (typeof line.numbers)[number]) => number.value)
       : []
     const starNumbers = line
       ? line.numbers
-          .filter((number) => number.kind === 'STAR')
-          .map((number) => number.value)
+          .filter((number: (typeof line.numbers)[number]) => number.kind === 'STAR')
+          .map((number: (typeof line.numbers)[number]) => number.value)
       : []
 
     const matchesMain = hasValidResult
@@ -225,7 +225,7 @@ export async function POST(request: Request) {
     }
 
     const imported = await importResults(game, normalized)
-    const uniqueDates = [...new Set(normalized.map((item) => item.date))]
+    const uniqueDates = [...new Set(normalized.map((item: (typeof normalized)[number]) => item.date))]
     let syncedChecks = 0
     for (const date of uniqueDates) {
       syncedChecks += await syncChecksForImportedDate(game, date)

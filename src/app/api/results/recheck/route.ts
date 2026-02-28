@@ -47,19 +47,19 @@ export async function POST(request: Request) {
     await requireGroupAccess(user.id, ticket.groupId)
 
   const line = ticket.lines[0]
-  const mainNumbers = line
-    ? line.numbers
-        .filter((number) => number.kind === 'MAIN')
-        .map((number) => number.value)
+    const mainNumbers = line
+      ? line.numbers
+        .filter((number: (typeof line.numbers)[number]) => number.kind === 'MAIN')
+        .map((number: (typeof line.numbers)[number]) => number.value)
     : []
   const starNumbers = line
     ? line.numbers
-        .filter((number) => number.kind === 'STAR')
-        .map((number) => number.value)
+        .filter((number: (typeof line.numbers)[number]) => number.kind === 'STAR')
+        .map((number: (typeof line.numbers)[number]) => number.value)
     : []
 
   const dates = ticket.checks.length > 0
-    ? ticket.checks.map((check) => toDateOnly(check.drawDate.toISOString()))
+    ? ticket.checks.map((check: (typeof ticket.checks)[number]) => toDateOnly(check.drawDate.toISOString()))
     : [toDateOnly(ticket.draw.drawDate.toISOString())]
 
     let updated = 0

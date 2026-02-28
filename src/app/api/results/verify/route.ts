@@ -81,13 +81,13 @@ export async function GET(request: Request) {
     const line = ticket.lines[0]
     const mainNumbers = line
       ? line.numbers
-          .filter((number) => number.kind === 'MAIN')
-          .map((number) => number.value)
+          .filter((number: (typeof line.numbers)[number]) => number.kind === 'MAIN')
+          .map((number: (typeof line.numbers)[number]) => number.value)
       : []
     const starNumbers = line
       ? line.numbers
-          .filter((number) => number.kind === 'STAR')
-          .map((number) => number.value)
+          .filter((number: (typeof line.numbers)[number]) => number.kind === 'STAR')
+          .map((number: (typeof line.numbers)[number]) => number.value)
       : []
 
     const mainMatches = hasValidResult

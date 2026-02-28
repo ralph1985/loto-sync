@@ -56,7 +56,7 @@ export async function POST(request: Request) {
 
     if (actorMemberships.length > 0) {
       await tx.groupMember.createMany({
-        data: actorMemberships.map((membership) => ({
+        data: actorMemberships.map((membership: (typeof actorMemberships)[number]) => ({
           groupId: membership.groupId,
           userId: nextUser.id,
           role: membership.role === 'OWNER' ? 'MEMBER' : membership.role

@@ -15,7 +15,7 @@ const normalizeGame = (value?: string): DrawType | null => {
 const toNumberArray = (value: unknown): number[] => {
   if (!Array.isArray(value)) return []
   return value
-    .map((item) =>
+    .map((item: (typeof value)[number]) =>
       typeof item === 'number'
         ? item
         : typeof item === 'string'
@@ -102,7 +102,7 @@ export async function GET(request: Request) {
       take: 200
     })
 
-    const data = cacheEntries.map((entry) => {
+    const data = cacheEntries.map((entry: (typeof cacheEntries)[number]) => {
       const parsed = parsePayload(entry.payload)
       return {
         id: entry.id,

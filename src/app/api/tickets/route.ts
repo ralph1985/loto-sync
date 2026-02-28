@@ -209,19 +209,19 @@ export async function GET() {
         where: {
           game: 'PRIMITIVA',
           drawDate: {
-            in: primitiveDates.map((date) => new Date(`${date}T00:00:00.000Z`))
+            in: primitiveDates.map((date: (typeof primitiveDates)[number]) => new Date(`${date}T00:00:00.000Z`))
           }
         }
       })
     : []
 
   const cacheByDate = new Map(
-    primitiveCaches.map((cache) => [toDateKey(cache.drawDate as Date), extractPrimitivaExtras(cache.payload)])
+    primitiveCaches.map((cache: (typeof primitiveCaches)[number]) => [toDateKey(cache.drawDate as Date), extractPrimitivaExtras(cache.payload)])
   )
 
-    const enriched = tickets.map((ticket) => ({
+    const enriched = tickets.map((ticket: (typeof tickets)[number]) => ({
       ...ticket,
-      checks: ticket.checks.map((check) => {
+      checks: ticket.checks.map((check: (typeof ticket.checks)[number]) => {
         const extras = ticket.draw?.type === 'PRIMITIVA' ? cacheByDate.get(toDateKey(check.drawDate)) : null
         return {
           ...check,
