@@ -118,8 +118,87 @@ export const exportSyncDataset = async (): Promise<SyncDataset> => {
 }
 
 const toDate = (value: unknown) => (value ? new Date(String(value)) : undefined)
+const toId = (value: unknown) => String(value)
+
+const normalizeDataset = (dataset: SyncDataset): SyncDataset => {
+  const users = dataset.User
+  const groups = dataset.Group
+  const draws = dataset.Draw
+
+  const userIds = new Set(users.map((row) => toId(row.id)))
+  const groupIds = new Set(groups.map((row) => toId(row.id)))
+  const drawIds = new Set(draws.map((row) => toId(row.id)))
+
+  const memberships = dataset.GroupMember.filter((row) => {
+    const groupId = toId(row.groupId)
+    const userId = toId(row.userId)
+    return groupIds.has(groupId) && userIds.has(userId)
+  })
+
+  const invitations = dataset.GroupInvitation.filter((row) => {
+    const groupId = toId(row.groupId)
+    const inviterId = toId(row.inviterId)
+    const inviteeId = row.inviteeId ? toId(row.inviteeId) : null
+    return (
+      groupIds.has(groupId) &&
+      userIds.has(inviterId) &&
+      (!inviteeId || userIds.has(inviteeId))
+    )
+  })
+
+  const tickets = dataset.Ticket.filter((row) => {
+    const groupId = toId(row.groupId)
+    const drawId = toId(row.drawId)
+    return groupIds.has(groupId) && drawIds.has(drawId)
+  })
+  const ticketIds = new Set(tickets.map((row) => toId(row.id)))
+
+  const lines = dataset.TicketLine.filter((row) => ticketIds.has(toId(row.ticketId)))
+  const lineIds = new Set(lines.map((row) => toId(row.id)))
+
+  const lineNumbers = dataset.TicketLineNumber.filter((row) => lineIds.has(toId(row.lineId)))
+  const receipts = dataset.Receipt.filter((row) => ticketIds.has(toId(row.ticketId)))
+  const checks = dataset.TicketCheck.filter((row) => ticketIds.has(toId(row.ticketId)))
+  const checkIds = new Set(checks.map((row) => toId(row.id)))
+
+  const movements = dataset.GroupMovement.filter((row) => {
+    const groupId = toId(row.groupId)
+    if (!groupIds.has(groupId)) return false
+
+    const relatedTicketId = row.relatedTicketId ? toId(row.relatedTicketId) : null
+    const relatedCheckId = row.relatedCheckId ? toId(row.relatedCheckId) : null
+
+    return (
+      (!relatedTicketId || ticketIds.has(relatedTicketId)) &&
+      (!relatedCheckId || checkIds.has(relatedCheckId))
+    )
+  })
+
+  const auditLogs = dataset.AuditLog.filter((row) => {
+    const actorId = row.actorId ? toId(row.actorId) : null
+    return !actorId || userIds.has(actorId)
+  })
+
+  return {
+    User: users,
+    Group: groups,
+    Draw: draws,
+    GroupMember: memberships,
+    GroupInvitation: invitations,
+    Ticket: tickets,
+    TicketLine: lines,
+    TicketLineNumber: lineNumbers,
+    Receipt: receipts,
+    TicketCheck: checks,
+    GroupMovement: movements,
+    ResultCache: dataset.ResultCache,
+    AuditLog: auditLogs
+  }
+}
 
 export const replaceSyncDataset = async (dataset: SyncDataset) => {
+  const normalized = normalizeDataset(dataset)
+
   await prisma.$transaction(async (tx) => {
     await tx.auditLog.deleteMany()
     await tx.resultCache.deleteMany()
@@ -135,9 +214,9 @@ export const replaceSyncDataset = async (dataset: SyncDataset) => {
     await tx.group.deleteMany()
     await tx.user.deleteMany()
 
-    if (dataset.User.length > 0) {
+    if (normalized.User.length > 0) {
       await tx.user.createMany({
-        data: dataset.User.map((row) => ({
+        data: normalized.User.map((row) => ({
           id: String(row.id),
           name: String(row.name),
           passwordHash: String(row.passwordHash),
@@ -147,9 +226,9 @@ export const replaceSyncDataset = async (dataset: SyncDataset) => {
       })
     }
 
-    if (dataset.Group.length > 0) {
+    if (normalized.Group.length > 0) {
       await tx.group.createMany({
-        data: dataset.Group.map((row) => ({
+        data: normalized.Group.map((row) => ({
           id: String(row.id),
           name: String(row.name),
           kind: row.kind ? String(row.kind) : null,
@@ -159,9 +238,9 @@ export const replaceSyncDataset = async (dataset: SyncDataset) => {
       })
     }
 
-    if (dataset.Draw.length > 0) {
+    if (normalized.Draw.length > 0) {
       await tx.draw.createMany({
-        data: dataset.Draw.map((row) => ({
+        data: normalized.Draw.map((row) => ({
           id: String(row.id),
           type: String(row.type),
           drawDate: toDate(row.drawDate),
@@ -172,9 +251,9 @@ export const replaceSyncDataset = async (dataset: SyncDataset) => {
       })
     }
 
-    if (dataset.GroupMember.length > 0) {
+    if (normalized.GroupMember.length > 0) {
       await tx.groupMember.createMany({
-        data: dataset.GroupMember.map((row) => ({
+        data: normalized.GroupMember.map((row) => ({
           id: String(row.id),
           groupId: String(row.groupId),
           userId: String(row.userId),
@@ -184,9 +263,9 @@ export const replaceSyncDataset = async (dataset: SyncDataset) => {
       })
     }
 
-    if (dataset.GroupInvitation.length > 0) {
+    if (normalized.GroupInvitation.length > 0) {
       await tx.groupInvitation.createMany({
-        data: dataset.GroupInvitation.map((row) => ({
+        data: normalized.GroupInvitation.map((row) => ({
           id: String(row.id),
           groupId: String(row.groupId),
           inviterId: String(row.inviterId),
@@ -200,9 +279,9 @@ export const replaceSyncDataset = async (dataset: SyncDataset) => {
       })
     }
 
-    if (dataset.Ticket.length > 0) {
+    if (normalized.Ticket.length > 0) {
       await tx.ticket.createMany({
-        data: dataset.Ticket.map((row) => ({
+        data: normalized.Ticket.map((row) => ({
           id: String(row.id),
           groupId: String(row.groupId),
           drawId: String(row.drawId),
@@ -218,9 +297,9 @@ export const replaceSyncDataset = async (dataset: SyncDataset) => {
       })
     }
 
-    if (dataset.TicketLine.length > 0) {
+    if (normalized.TicketLine.length > 0) {
       await tx.ticketLine.createMany({
-        data: dataset.TicketLine.map((row) => ({
+        data: normalized.TicketLine.map((row) => ({
           id: String(row.id),
           ticketId: String(row.ticketId),
           complement:
@@ -241,9 +320,9 @@ export const replaceSyncDataset = async (dataset: SyncDataset) => {
       })
     }
 
-    if (dataset.TicketLineNumber.length > 0) {
+    if (normalized.TicketLineNumber.length > 0) {
       await tx.ticketLineNumber.createMany({
-        data: dataset.TicketLineNumber.map((row) => ({
+        data: normalized.TicketLineNumber.map((row) => ({
           id: String(row.id),
           lineId: String(row.lineId),
           kind: String(row.kind),
@@ -254,9 +333,9 @@ export const replaceSyncDataset = async (dataset: SyncDataset) => {
       })
     }
 
-    if (dataset.Receipt.length > 0) {
+    if (normalized.Receipt.length > 0) {
       await tx.receipt.createMany({
-        data: dataset.Receipt.map((row) => ({
+        data: normalized.Receipt.map((row) => ({
           id: String(row.id),
           ticketId: String(row.ticketId),
           blobUrl: String(row.blobUrl),
@@ -273,9 +352,9 @@ export const replaceSyncDataset = async (dataset: SyncDataset) => {
       })
     }
 
-    if (dataset.TicketCheck.length > 0) {
+    if (normalized.TicketCheck.length > 0) {
       await tx.ticketCheck.createMany({
-        data: dataset.TicketCheck.map((row) => ({
+        data: normalized.TicketCheck.map((row) => ({
           id: String(row.id),
           ticketId: String(row.ticketId),
           drawDate: toDate(row.drawDate),
@@ -300,9 +379,9 @@ export const replaceSyncDataset = async (dataset: SyncDataset) => {
       })
     }
 
-    if (dataset.GroupMovement.length > 0) {
+    if (normalized.GroupMovement.length > 0) {
       await tx.groupMovement.createMany({
-        data: dataset.GroupMovement.map((row) => ({
+        data: normalized.GroupMovement.map((row) => ({
           id: String(row.id),
           groupId: String(row.groupId),
           type: String(row.type),
@@ -316,9 +395,9 @@ export const replaceSyncDataset = async (dataset: SyncDataset) => {
       })
     }
 
-    if (dataset.ResultCache.length > 0) {
+    if (normalized.ResultCache.length > 0) {
       await tx.resultCache.createMany({
-        data: dataset.ResultCache.map((row) => ({
+        data: normalized.ResultCache.map((row) => ({
           id: String(row.id),
           game: String(row.game),
           drawDate: row.drawDate ? toDate(row.drawDate) : null,
@@ -330,9 +409,9 @@ export const replaceSyncDataset = async (dataset: SyncDataset) => {
       })
     }
 
-    if (dataset.AuditLog.length > 0) {
+    if (normalized.AuditLog.length > 0) {
       await tx.auditLog.createMany({
-        data: dataset.AuditLog.map((row) => ({
+        data: normalized.AuditLog.map((row) => ({
           id: String(row.id),
           actorId: row.actorId ? String(row.actorId) : null,
           entityType: String(row.entityType),
