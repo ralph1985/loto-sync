@@ -1,6 +1,6 @@
 import { existsSync, promises as fs } from 'node:fs'
 import path from 'node:path'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 
 const getProjectRoot = () => {
   const cwd = process.cwd()
@@ -19,8 +19,8 @@ const getProjectRoot = () => {
 const uploadsRoot = path.join(getProjectRoot(), 'uploads')
 
 export async function GET(
-  _request: Request,
-  context: { params: { path?: string[] } }
+  _request: NextRequest,
+  context: { params: Promise<{ path: string[] }> }
 ) {
   const { path: pathParts } = await context.params
   const filePath = pathParts?.join('/')
