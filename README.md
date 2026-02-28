@@ -29,11 +29,11 @@ Abre http://localhost:3000 en el navegador.
 
 Copia `.env.example` a `.env` y completa:
 
-- `DATABASE_URL` (SQLite local)
+- `DATABASE_URL` (Postgres local/remoto)
 - `LOTERIAS_API_KEY` (API terceros para resultados)
 - `LOTERIAS_API_BASE` (opcional, por defecto loteriasapi.com)
 - `LOTERIAS_API_FALLBACK` (opcional: `true` para permitir fallback a API externa si falta resultado local)
-- Cache local de resultados usa SQLite (`ResultCache`) con TTL de 10 min y rate limit básico.
+- Cache de resultados usa tabla `ResultCache` (TTL de 10 min y rate limit básico).
 
 ## Prisma
 

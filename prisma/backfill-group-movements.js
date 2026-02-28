@@ -1,9 +1,5 @@
 const { PrismaClient } = require('@prisma/client')
-const { PrismaBetterSqlite3 } = require('@prisma/adapter-better-sqlite3')
-
-const databaseUrl = process.env.DATABASE_URL || 'file:./data/dev.db'
-const adapter = new PrismaBetterSqlite3({ url: databaseUrl })
-const prisma = new PrismaClient({ adapter })
+const prisma = new PrismaClient()
 
 async function main() {
   const tickets = await prisma.ticket.findMany({
