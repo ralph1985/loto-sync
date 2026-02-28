@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 type DrawType = "PRIMITIVA" | "EUROMILLONES";
 
@@ -68,6 +68,40 @@ const DRAW_TYPES: { id: DrawType; label: string; description: string }[] = [
     description: "5 numeros + 2 estrellas",
   },
 ];
+
+const API_CACHE_TTL_MS = 60 * 60 * 1000;
+const API_TICKETS_CACHE_KEY = "review:api:tickets";
+const API_GROUPS_CACHE_KEY = "review:api:groups";
+
+const readApiCache = <T,>(key: string): T | null => {
+  if (typeof window === "undefined") return null;
+  const raw = window.localStorage.getItem(key);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as { cachedAt?: number; data?: T };
+    if (
+      typeof parsed.cachedAt === "number" &&
+      Date.now() - parsed.cachedAt < API_CACHE_TTL_MS &&
+      parsed.data !== undefined
+    ) {
+      return parsed.data;
+    }
+  } catch {
+    window.localStorage.removeItem(key);
+  }
+  return null;
+};
+
+const writeApiCache = <T,>(key: string, data: T) => {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(
+    key,
+    JSON.stringify({
+      cachedAt: Date.now(),
+      data,
+    })
+  );
+};
 
 const createEmptyLine = (): LineState => ({
   mainInput: "",
@@ -279,6 +313,38 @@ export default function Home() {
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [canAccessCreate, setCanAccessCreate] = useState<boolean | null>(null);
 
+  const refreshInitialData = useCallback(async () => {
+    setLoadingData(true);
+    setLoadingTickets(true);
+    setLoadError(null);
+    setTicketsError(null);
+    try {
+      const [groupsResponse, ticketsResponse] = await Promise.all([
+        fetch("/api/groups"),
+        fetch("/api/tickets"),
+      ]);
+      if (!groupsResponse.ok || !ticketsResponse.ok) {
+        throw new Error("No se pudieron recargar los datos.");
+      }
+      const groupsPayload = await groupsResponse.json();
+      const ticketsPayload = await ticketsResponse.json();
+      const nextGroups = groupsPayload.data ?? [];
+      const nextTickets = ticketsPayload.data ?? [];
+      setGroups(nextGroups);
+      setTickets(nextTickets);
+      writeApiCache(API_GROUPS_CACHE_KEY, nextGroups);
+      writeApiCache(API_TICKETS_CACHE_KEY, nextTickets);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "No se pudieron recargar los datos.";
+      setLoadError(message);
+      setTicketsError(message);
+    } finally {
+      setLoadingData(false);
+      setLoadingTickets(false);
+    }
+  }, []);
+
   useEffect(() => {
     let isActive = true;
 
@@ -325,16 +391,25 @@ export default function Home() {
       setLoadError(null);
 
       try {
+        const cachedGroups = readApiCache<Group[]>(API_GROUPS_CACHE_KEY);
+        if (cachedGroups) {
+          if (!isActive) return;
+          setGroups(cachedGroups);
+          return;
+        }
+
         const groupsResponse = await fetch("/api/groups");
         if (!groupsResponse.ok) {
           throw new Error("No se pudieron cargar los datos iniciales.");
         }
 
         const groupsPayload = await groupsResponse.json();
+        const nextGroups = groupsPayload.data ?? [];
 
         if (!isActive) return;
 
-        setGroups(groupsPayload.data ?? []);
+        setGroups(nextGroups);
+        writeApiCache(API_GROUPS_CACHE_KEY, nextGroups);
       } catch (error) {
         if (!isActive) return;
         setLoadError(
@@ -379,13 +454,22 @@ export default function Home() {
       setTicketsError(null);
 
       try {
+        const cachedTickets = readApiCache<Ticket[]>(API_TICKETS_CACHE_KEY);
+        if (cachedTickets) {
+          if (!isActive) return;
+          setTickets(cachedTickets);
+          return;
+        }
+
         const response = await fetch("/api/tickets");
         if (!response.ok) {
           throw new Error("No se pudieron cargar los boletos.");
         }
         const payload = await response.json();
+        const nextTickets = payload.data ?? [];
         if (!isActive) return;
-        setTickets(payload.data ?? []);
+        setTickets(nextTickets);
+        writeApiCache(API_TICKETS_CACHE_KEY, nextTickets);
       } catch (error) {
         if (!isActive) return;
         setTicketsError(
@@ -604,12 +688,16 @@ export default function Home() {
       const refreshResponse = await fetch("/api/tickets");
       if (refreshResponse.ok) {
         const payload = await refreshResponse.json();
-        setTickets(payload.data ?? []);
+        const nextTickets = payload.data ?? [];
+        setTickets(nextTickets);
+        writeApiCache(API_TICKETS_CACHE_KEY, nextTickets);
       }
       const refreshGroupsResponse = await fetch("/api/groups");
       if (refreshGroupsResponse.ok) {
         const groupsPayload = await refreshGroupsResponse.json();
-        setGroups(groupsPayload.data ?? []);
+        const nextGroups = groupsPayload.data ?? [];
+        setGroups(nextGroups);
+        writeApiCache(API_GROUPS_CACHE_KEY, nextGroups);
       }
     } catch (error) {
       setSaveError(
@@ -698,6 +786,15 @@ export default function Home() {
               <p className="mt-1 text-sm text-slate-500">
                 Define sorteo, grupo y fecha del boleto.
               </p>
+              <div className="mt-3">
+                <button
+                  type="button"
+                  onClick={() => refreshInitialData()}
+                  className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600"
+                >
+                  Recargar datos
+                </button>
+              </div>
               {loadError ? (
                 <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
                   {loadError}

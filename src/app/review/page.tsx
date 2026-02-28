@@ -127,6 +127,10 @@ const DRAW_LABELS: Record<DrawType, string> = {
   EUROMILLONES: "Euromillones",
 };
 
+const REVIEW_CACHE_TTL_MS = 60 * 60 * 1000;
+const REVIEW_TICKETS_CACHE_KEY = "review:api:tickets";
+const REVIEW_GROUPS_CACHE_KEY = "review:api:groups";
+
 const formatDate = (value?: string | null) => {
   if (!value) return "Sin fecha";
   return new Date(value).toLocaleDateString("es-ES");
@@ -232,7 +236,51 @@ function ReviewPageContent() {
   const [movementsError, setMovementsError] = useState<string | null>(null);
   const [showMovementsModal, setShowMovementsModal] = useState(false);
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (forceRefresh = false) => {
+    const now = Date.now();
+    const readCache = <T,>(key: string): T | null => {
+      if (forceRefresh || typeof window === "undefined") return null;
+      const raw = window.localStorage.getItem(key);
+      if (!raw) return null;
+      try {
+        const parsed = JSON.parse(raw) as { cachedAt?: number; data?: T };
+        if (
+          typeof parsed.cachedAt === "number" &&
+          now - parsed.cachedAt < REVIEW_CACHE_TTL_MS &&
+          parsed.data !== undefined
+        ) {
+          return parsed.data;
+        }
+      } catch {
+        window.localStorage.removeItem(key);
+      }
+      return null;
+    };
+
+    const writeCache = <T,>(key: string, data: T) => {
+      if (typeof window === "undefined") return;
+      window.localStorage.setItem(
+        key,
+        JSON.stringify({
+          cachedAt: Date.now(),
+          data,
+        })
+      );
+    };
+
+    const cachedTickets = readCache<Ticket[]>(REVIEW_TICKETS_CACHE_KEY);
+    const cachedGroups = readCache<Group[]>(REVIEW_GROUPS_CACHE_KEY);
+    if (cachedTickets && cachedGroups) {
+      setTickets(cachedTickets);
+      setSelectedTicket((current) =>
+        current
+          ? cachedTickets.find((ticket: Ticket) => ticket.id === current.id) ?? null
+          : current
+      );
+      setGroups(cachedGroups);
+      return;
+    }
+
     const [ticketsResponse, groupsResponse] = await Promise.all([
       fetch("/api/tickets"),
       fetch("/api/groups"),
@@ -252,7 +300,10 @@ function ReviewPageContent() {
         ? nextTickets.find((ticket: Ticket) => ticket.id === current.id) ?? null
         : current
     );
-    setGroups(groupsPayload.data ?? []);
+    const nextGroups = groupsPayload.data ?? [];
+    setGroups(nextGroups);
+    writeCache(REVIEW_TICKETS_CACHE_KEY, nextTickets);
+    writeCache(REVIEW_GROUPS_CACHE_KEY, nextGroups);
   }, []);
 
   useEffect(() => {
@@ -508,15 +559,24 @@ function ReviewPageContent() {
                   ? "Selecciona grupo"
                   : formatPrice(selectedGroupBalanceCents)}
               </p>
-              {groupFilter !== "ALL" ? (
+              <div className="mt-2 flex flex-wrap gap-2">
                 <button
                   type="button"
-                  onClick={() => setShowMovementsModal(true)}
-                  className="mt-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600"
+                  onClick={() => loadData(true)}
+                  className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600"
                 >
-                  Ver historial
+                  Recargar
                 </button>
-              ) : null}
+                {groupFilter !== "ALL" ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowMovementsModal(true)}
+                    className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600"
+                  >
+                    Ver historial
+                  </button>
+                ) : null}
+              </div>
             </div>
           </div>
         </section>
@@ -1003,7 +1063,7 @@ function ReviewPageContent() {
                           throw new Error(payload?.error || "Error al comprobar.");
                         }
                         setVerifyResult(payload.data);
-                        await loadData();
+                        await loadData(true);
                       } catch (verifyLoadError) {
                         setVerifyError(
                           verifyLoadError instanceof Error
@@ -1038,7 +1098,7 @@ function ReviewPageContent() {
                         if (!response.ok) {
                           throw new Error(payload?.error || "No se pudo recomprobar.");
                         }
-                        await loadData();
+                        await loadData(true);
                       } catch (recheckError) {
                         setVerifyError(
                           recheckError instanceof Error
@@ -1114,7 +1174,7 @@ function ReviewPageContent() {
                         if (!response.ok) {
                           throw new Error(payload?.error || "No se pudo guardar.");
                         }
-                        await loadData();
+                        await loadData(true);
                       } catch (prizeSaveError) {
                         setPrizeError(
                           prizeSaveError instanceof Error
