@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 
 import { ApiAuthError, requireGroupAccess, requireSessionUser } from '@/lib/auth'
 import { writeAuditLog } from '@/lib/audit'
@@ -66,7 +67,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'drawDate no es valida.' }, { status: 400 })
     }
 
-    const data = await prisma.$transaction(async (tx) => {
+    const data = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const check = await tx.ticketCheck.upsert({
       where: {
         ticketId_drawDate: {

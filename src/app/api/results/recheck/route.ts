@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 
 import { ApiAuthError, requireGroupAccess, requireSessionUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
@@ -83,7 +84,7 @@ export async function POST(request: Request) {
         ? null
         : 'No hay resultado local para esa fecha.'
 
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const existing = await tx.ticketCheck.findUnique({
         where: {
           ticketId_drawDate: {

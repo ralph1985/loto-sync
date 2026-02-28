@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "prepare": "husky",
     "prisma:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:seed": "node prisma/seed.js",
@@ -31,6 +32,7 @@
     "@types/react-dom": "19.2.3",
     "eslint": "9.39.2",
     "eslint-config-next": "16.1.3",
+    "husky": "9.0.11",
     "prisma": "^7.3.0",
     "tailwindcss": "4.1.18",
     "typescript": "5.9.3"
