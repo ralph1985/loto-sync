@@ -129,7 +129,12 @@ const validateTicket = (input: TicketInput, drawType: 'PRIMITIVA' | 'EUROMILLONE
 
 const toDateKey = (value: Date) => value.toISOString().slice(0, 10)
 
-const extractPrimitivaExtras = (payload: unknown) => {
+type PrimitivaExtras = {
+  complementario: number | null
+  reintegro: number | null
+}
+
+const extractPrimitivaExtras = (payload: unknown): PrimitivaExtras => {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
     return { complementario: null as number | null, reintegro: null as number | null }
   }
@@ -214,8 +219,13 @@ export async function GET() {
       })
     : []
 
-  const cacheByDate = new Map(
-    primitiveCaches.map((cache: (typeof primitiveCaches)[number]) => [toDateKey(cache.drawDate as Date), extractPrimitivaExtras(cache.payload)])
+  const cacheByDate = new Map<string, PrimitivaExtras>(
+    primitiveCaches.map(
+      (cache: (typeof primitiveCaches)[number]): [string, PrimitivaExtras] => [
+        toDateKey(cache.drawDate as Date),
+        extractPrimitivaExtras(cache.payload)
+      ]
+    )
   )
 
     const enriched = tickets.map((ticket: (typeof tickets)[number]) => ({
