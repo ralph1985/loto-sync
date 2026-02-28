@@ -36,6 +36,24 @@ type StoredResult = {
   fetchedAt: string;
 };
 
+const STORED_RESULTS_CACHE_PREFIX = "results:stored:";
+const STORED_RESULTS_CACHE_TTL_MS = 60 * 60 * 1000;
+
+const getStoredResultsCacheKey = (gameFilter: "ALL" | "PRIMITIVA" | "EUROMILLONES") =>
+  `${STORED_RESULTS_CACHE_PREFIX}${gameFilter}`;
+
+const clearStoredResultsCache = () => {
+  if (typeof window === "undefined") return;
+  const keys: string[] = [];
+  for (let index = 0; index < window.localStorage.length; index += 1) {
+    const key = window.localStorage.key(index);
+    if (key && key.startsWith(STORED_RESULTS_CACHE_PREFIX)) {
+      keys.push(key);
+    }
+  }
+  keys.forEach((key) => window.localStorage.removeItem(key));
+};
+
 export default function ResultsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [gameFilter, setGameFilter] = useState<"ALL" | "PRIMITIVA" | "EUROMILLONES">(
@@ -52,10 +70,34 @@ export default function ResultsPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const loadStoredResults = useCallback(async () => {
+  const loadStoredResults = useCallback(async (forceRefresh = false) => {
     setLoadingResults(true);
     setResultsError(null);
     try {
+      const cacheKey = getStoredResultsCacheKey(gameFilter);
+      if (!forceRefresh && typeof window !== "undefined") {
+        const cachedRaw = window.localStorage.getItem(cacheKey);
+        if (cachedRaw) {
+          try {
+            const cached = JSON.parse(cachedRaw) as {
+              cachedAt?: number;
+              data?: StoredResult[];
+            };
+            const cachedAt = typeof cached.cachedAt === "number" ? cached.cachedAt : 0;
+            if (
+              Array.isArray(cached.data) &&
+              cachedAt > 0 &&
+              Date.now() - cachedAt < STORED_RESULTS_CACHE_TTL_MS
+            ) {
+              setStoredResults(cached.data);
+              return;
+            }
+          } catch {
+            window.localStorage.removeItem(cacheKey);
+          }
+        }
+      }
+
       const query =
         gameFilter === "ALL" ? "/api/results/stored" : `/api/results/stored?game=${gameFilter}`;
       const response = await fetch(query);
@@ -63,7 +105,17 @@ export default function ResultsPage() {
       if (!response.ok) {
         throw new Error(payload?.error || "No se pudieron cargar resultados.");
       }
-      setStoredResults(payload.data ?? []);
+      const data = payload.data ?? [];
+      setStoredResults(data);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(
+          cacheKey,
+          JSON.stringify({
+            cachedAt: Date.now(),
+            data,
+          })
+        );
+      }
     } catch (loadError) {
       setResultsError(
         loadError instanceof Error
@@ -247,7 +299,7 @@ export default function ResultsPage() {
               </select>
               <button
                 type="button"
-                onClick={() => loadStoredResults()}
+                onClick={() => loadStoredResults(true)}
                 className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600"
               >
                 Recargar
@@ -391,6 +443,7 @@ export default function ResultsPage() {
                   setComplementarioInput("");
                   setReintegroInput("");
                   setShowCreateModal(false);
+                  clearStoredResultsCache();
                   await loadStoredResults();
                 } catch (submitError) {
                   setError(
