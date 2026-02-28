@@ -195,9 +195,9 @@ export async function GET() {
     })
 
   const primitiveCheckDateSet = new Set<string>()
-  tickets.forEach((ticket) => {
+  tickets.forEach((ticket: (typeof tickets)[number]) => {
     if (ticket.draw?.type !== 'PRIMITIVA') return
-    ticket.checks.forEach((check) => {
+    ticket.checks.forEach((check: (typeof ticket.checks)[number]) => {
       primitiveCheckDateSet.add(toDateKey(check.drawDate))
     })
   })
