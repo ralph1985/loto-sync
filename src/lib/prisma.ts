@@ -9,6 +9,11 @@ function createPrismaClient(): PrismaClient {
   const databaseUrl =
     process.env.DATABASE_URL ??
     'postgresql://postgres:postgres@localhost:5432/loto_sync?schema=public'
+  if (databaseUrl.startsWith('file:')) {
+    throw new Error(
+      'SQLite local desactivada. Configura DATABASE_URL con la base de datos Postgres de Vercel.'
+    )
+  }
   const adapter = new PrismaPg({ connectionString: databaseUrl })
 
   return new PrismaClient({ adapter })

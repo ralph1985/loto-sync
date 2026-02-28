@@ -25,19 +25,22 @@ npm run dev
 
 Abre http://localhost:3000 en el navegador.
 
+La base de datos unica del proyecto es **Vercel Postgres**. SQLite local esta desactivada.
+
 ## Entorno
 
-Copia `.env.example` a `.env` y completa:
+Copia `.env.example` a `.env.local` y completa:
 
-- `DATABASE_URL` (Postgres local/remoto)
+- `DATABASE_URL` (Postgres de Vercel)
 - `LOTERIAS_API_KEY` (API terceros para resultados)
 - `LOTERIAS_API_BASE` (opcional, por defecto loteriasapi.com)
 - `LOTERIAS_API_FALLBACK` (opcional: `true` para permitir fallback a API externa si falta resultado local)
+- `DB_SYNC_TOKEN` y `REMOTE_SYNC_BASE_URL` (necesarios para backup remoto)
 - Cache de resultados usa tabla `ResultCache` (TTL de 10 min y rate limit básico).
 
 ## Prisma
 
-Configura `DATABASE_URL` en `.env` (puedes copiar `.env.example`).
+Configura `DATABASE_URL` en `.env.local` (puedes copiar `.env.example`).
 
 ```bash
 npx prisma generate
@@ -123,6 +126,18 @@ Ejemplo de importación de resultados locales:
 ## Storage local
 
 Los resguardos se guardan en `uploads/` y se sirven via `GET /api/uploads/<path>`.
+
+## Backup de base de datos
+
+La copia de seguridad se hace desde Vercel Postgres via API segura y se sube a OneDrive:
+
+```bash
+npm run backup:db
+```
+
+Genera un fichero `backups/vercel-postgres-YYYYMMDD-HHMMSS.json` y lo sube al directorio remoto configurado.
+
+Los comandos `db:sync:up` y `db:sync:down` quedan desactivados para evitar sobrescrituras de una base local.
 
 ---
 
