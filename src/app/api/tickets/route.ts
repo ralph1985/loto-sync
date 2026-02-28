@@ -134,6 +134,28 @@ type PrimitivaExtras = {
   reintegro: number | null
 }
 
+const normalizeNumberArray = (value: unknown): number[] => {
+  const parseValue = (input: unknown): unknown => {
+    if (typeof input !== 'string') return input
+    try {
+      return JSON.parse(input)
+    } catch {
+      return input
+    }
+  }
+
+  const parsed = parseValue(value)
+  if (!Array.isArray(parsed)) return []
+
+  return parsed
+    .map((item) => {
+      if (typeof item === 'number') return item
+      if (typeof item === 'string') return Number.parseInt(item, 10)
+      return NaN
+    })
+    .filter((item) => Number.isFinite(item))
+}
+
 const extractPrimitivaExtras = (payload: unknown): PrimitivaExtras => {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
     return { complementario: null as number | null, reintegro: null as number | null }
@@ -234,6 +256,8 @@ export async function GET() {
         const extras = ticket.draw?.type === 'PRIMITIVA' ? cacheByDate.get(toDateKey(check.drawDate)) : null
         return {
           ...check,
+          winningNumbers: normalizeNumberArray(check.winningNumbers),
+          winningStars: normalizeNumberArray(check.winningStars),
           winningComplementario: extras?.complementario ?? null,
           winningReintegro: extras?.reintegro ?? null
         }

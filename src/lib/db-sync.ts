@@ -119,6 +119,17 @@ export const exportSyncDataset = async (): Promise<SyncDataset> => {
 
 const toDate = (value: unknown) => (value ? new Date(String(value)) : undefined)
 const toId = (value: unknown) => String(value)
+const toJson = <T = unknown>(value: unknown, fallback: T): T => {
+  if (value === null || value === undefined) return fallback
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value) as T
+    } catch {
+      return fallback
+    }
+  }
+  return value as T
+}
 
 const normalizeDataset = (dataset: SyncDataset): SyncDataset => {
   const users = dataset.User
@@ -360,8 +371,8 @@ export const replaceSyncDataset = async (dataset: SyncDataset) => {
           drawDate: toDate(row.drawDate),
           status: String(row.status),
           reason: row.reason ? String(row.reason) : null,
-          winningNumbers: row.winningNumbers,
-          winningStars: row.winningStars ?? null,
+          winningNumbers: toJson(row.winningNumbers, []),
+          winningStars: toJson(row.winningStars, []),
           matchesMain: typeof row.matchesMain === 'number' ? row.matchesMain : Number(row.matchesMain),
           matchesStars:
             typeof row.matchesStars === 'number' ? row.matchesStars : Number(row.matchesStars),
@@ -401,7 +412,7 @@ export const replaceSyncDataset = async (dataset: SyncDataset) => {
           id: String(row.id),
           game: String(row.game),
           drawDate: row.drawDate ? toDate(row.drawDate) : null,
-          payload: row.payload,
+          payload: toJson(row.payload, {}),
           fetchedAt: toDate(row.fetchedAt),
           createdAt: toDate(row.createdAt),
           updatedAt: toDate(row.updatedAt)
@@ -417,7 +428,7 @@ export const replaceSyncDataset = async (dataset: SyncDataset) => {
           entityType: String(row.entityType),
           entityId: String(row.entityId),
           action: String(row.action),
-          payload: row.payload ?? null,
+          payload: row.payload === null || row.payload === undefined ? null : toJson(row.payload, null),
           createdAt: toDate(row.createdAt)
         }))
       })
