@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { Prisma } from '@prisma/client'
 
 import { ApiAuthError, requireGroupAccess, requireSessionUser } from '@/lib/auth'
 import { writeAuditLog } from '@/lib/audit'
@@ -130,7 +129,7 @@ const validateTicket = (input: TicketInput, drawType: 'PRIMITIVA' | 'EUROMILLONE
 
 const toDateKey = (value: Date) => value.toISOString().slice(0, 10)
 
-const extractPrimitivaExtras = (payload: Prisma.JsonValue) => {
+const extractPrimitivaExtras = (payload: unknown) => {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
     return { complementario: null as number | null, reintegro: null as number | null }
   }
