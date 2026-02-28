@@ -40,9 +40,13 @@ yarn-error.log*
 # local uploads
 /uploads
 
+# local backups
+/backups
+
 # vercel
 .vercel
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+.env*.local

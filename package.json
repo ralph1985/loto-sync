@@ -9,7 +9,8 @@
     "lint": "eslint",
     "prisma:generate": "prisma generate",
     "db:push": "prisma db push",
-    "db:seed": "node prisma/seed.js"
+    "db:seed": "node prisma/seed.js",
+    "backup:db": "node scripts/backup-db.mjs"
   },
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "7.2.0",
