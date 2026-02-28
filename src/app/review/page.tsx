@@ -705,104 +705,108 @@ function ReviewPageContent() {
                                   </div>
 
                                   <div className="space-y-2">
-                                    <div className="flex flex-wrap items-center gap-2">
+                                    <div className="grid grid-cols-[72px_minmax(0,1fr)] items-start gap-x-2">
                                       <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                                         Apostado
                                       </span>
-                                      {mainNumbers.map((value, index) => {
-                                        const hit = winningMain.includes(value);
-                                        return (
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        {mainNumbers.map((value, index) => {
+                                          const hit = winningMain.includes(value);
+                                          return (
+                                            <span
+                                              key={`${ticket.id}-bet-main-${check.id}-${index}`}
+                                              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                                                hit
+                                                  ? "bg-emerald-500 text-white"
+                                                  : "bg-slate-800 text-white"
+                                              }`}
+                                            >
+                                              {value}
+                                            </span>
+                                          );
+                                        })}
+                                        {stars.map((value, index) => {
+                                          const hit = winningStars.includes(value);
+                                          return (
+                                            <span
+                                              key={`${ticket.id}-bet-star-${check.id}-${index}`}
+                                              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                                                hit
+                                                  ? "bg-emerald-200 text-emerald-900"
+                                                  : "bg-[#f9c784] text-slate-900"
+                                              }`}
+                                            >
+                                              {value}
+                                            </span>
+                                          );
+                                        })}
+                                        {ticket.draw?.type === "PRIMITIVA" ? (
                                           <span
-                                            key={`${ticket.id}-bet-main-${check.id}-${index}`}
                                             className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                                              hit
+                                              reintegroHit
                                                 ? "bg-emerald-500 text-white"
                                                 : "bg-slate-800 text-white"
                                             }`}
                                           >
-                                            {value}
+                                            R {reintegro ?? "-"}
                                           </span>
-                                        );
-                                      })}
-                                      {stars.map((value, index) => {
-                                        const hit = winningStars.includes(value);
-                                        return (
-                                          <span
-                                            key={`${ticket.id}-bet-star-${check.id}-${index}`}
-                                            className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                                              hit
-                                                ? "bg-emerald-200 text-emerald-900"
-                                                : "bg-[#f9c784] text-slate-900"
-                                            }`}
-                                          >
-                                            {value}
-                                          </span>
-                                        );
-                                      })}
-                                      {ticket.draw?.type === "PRIMITIVA" ? (
-                                        <span
-                                          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                                            reintegroHit
-                                              ? "bg-emerald-500 text-white"
-                                              : "bg-slate-800 text-white"
-                                          }`}
-                                        >
-                                          R {reintegro ?? "-"}
-                                        </span>
-                                      ) : null}
+                                        ) : null}
+                                      </div>
                                     </div>
 
-                                    <div className="flex flex-wrap items-center gap-2">
+                                    <div className="grid grid-cols-[72px_minmax(0,1fr)] items-start gap-x-2">
                                       <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                                        Salido
+                                        Resultado
                                       </span>
-                                      {winningMain.length > 0 ? (
-                                        winningMain.map((value, index) => {
-                                          const hit = mainNumbers.includes(value);
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        {winningMain.length > 0 ? (
+                                          winningMain.map((value, index) => {
+                                            const hit = mainNumbers.includes(value);
+                                            return (
+                                              <span
+                                                key={`${ticket.id}-win-main-${check.id}-${index}`}
+                                                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                                                  hit
+                                                    ? "bg-emerald-500 text-white"
+                                                    : "bg-slate-200 text-slate-700"
+                                                }`}
+                                              >
+                                                {value}
+                                              </span>
+                                            );
+                                          })
+                                        ) : (
+                                          <span className="text-xs text-slate-400">
+                                            Sin resultado cargado
+                                          </span>
+                                        )}
+                                        {winningStars.map((value, index) => {
+                                          const hit = stars.includes(value);
                                           return (
                                             <span
-                                              key={`${ticket.id}-win-main-${check.id}-${index}`}
+                                              key={`${ticket.id}-win-star-${check.id}-${index}`}
                                               className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
                                                 hit
-                                                  ? "bg-emerald-500 text-white"
+                                                  ? "bg-emerald-200 text-emerald-900"
                                                   : "bg-slate-200 text-slate-700"
                                               }`}
                                             >
                                               {value}
                                             </span>
                                           );
-                                        })
-                                      ) : (
-                                        <span className="text-xs text-slate-400">
-                                          Sin resultado cargado
-                                        </span>
-                                      )}
-                                      {winningStars.map((value, index) => {
-                                        const hit = stars.includes(value);
-                                        return (
+                                        })}
+                                        {ticket.draw?.type === "PRIMITIVA" ? (
                                           <span
-                                            key={`${ticket.id}-win-star-${check.id}-${index}`}
                                             className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                                              hit
-                                                ? "bg-emerald-200 text-emerald-900"
+                                              reintegroHit
+                                                ? "bg-emerald-500 text-white"
                                                 : "bg-slate-200 text-slate-700"
                                             }`}
                                           >
-                                            {value}
+                                            R {check.winningReintegro ?? "-"}
                                           </span>
-                                        );
-                                      })}
-                                      {ticket.draw?.type === "PRIMITIVA" ? (
-                                        <span
-                                          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                                            reintegroHit
-                                              ? "bg-emerald-500 text-white"
-                                              : "bg-slate-200 text-slate-700"
-                                          }`}
-                                        >
-                                          R {check.winningReintegro ?? "-"}
-                                        </span>
-                                      ) : null}
+                                        ) : null}
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
