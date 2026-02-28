@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { loadSessionClient } from "@/lib/session-client";
+
 type DrawType = "PRIMITIVA" | "EUROMILLONES";
 
 type Group = {
@@ -350,16 +352,15 @@ export default function Home() {
 
     (async () => {
       try {
-        const response = await fetch("/api/auth/session");
+        const session = await loadSessionClient();
         if (!isActive) return;
-        if (!response.ok) {
+        if (!session) {
           router.replace("/login");
           setCanAccessCreate(false);
           return;
         }
-        const payload = await response.json();
-        const memberships = Array.isArray(payload?.data?.memberships)
-          ? payload.data.memberships
+        const memberships = Array.isArray(session.memberships)
+          ? session.memberships
           : [];
         const hasCreatePermission = memberships.some(
           (membership: { role?: string }) => membership.role === "OWNER"

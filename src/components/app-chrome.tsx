@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 
+import { clearSessionCache, loadSessionClient, type ClientSession } from "@/lib/session-client";
+
 type NavItem = {
   href: string;
   shortLabel: string;
@@ -25,11 +27,7 @@ const isItemActive = (pathname: string, href: string) => {
 export function AppChrome({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [session, setSession] = useState<{
-    id: string;
-    name: string;
-    memberships?: Array<{ role: "OWNER" | "MEMBER" }>;
-  } | null>(null);
+  const [session, setSession] = useState<ClientSession | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
   const [userError, setUserError] = useState<string | null>(null);
   const canCreateTickets =
@@ -38,33 +36,14 @@ export function AppChrome({ children }: { children: ReactNode }) {
     (item) => item.href !== "/create" || canCreateTickets
   );
 
-  const loadSession = async () => {
-    const response = await fetch("/api/auth/session");
-    if (!response.ok) {
-      if (response.status === 401) {
-        setSession(null);
-        return;
-      }
-      throw new Error("No se pudo cargar la sesión.");
-    }
-    const payload = await response.json();
-    setSession(
-      payload.data
-        ? {
-            id: payload.data.id,
-            name: payload.data.name,
-            memberships: payload.data.memberships ?? [],
-          }
-        : null
-    );
-  };
-
   useEffect(() => {
     if (pathname === "/login") return;
     let isActive = true;
     (async () => {
       try {
-        await loadSession();
+        const nextSession = await loadSessionClient();
+        if (!isActive) return;
+        setSession(nextSession);
       } catch {
         if (!isActive) return;
         setUserError("No se pudo inicializar la sesión.");
@@ -103,6 +82,7 @@ export function AppChrome({ children }: { children: ReactNode }) {
             type="button"
             onClick={async () => {
               await fetch("/api/auth/session", { method: "DELETE" });
+              clearSessionCache();
               setPanelOpen(false);
               router.replace("/login");
               router.refresh();

@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { clearSessionCache, loadSessionClient } from "@/lib/session-client";
+
 export default function LoginPage() {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -13,11 +15,15 @@ export default function LoginPage() {
   useEffect(() => {
     let isActive = true;
     (async () => {
-      const response = await fetch("/api/auth/session");
-      if (!isActive) return;
-      if (response.ok) {
-        router.replace("/review");
-        router.refresh();
+      try {
+        const session = await loadSessionClient();
+        if (!isActive) return;
+        if (session) {
+          router.replace("/review");
+          router.refresh();
+        }
+      } catch {
+        // keep login page available when session check fails temporarily
       }
     })();
     return () => {
@@ -52,6 +58,7 @@ export default function LoginPage() {
               if (!response.ok) {
                 throw new Error(payload?.error || "No se pudo iniciar sesión.");
               }
+              clearSessionCache();
               router.replace("/review");
               router.refresh();
             } catch (loginError) {
