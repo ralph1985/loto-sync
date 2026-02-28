@@ -32,7 +32,7 @@ export async function GET(
     })
 
     let runningBalance = 0
-    const withBalance = ascending.map((movement) => {
+    const withBalance = ascending.map((movement: (typeof ascending)[number]) => {
       runningBalance += movement.amountCents
       return {
         ...movement,
