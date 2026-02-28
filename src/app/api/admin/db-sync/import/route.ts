@@ -65,9 +65,10 @@ export async function POST(request: Request) {
         sourceSummary: incomingSummary
       }
     })
-  } catch {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'No se pudo importar la base de datos.'
     return NextResponse.json(
-      { error: 'No se pudo importar la base de datos.' },
+      { error: message },
       { status: 500 }
     )
   }

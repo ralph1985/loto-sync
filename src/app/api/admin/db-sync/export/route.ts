@@ -20,9 +20,10 @@ export async function GET(request: Request) {
         summary: buildSyncSummary(dataset)
       }
     })
-  } catch {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'No se pudo exportar la base de datos.'
     return NextResponse.json(
-      { error: 'No se pudo exportar la base de datos.' },
+      { error: message },
       { status: 500 }
     )
   }
