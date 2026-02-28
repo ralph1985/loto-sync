@@ -330,66 +330,67 @@ export async function POST(request: Request) {
       )
     }
 
-    const created = await prisma.$transaction(async (tx) => {
-    const ticket = await tx.ticket.create({
-      data: {
-        groupId: payload.groupId,
-        drawId: draw.id,
-        status: 'PENDIENTE',
-        priceCents: payload.priceCents ?? null,
-        playsJoker: payload.playsJoker ?? false,
-        jokerNumber: payload.jokerNumber?.trim() || null,
-        notes: payload.notes ?? null,
-        lines: {
-          create: payload.lines.map((line, index) => ({
-            lineIndex: index + 1,
-            complement: line.complement ?? null,
-            reintegro: line.reintegro ?? null,
-            numbers: {
-              create: [
-                ...line.mainNumbers.map((value, position) => ({
-                  kind: 'MAIN',
-                  position: position + 1,
-                  value
-                })),
-                ...(draw.type === 'EUROMILLONES'
-                  ? (line.starNumbers ?? []).map((value, position) => ({
-                      kind: 'STAR',
-                      position: position + 1,
-                      value
-                    }))
-                  : [])
-              ]
-            }
-          }))
-        }
-      },
-      include: {
-        group: true,
-        draw: true,
-        lines: {
-          include: { numbers: true }
-        },
-        receipt: true,
-        checks: {
-          orderBy: { drawDate: 'desc' }
-        }
-      }
-    })
-
-    const priceCents = payload.priceCents ?? 0
-    if (priceCents > 0) {
-      await tx.groupMovement.create({
+    const created = await prisma.$transaction(async (tx: unknown) => {
+      const db = tx as typeof prisma
+      const ticket = await db.ticket.create({
         data: {
           groupId: payload.groupId,
-          type: 'TICKET_EXPENSE',
-          amountCents: -priceCents,
-          occurredAt: new Date(),
-          note: `Boleto ${draw.type} ${payload.drawDate ?? ''}`.trim(),
-          relatedTicketId: ticket.id
+          drawId: draw.id,
+          status: 'PENDIENTE',
+          priceCents: payload.priceCents ?? null,
+          playsJoker: payload.playsJoker ?? false,
+          jokerNumber: payload.jokerNumber?.trim() || null,
+          notes: payload.notes ?? null,
+          lines: {
+            create: payload.lines.map((line, index) => ({
+              lineIndex: index + 1,
+              complement: line.complement ?? null,
+              reintegro: line.reintegro ?? null,
+              numbers: {
+                create: [
+                  ...line.mainNumbers.map((value, position) => ({
+                    kind: 'MAIN',
+                    position: position + 1,
+                    value
+                  })),
+                  ...(draw.type === 'EUROMILLONES'
+                    ? (line.starNumbers ?? []).map((value, position) => ({
+                        kind: 'STAR',
+                        position: position + 1,
+                        value
+                      }))
+                    : [])
+                ]
+              }
+            }))
+          }
+        },
+        include: {
+          group: true,
+          draw: true,
+          lines: {
+            include: { numbers: true }
+          },
+          receipt: true,
+          checks: {
+            orderBy: { drawDate: 'desc' }
+          }
         }
       })
-    }
+
+      const priceCents = payload.priceCents ?? 0
+      if (priceCents > 0) {
+        await db.groupMovement.create({
+          data: {
+            groupId: payload.groupId,
+            type: 'TICKET_EXPENSE',
+            amountCents: -priceCents,
+            occurredAt: new Date(),
+            note: `Boleto ${draw.type} ${payload.drawDate ?? ''}`.trim(),
+            relatedTicketId: ticket.id
+          }
+        })
+      }
 
       return ticket
     })
