@@ -1,6 +1,12 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { InlineAlert } from "@/components/ui/inline-alert";
+import { ModalShell } from "@/components/ui/modal-shell";
+import { NumberBadge } from "@/components/ui/number-badge";
+import { PageShell } from "@/components/ui/page-shell";
+import { SurfaceCard } from "@/components/ui/surface-card";
+
 const parseNumbers = (value: string) =>
   value
     .split(/[\s,.-]+/)
@@ -259,280 +265,216 @@ export default function ResultsPage() {
   );
 
   return (
-    <div className="relative bg-[#f7f2ea] text-slate-900">
-      <main className="relative mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 pb-24 pt-10 md:px-10 md:pt-14">
-        <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-3xl font-semibold text-slate-900">Resultados guardados</h1>
-            <p className="text-sm text-slate-600">
-              Historico de sorteos cargados.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowCreateModal(true)}
-            className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600"
-          >
-            Alta manual
-          </button>
-        </header>
+    <PageShell mainClassName="flex max-w-3xl flex-col gap-6">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-semibold">Resultados guardados</h1>
+          <p className="text-sm text-base-content/70">Historico de sorteos cargados.</p>
+        </div>
+        <button type="button" onClick={() => setShowCreateModal(true)} className="btn btn-outline btn-sm">
+          Alta manual
+        </button>
+      </header>
 
-        <section className="rounded-3xl border border-white/70 bg-white/90 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.08)]">
-          {success ? (
-            <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-              {success}
-            </div>
-          ) : null}
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="text-lg font-semibold text-slate-900">Resultados guardados</h2>
-            <div className="flex flex-wrap items-center gap-2">
-              <select
-                value={gameFilter}
-                onChange={(event) =>
-                  setGameFilter(event.target.value as "ALL" | "PRIMITIVA" | "EUROMILLONES")
-                }
-                className="max-w-full rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600"
-              >
-                <option value="ALL">Todos</option>
-                <option value="PRIMITIVA">Primitiva</option>
-                <option value="EUROMILLONES">Euromillones</option>
-              </select>
-              <button
-                type="button"
-                onClick={() => loadStoredResults(true)}
-                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600"
-              >
-                Recargar
-              </button>
-            </div>
+      <SurfaceCard>
+        {success ? <InlineAlert tone="success" className="mb-4">{success}</InlineAlert> : null}
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="text-lg font-semibold">Resultados guardados</h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={gameFilter}
+              onChange={(event) =>
+                setGameFilter(event.target.value as "ALL" | "PRIMITIVA" | "EUROMILLONES")
+              }
+              className="select select-bordered select-sm"
+            >
+              <option value="ALL">Todos</option>
+              <option value="PRIMITIVA">Primitiva</option>
+              <option value="EUROMILLONES">Euromillones</option>
+            </select>
+            <button type="button" onClick={() => loadStoredResults(true)} className="btn btn-sm btn-outline">
+              Recargar
+            </button>
           </div>
+        </div>
 
-          {resultsError ? (
-            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-              {resultsError}
-            </div>
-          ) : loadingResults ? (
-            <p className="text-sm text-slate-500">Cargando resultados...</p>
-          ) : displayedResults.length === 0 ? (
-            <p className="text-sm text-slate-500">No hay resultados guardados.</p>
-          ) : (
-            <div className="space-y-2">
-              {missingCount > 0 ? (
-                <p className="text-xs text-amber-700">
-                  Faltan {missingCount} sorteos por cargar (Primitiva).
-                </p>
-              ) : null}
-              {displayedResults.map((result) => (
-                <div
-                  key={result.id}
-                  className={`rounded-2xl border px-4 py-3 ${
-                    result.isMissing
-                      ? "border-amber-200 bg-amber-50"
-                      : "border-slate-200 bg-slate-50"
-                  }`}
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <p
-                        className={`rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-wide ${
-                          result.isMissing
-                            ? "bg-amber-200 text-amber-800"
-                            : "bg-slate-200 text-slate-600"
-                        }`}
-                      >
-                        {result.game}
-                      </p>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        {result.drawDate ?? "Sin fecha"}
-                      </p>
-                      {result.isMissing ? (
-                        <p className="rounded-full bg-rose-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-rose-700">
-                          Falta cargar
-                        </p>
-                      ) : null}
-                    </div>
-                    {!result.isMissing ? (
-                      <p className="text-[11px] text-slate-400">
-                        Cargado: {new Date(result.fetchedAt).toLocaleString("es-ES")}
-                      </p>
+        {resultsError ? (
+          <InlineAlert tone="error">{resultsError}</InlineAlert>
+        ) : loadingResults ? (
+          <p className="text-sm text-base-content/70">Cargando resultados...</p>
+        ) : displayedResults.length === 0 ? (
+          <p className="text-sm text-base-content/70">No hay resultados guardados.</p>
+        ) : (
+          <div className="space-y-2">
+            {missingCount > 0 ? (
+              <InlineAlert tone="warning">Faltan {missingCount} sorteos por cargar (Primitiva).</InlineAlert>
+            ) : null}
+            {displayedResults.map((result) => (
+              <div
+                key={result.id}
+                className={`rounded-2xl border px-4 py-3 ${
+                  result.isMissing ? "border-warning/40 bg-warning/10" : "border-base-300 bg-base-200/40"
+                }`}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className={`badge badge-sm font-semibold ${result.isMissing ? "badge-warning" : "badge-ghost"}`}>
+                      {result.game}
+                    </span>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-base-content/70">
+                      {result.drawDate ?? "Sin fecha"}
+                    </p>
+                    {result.isMissing ? <span className="badge badge-error badge-sm">Falta cargar</span> : null}
+                  </div>
+                  {!result.isMissing ? (
+                    <p className="text-[11px] text-base-content/60">
+                      Cargado: {new Date(result.fetchedAt).toLocaleString("es-ES")}
+                    </p>
+                  ) : null}
+                </div>
+                {result.isMissing ? (
+                  <p className="mt-2 text-xs text-base-content/80">
+                    Pendiente de alta manual del resultado de este sorteo.
+                  </p>
+                ) : (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {result.numbers.map((value, index) => (
+                      <NumberBadge key={`${result.id}-main-${index}`} value={value} tone="primary" />
+                    ))}
+                    {result.complementario !== null && result.complementario !== undefined ? (
+                      <NumberBadge value={`C ${result.complementario}`} tone="neutral" />
+                    ) : null}
+                    {result.reintegro !== null && result.reintegro !== undefined ? (
+                      <NumberBadge value={`R ${result.reintegro}`} tone="success" />
                     ) : null}
                   </div>
-                  {result.isMissing ? (
-                    <p className="mt-2 text-xs text-amber-800">
-                      Pendiente de alta manual del resultado de este sorteo.
-                    </p>
-                  ) : (
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {result.numbers.map((value, index) => (
-                        <span
-                          key={`${result.id}-main-${index}`}
-                          className="rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white"
-                        >
-                          {value}
-                        </span>
-                      ))}
-                      {result.complementario !== null &&
-                      result.complementario !== undefined ? (
-                        <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-700">
-                          C {result.complementario}
-                        </span>
-                      ) : null}
-                      {result.reintegro !== null && result.reintegro !== undefined ? (
-                        <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">
-                          R {result.reintegro}
-                        </span>
-                      ) : null}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-      </main>
-
-      {showCreateModal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
-            onClick={() => setShowCreateModal(false)}
-          />
-          <section className="relative z-10 w-full max-w-2xl rounded-3xl border border-slate-200 bg-white p-4 shadow-[0_30px_80px_rgba(15,23,42,0.35)] sm:p-6">
-            <div className="mb-4 flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-900">Alta manual</h2>
-                <p className="text-sm text-slate-500">Primitiva (lunes, jueves o sábado).</p>
+                )}
               </div>
-              <button
-                type="button"
-                onClick={() => setShowCreateModal(false)}
-                className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600"
-              >
-                Cerrar
-              </button>
-            </div>
+            ))}
+          </div>
+        )}
+      </SurfaceCard>
 
-            <form
-              className="flex flex-col gap-4"
-              onSubmit={async (event) => {
-                event.preventDefault();
-                setError(null);
-                setSuccess(null);
-                if (!validation.isValid || saving) return;
-
-                setSaving(true);
-                try {
-                  const response = await fetch("/api/results/import", {
-                    method: "POST",
-                    headers: {
-                      "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify(validation.payload),
-                  });
-                  const payload = await response.json();
-                  if (!response.ok) {
-                    const issues = Array.isArray(payload?.issues)
-                      ? payload.issues.join(" ")
-                      : payload?.error;
-                    throw new Error(issues || "No se pudo guardar el resultado.");
-                  }
-
-                  setSuccess("Resultado guardado correctamente.");
-                  setDrawDate("");
-                  setNumbersInput("");
-                  setComplementarioInput("");
-                  setReintegroInput("");
-                  setShowCreateModal(false);
-                  clearStoredResultsCache();
-                  await loadStoredResults();
-                } catch (submitError) {
-                  setError(
-                    submitError instanceof Error
-                      ? submitError.message
-                      : "No se pudo guardar el resultado."
-                  );
-                } finally {
-                  setSaving(false);
-                }
-              }}
-            >
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Fecha sorteo
-                  </label>
-                  <input
-                    type="date"
-                    value={drawDate}
-                    onChange={(event) => setDrawDate(event.target.value)}
-                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm"
-                  />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Números (6)
-                  </label>
-                  <input
-                    value={numbersInput}
-                    onChange={(event) => setNumbersInput(event.target.value)}
-                    placeholder="Ej: 4 7 8 22 40 49"
-                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm"
-                  />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Complementario
-                  </label>
-                  <input
-                    value={complementarioInput}
-                    onChange={(event) => setComplementarioInput(event.target.value)}
-                    placeholder="Ej: 44"
-                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm"
-                  />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Reintegro
-                  </label>
-                  <input
-                    value={reintegroInput}
-                    onChange={(event) => setReintegroInput(event.target.value)}
-                    placeholder="Ej: 2"
-                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm"
-                  />
-                </div>
-              </div>
-
-              {validation.issues.length > 0 ? (
-                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700">
-                  {validation.issues.map((issue, index) => (
-                    <p key={index}>{issue}</p>
-                  ))}
-                </div>
-              ) : null}
-              {error ? (
-                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                  {error}
-                </div>
-              ) : null}
-
-              <div className="flex justify-end">
-                <button
-                  type="submit"
-                  disabled={!validation.isValid || saving}
-                  className={`rounded-full px-6 py-3 text-sm font-semibold uppercase tracking-wide ${
-                    validation.isValid && !saving
-                      ? "bg-slate-900 text-white"
-                      : "cursor-not-allowed bg-slate-200 text-slate-500"
-                  }`}
-                >
-                  {saving ? "Guardando..." : "Guardar resultado"}
-                </button>
-              </div>
-            </form>
-          </section>
+      <ModalShell open={showCreateModal} onClose={() => setShowCreateModal(false)}>
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold">Alta manual</h2>
+            <p className="text-sm text-base-content/70">Primitiva (lunes, jueves o sábado).</p>
+          </div>
+          <button type="button" onClick={() => setShowCreateModal(false)} className="btn btn-sm btn-ghost">
+            Cerrar
+          </button>
         </div>
-      ) : null}
-    </div>
+
+        <form
+          className="flex flex-col gap-4"
+          onSubmit={async (event) => {
+            event.preventDefault();
+            setError(null);
+            setSuccess(null);
+            if (!validation.isValid || saving) return;
+
+            setSaving(true);
+            try {
+              const response = await fetch("/api/results/import", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify(validation.payload),
+              });
+              const payload = await response.json();
+              if (!response.ok) {
+                const issues = Array.isArray(payload?.issues)
+                  ? payload.issues.join(" ")
+                  : payload?.error;
+                throw new Error(issues || "No se pudo guardar el resultado.");
+              }
+
+              setSuccess("Resultado guardado correctamente.");
+              setDrawDate("");
+              setNumbersInput("");
+              setComplementarioInput("");
+              setReintegroInput("");
+              setShowCreateModal(false);
+              clearStoredResultsCache();
+              await loadStoredResults();
+            } catch (submitError) {
+              setError(
+                submitError instanceof Error
+                  ? submitError.message
+                  : "No se pudo guardar el resultado."
+              );
+            } finally {
+              setSaving(false);
+            }
+          }}
+        >
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-semibold uppercase tracking-wide text-base-content/70">
+                Fecha sorteo
+              </label>
+              <input
+                type="date"
+                value={drawDate}
+                onChange={(event) => setDrawDate(event.target.value)}
+                className="input input-bordered w-full"
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-semibold uppercase tracking-wide text-base-content/70">
+                Números (6)
+              </label>
+              <input
+                value={numbersInput}
+                onChange={(event) => setNumbersInput(event.target.value)}
+                placeholder="Ej: 4 7 8 22 40 49"
+                className="input input-bordered w-full"
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-semibold uppercase tracking-wide text-base-content/70">
+                Complementario
+              </label>
+              <input
+                value={complementarioInput}
+                onChange={(event) => setComplementarioInput(event.target.value)}
+                placeholder="Ej: 44"
+                className="input input-bordered w-full"
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-semibold uppercase tracking-wide text-base-content/70">
+                Reintegro
+              </label>
+              <input
+                value={reintegroInput}
+                onChange={(event) => setReintegroInput(event.target.value)}
+                placeholder="Ej: 2"
+                className="input input-bordered w-full"
+              />
+            </div>
+          </div>
+
+          {validation.issues.length > 0 ? (
+            <InlineAlert tone="error">
+              {validation.issues.map((issue, index) => (
+                <span key={index} className="block">
+                  {issue}
+                </span>
+              ))}
+            </InlineAlert>
+          ) : null}
+          {error ? <InlineAlert tone="error">{error}</InlineAlert> : null}
+
+          <div className="flex justify-end">
+            <button type="submit" disabled={!validation.isValid || saving} className="btn btn-primary">
+              {saving ? "Guardando..." : "Guardar resultado"}
+            </button>
+          </div>
+        </form>
+      </ModalShell>
+    </PageShell>
   );
 }

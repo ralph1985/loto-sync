@@ -64,43 +64,43 @@ export function AppChrome({ children }: { children: ReactNode }) {
       <button
         type="button"
         onClick={() => setPanelOpen((current) => !current)}
-        className="fixed left-4 top-4 z-[100] rounded-full border border-slate-300 bg-white/90 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-700 shadow-[0_10px_30px_rgba(15,23,42,0.25)] backdrop-blur transition hover:border-slate-500"
+        className="btn btn-sm btn-outline fixed left-4 top-4 z-[100] rounded-full"
       >
         {session ? session.name : "Usuario"}
       </button>
 
       {panelOpen ? (
-        <div className="fixed left-4 top-16 z-[100] w-[min(320px,calc(100vw-2rem))] rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_20px_50px_rgba(15,23,42,0.25)]">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-            Sesión activa
-          </p>
-          <p className="mt-1 text-sm font-semibold text-slate-900">
-            {session?.name ?? "Sin sesión"}
-          </p>
+        <div className="card fixed left-4 top-16 z-[100] w-[min(320px,calc(100vw-2rem))] border border-base-300 bg-base-100 shadow-xl">
+          <div className="card-body gap-2 p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-base-content/70">
+              Sesión activa
+            </p>
+            <p className="mt-1 text-sm font-semibold text-base-content">
+              {session?.name ?? "Sin sesión"}
+            </p>
 
-          <button
-            type="button"
-            onClick={async () => {
-              await fetch("/api/auth/session", { method: "DELETE" });
-              clearSessionCache();
-              setPanelOpen(false);
-              router.replace("/login");
-              router.refresh();
-            }}
-            className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700"
-          >
-            Cerrar sesión
-          </button>
+            <button
+              type="button"
+              onClick={async () => {
+                await fetch("/api/auth/session", { method: "DELETE" });
+                clearSessionCache();
+                setPanelOpen(false);
+                router.replace("/login");
+                router.refresh();
+              }}
+              className="btn btn-sm btn-outline mt-2 w-full"
+            >
+              Cerrar sesión
+            </button>
 
-          {userError ? (
-            <p className="mt-2 text-xs text-rose-600">{userError}</p>
-          ) : null}
+            {userError ? <p className="mt-2 text-xs text-error">{userError}</p> : null}
+          </div>
         </div>
       ) : null}
 
       <div className="pb-20">{children}</div>
 
-      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/95 px-2 py-2 backdrop-blur">
+      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-base-300 bg-base-100/95 px-2 py-2 backdrop-blur">
         <div
           className="mx-auto grid max-w-3xl gap-2"
           style={{ gridTemplateColumns: `repeat(${visibleNavItems.length}, minmax(0, 1fr))` }}
@@ -112,7 +112,7 @@ export function AppChrome({ children }: { children: ReactNode }) {
                 key={`mobile-${item.href}-${item.shortLabel}`}
                 href={item.href}
                 className={`rounded-xl px-2 py-2 text-center text-[11px] font-semibold uppercase tracking-wide ${
-                  active ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600"
+                  active ? "bg-primary text-primary-content" : "bg-base-200 text-base-content/70"
                 }`}
               >
                 {item.shortLabel}

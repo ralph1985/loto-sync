@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { InlineAlert } from "@/components/ui/inline-alert";
+import { NumberBadge } from "@/components/ui/number-badge";
 import { loadSessionClient } from "@/lib/session-client";
 
 type DrawType = "PRIMITIVA" | "EUROMILLONES";
@@ -791,15 +793,13 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={() => refreshInitialData()}
-                  className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600"
+                  className="btn btn-xs btn-outline"
                 >
                   Recargar datos
                 </button>
               </div>
               {loadError ? (
-                <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                  {loadError}
-                </div>
+                <InlineAlert tone="error" className="mt-4">{loadError}</InlineAlert>
               ) : null}
               <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="flex flex-col gap-2">
@@ -1073,21 +1073,17 @@ export default function Home() {
               </div>
 
               {saveSuccess ? (
-                <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-                  {saveSuccess}
-                </div>
+                <InlineAlert tone="success" className="mt-4">{saveSuccess}</InlineAlert>
               ) : null}
 
               {saveError ? (
-                <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                  {saveError}
-                </div>
+                <InlineAlert tone="error" className="mt-4">{saveError}</InlineAlert>
               ) : null}
 
               {submitted && !validation.isValid ? (
-                <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                <InlineAlert tone="error" className="mt-4">
                   Revisa las validaciones para continuar.
-                </div>
+                </InlineAlert>
               ) : null}
             </section>
           </form>
@@ -1182,12 +1178,7 @@ export default function Home() {
                   <div className="mt-2 flex flex-wrap gap-2">
                     {line.main.length ? (
                       line.main.map((value, valueIndex) => (
-                        <span
-                          key={`${value}-${valueIndex}`}
-                          className="rounded-full bg-white/20 px-3 py-1 text-sm"
-                        >
-                          {value}
-                        </span>
+                        <NumberBadge key={`${value}-${valueIndex}`} value={value} className="text-white border-white/30 bg-white/20" />
                       ))
                     ) : (
                       <span className="text-sm text-white/60">
@@ -1200,12 +1191,7 @@ export default function Home() {
                     <div className="mt-3 flex flex-wrap gap-2">
                       {line.stars.length ? (
                         line.stars.map((value, valueIndex) => (
-                          <span
-                            key={`star-${value}-${valueIndex}`}
-                            className="rounded-full bg-[#f9c784] px-3 py-1 text-sm text-slate-900"
-                          >
-                            {value}
-                          </span>
+                          <NumberBadge key={`star-${value}-${valueIndex}`} value={value} tone="accent" />
                         ))
                       ) : (
                         <span className="text-sm text-white/60">
@@ -1301,9 +1287,7 @@ export default function Home() {
               Boletos recientes
             </h4>
             {ticketsError ? (
-              <div className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                {ticketsError}
-              </div>
+              <InlineAlert tone="error" className="mt-3">{ticketsError}</InlineAlert>
             ) : null}
             {loadingTickets ? (
               <div className="mt-4 space-y-3">
@@ -1354,12 +1338,7 @@ export default function Home() {
                       <div className="mt-2 flex flex-wrap gap-2">
                         {mainNumbers.length > 0 ? (
                           mainNumbers.map((value, index) => (
-                            <span
-                              key={`${ticket.id}-main-${index}`}
-                              className="rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white"
-                            >
-                              {value}
-                            </span>
+                            <NumberBadge key={`${ticket.id}-main-${index}`} value={value} tone="neutral" />
                           ))
                         ) : (
                           <span className="text-xs text-slate-400">
@@ -1368,12 +1347,7 @@ export default function Home() {
                         )}
                         {stars.length > 0
                           ? stars.map((value, index) => (
-                              <span
-                                key={`${ticket.id}-star-${index}`}
-                                className="rounded-full bg-[#f9c784] px-3 py-1 text-xs font-semibold text-slate-900"
-                              >
-                                {value}
-                              </span>
+                              <NumberBadge key={`${ticket.id}-star-${index}`} value={value} tone="accent" />
                             ))
                           : null}
                       </div>
