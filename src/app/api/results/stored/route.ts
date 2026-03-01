@@ -26,7 +26,16 @@ const toNumberArray = (value: unknown): number[] => {
 }
 
 const parsePayload = (payload: unknown) => {
-  if (!payload || typeof payload !== 'object') {
+  let normalizedPayload = payload
+  if (typeof normalizedPayload === 'string') {
+    try {
+      normalizedPayload = JSON.parse(normalizedPayload)
+    } catch {
+      normalizedPayload = null
+    }
+  }
+
+  if (!normalizedPayload || typeof normalizedPayload !== 'object') {
     return {
       drawDate: null as string | null,
       numbers: [] as number[],
@@ -36,7 +45,7 @@ const parsePayload = (payload: unknown) => {
     }
   }
 
-  const root = payload as Record<string, unknown>
+  const root = normalizedPayload as Record<string, unknown>
   const data =
     root.data && typeof root.data === 'object' && !Array.isArray(root.data)
       ? (root.data as Record<string, unknown>)
