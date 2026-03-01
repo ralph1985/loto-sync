@@ -202,6 +202,7 @@ const getStarNumbers = (line?: TicketLine) =>
     : [];
 
 function ReviewPageContent() {
+  const ARCHIVED_PAGE_SIZE = 2;
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -235,6 +236,7 @@ function ReviewPageContent() {
   const [loadingMovements, setLoadingMovements] = useState(false);
   const [movementsError, setMovementsError] = useState<string | null>(null);
   const [showMovementsModal, setShowMovementsModal] = useState(false);
+  const [archivedVisibleCount, setArchivedVisibleCount] = useState(0);
 
   const loadData = useCallback(async (forceRefresh = false) => {
     const now = Date.now();
@@ -399,6 +401,30 @@ function ReviewPageContent() {
     });
   }, [tickets, statusFilter, groupFilter, drawTypeFilter]);
 
+  const primaryActiveTicket = useMemo(() => {
+    const pending = filteredTickets.find((ticket) => ticket.status === "PENDIENTE");
+    return pending ?? filteredTickets[0] ?? null;
+  }, [filteredTickets]);
+  const secondaryTickets = useMemo(
+    () =>
+      filteredTickets.filter((ticket) =>
+        primaryActiveTicket ? ticket.id !== primaryActiveTicket.id : true
+      ),
+    [filteredTickets, primaryActiveTicket]
+  );
+  const secondaryVisibleTickets = useMemo(
+    () => secondaryTickets.slice(0, archivedVisibleCount),
+    [secondaryTickets, archivedVisibleCount]
+  );
+  const visibleTickets = useMemo(
+    () =>
+      primaryActiveTicket
+        ? [primaryActiveTicket, ...secondaryVisibleTickets]
+        : secondaryVisibleTickets,
+    [primaryActiveTicket, secondaryVisibleTickets]
+  );
+  const hasMoreSecondaryTickets = archivedVisibleCount < secondaryTickets.length;
+
   const selectedGroupBalanceCents = useMemo(() => {
     if (groupFilter === "ALL") return null;
     return groups.find((group) => group.id === groupFilter)?.balanceCents ?? 0;
@@ -444,10 +470,11 @@ function ReviewPageContent() {
     };
   }, [groupFilter, movementTypeFilter, tickets]);
 
-  const activeTicketId = useMemo(() => {
-    const pending = filteredTickets.find((ticket) => ticket.status === "PENDIENTE");
-    return pending?.id ?? filteredTickets[0]?.id ?? null;
-  }, [filteredTickets]);
+  useEffect(() => {
+    setArchivedVisibleCount(0);
+  }, [statusFilter, groupFilter, drawTypeFilter, tickets]);
+
+  const activeTicketId = primaryActiveTicket?.id ?? null;
 
   useEffect(() => {
     if (!activeTicketId) {
@@ -594,8 +621,12 @@ function ReviewPageContent() {
             <div className="rounded-2xl border border-slate-200 bg-white/80 px-4 py-6 text-sm text-slate-500">
               No hay boletos que coincidan con los filtros.
             </div>
+          ) : visibleTickets.length === 0 ? (
+            <div className="rounded-2xl border border-slate-200 bg-white/80 px-4 py-6 text-sm text-slate-500">
+              No hay apuestas para mostrar.
+            </div>
           ) : (
-            filteredTickets.map((ticket) => {
+            visibleTickets.map((ticket) => {
               const firstLine = ticket.lines?.[0];
               const mainNumbers = getMainNumbers(firstLine);
               const stars = getStarNumbers(firstLine);
@@ -897,6 +928,28 @@ function ReviewPageContent() {
               );
             })
           )}
+          {!loading && !error && filteredTickets.length > 0 && secondaryTickets.length > 0 ? (
+            <div className="mt-2 flex justify-center">
+              <button
+                type="button"
+                onClick={() =>
+                  setArchivedVisibleCount((current) =>
+                    Math.min(current + ARCHIVED_PAGE_SIZE, secondaryTickets.length)
+                  )
+                }
+                disabled={!hasMoreSecondaryTickets}
+                className={`rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wide ${
+                  hasMoreSecondaryTickets
+                    ? "border border-slate-200 bg-white text-slate-600"
+                    : "cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-400"
+                }`}
+              >
+                {hasMoreSecondaryTickets
+                  ? "Mostrar 2 más"
+                  : "No hay más apuestas"}
+              </button>
+            </div>
+          ) : null}
         </section>
       </main>
 
