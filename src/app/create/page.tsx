@@ -9,6 +9,7 @@ import { NumberBadge } from "@/components/ui/number-badge";
 import { loadSessionClient } from "@/lib/session-client";
 
 type DrawType = "PRIMITIVA" | "EUROMILLONES";
+type PrimitivaCoverageMode = "SINGLE" | "WEEKLY";
 
 type Group = {
   id: string;
@@ -113,6 +114,22 @@ const createEmptyLine = (): LineState => ({
   complement: "",
   reintegro: "",
 });
+
+const getPrimitivaWeeklyDrawDates = (drawDate: string) => {
+  const source = new Date(`${drawDate}T00:00:00.000Z`);
+  if (Number.isNaN(source.getTime())) return [];
+  const weekday = source.getUTCDay();
+  const mondayOffset = weekday === 0 ? -6 : 1 - weekday;
+  const monday = new Date(source);
+  monday.setUTCDate(source.getUTCDate() + mondayOffset);
+
+  const candidates = [0, 3, 5].map((offset) => {
+    const value = new Date(monday);
+    value.setUTCDate(monday.getUTCDate() + offset);
+    return value.toISOString().slice(0, 10);
+  });
+  return candidates;
+};
 
 const toIntArray = (input: string) =>
   input
@@ -295,6 +312,8 @@ const TicketDetailModal = ({
 export default function Home() {
   const router = useRouter();
   const [drawType, setDrawType] = useState<DrawType>("PRIMITIVA");
+  const [primitivaCoverageMode, setPrimitivaCoverageMode] =
+    useState<PrimitivaCoverageMode>("SINGLE");
   const [drawDate, setDrawDate] = useState<string>("");
   const [groupId, setGroupId] = useState<string>("");
   const [priceInput, setPriceInput] = useState<string>("");
@@ -445,6 +464,7 @@ export default function Home() {
     if (drawType !== "PRIMITIVA") {
       setPlaysJoker(false);
       setJokerNumber("");
+      setPrimitivaCoverageMode("SINGLE");
     }
   }, [drawType]);
 
@@ -626,6 +646,10 @@ export default function Home() {
           groupId,
           drawType,
           drawDate,
+          drawDates:
+            drawType === "PRIMITIVA" && primitivaCoverageMode === "WEEKLY"
+              ? getPrimitivaWeeklyDrawDates(drawDate)
+              : undefined,
           priceCents,
           playsJoker: drawType === "PRIMITIVA" ? playsJoker : undefined,
           jokerNumber:
@@ -686,6 +710,7 @@ export default function Home() {
       setPriceInput("");
       setPlaysJoker(false);
       setJokerNumber("");
+      setPrimitivaCoverageMode("SINGLE");
       setReceipt(null);
       setSubmitted(false);
       const refreshResponse = await fetch("/api/tickets");
@@ -854,6 +879,36 @@ export default function Home() {
                     className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
                   />
                 </div>
+
+                {drawType === "PRIMITIVA" ? (
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Cobertura
+                    </label>
+                    <select
+                      value={primitivaCoverageMode}
+                      onChange={(event) =>
+                        setPrimitivaCoverageMode(
+                          event.target.value as PrimitivaCoverageMode
+                        )
+                      }
+                      className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
+                    >
+                      <option value="SINGLE">Solo este sorteo</option>
+                      <option value="WEEKLY">Semana completa (L-J-S)</option>
+                    </select>
+                    {drawDate && primitivaCoverageMode === "WEEKLY" ? (
+                      <p className="text-xs text-slate-500">
+                        Se aplicará a:{" "}
+                        {getPrimitivaWeeklyDrawDates(drawDate)
+                          .map((value) =>
+                            new Date(`${value}T00:00:00.000Z`).toLocaleDateString("es-ES")
+                          )
+                          .join(" · ")}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
 
                 <div className="flex flex-col gap-2">
                   <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">

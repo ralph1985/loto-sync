@@ -12,16 +12,20 @@ type TicketLineInput = {
 }
 
 type TicketInput = {
+  ticketId?: string
   groupId: string
   drawId?: string
   drawType?: 'PRIMITIVA' | 'EUROMILLONES'
   drawDate?: string
+  drawDates?: string[]
   priceCents?: number
   playsJoker?: boolean
   jokerNumber?: string
   notes?: string
   lines: TicketLineInput[]
 }
+
+const PRIMITIVA_DRAW_WEEKDAYS = new Set([1, 4, 6])
 
 const isValidNumberArray = (values: number[], expected: number, min: number, max: number) => {
   if (values.length !== expected) {
@@ -58,6 +62,9 @@ const validateTicket = (input: TicketInput, drawType: 'PRIMITIVA' | 'EUROMILLONE
   }
   if (!input.drawId && (!input.drawType || !input.drawDate)) {
     issues.push('drawId o drawType+drawDate son obligatorios.')
+  }
+  if (input.drawDates !== undefined && (!Array.isArray(input.drawDates) || input.drawDates.length === 0)) {
+    issues.push('drawDates debe incluir al menos una fecha.')
   }
   if (!Array.isArray(input.lines) || input.lines.length === 0) {
     issues.push('Debes incluir al menos una linea.')
@@ -124,6 +131,38 @@ const validateTicket = (input: TicketInput, drawType: 'PRIMITIVA' | 'EUROMILLONE
     }
   })
 
+  return issues
+}
+
+const parseDateOnly = (value: string) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null
+  const parsed = new Date(`${value}T00:00:00.000Z`)
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
+const normalizeDrawDates = (
+  drawDates: string[] | undefined,
+  fallbackDrawDate: string | undefined
+) => {
+  const dates = (drawDates && drawDates.length > 0 ? drawDates : fallbackDrawDate ? [fallbackDrawDate] : [])
+    .map((value) => value.trim())
+    .filter(Boolean)
+  const unique = Array.from(new Set(dates))
+  return unique.sort((left, right) => left.localeCompare(right))
+}
+
+const validateDrawDatesForType = (drawType: 'PRIMITIVA' | 'EUROMILLONES', drawDates: string[]) => {
+  const issues: string[] = []
+  drawDates.forEach((date) => {
+    const parsed = parseDateOnly(date)
+    if (!parsed) {
+      issues.push(`drawDate no es valida: ${date}`)
+      return
+    }
+    if (drawType === 'PRIMITIVA' && !PRIMITIVA_DRAW_WEEKDAYS.has(parsed.getUTCDay())) {
+      issues.push(`Primitiva solo admite lunes, jueves o sabado: ${date}`)
+    }
+  })
   return issues
 }
 
@@ -304,8 +343,23 @@ export async function POST(request: Request) {
       )
     }
 
-    const parsedDate = new Date(`${payload.drawDate}T00:00:00.000Z`)
-    if (Number.isNaN(parsedDate.getTime())) {
+    const normalizedDrawDates = normalizeDrawDates(payload.drawDates, payload.drawDate)
+    if (normalizedDrawDates.length === 0) {
+      return NextResponse.json(
+        { error: 'drawDate o drawDates son obligatorios.' },
+        { status: 400 }
+      )
+    }
+    const drawDateIssues = validateDrawDatesForType(payload.drawType, normalizedDrawDates)
+    if (drawDateIssues.length > 0) {
+      return NextResponse.json(
+        { error: 'Validacion de fechas fallida.', issues: drawDateIssues },
+        { status: 400 }
+      )
+    }
+    const primaryDrawDate = normalizedDrawDates[normalizedDrawDates.length - 1]
+    const parsedDate = parseDateOnly(primaryDrawDate)
+    if (!parsedDate) {
       return NextResponse.json(
         { error: 'drawDate no es valida.' },
         { status: 400 }
@@ -326,6 +380,8 @@ export async function POST(request: Request) {
       },
       select: { id: true, type: true }
     })
+    payload.drawDates = normalizedDrawDates
+    payload.drawDate = primaryDrawDate
   }
 
     const groupExists = await prisma.group.findUnique({
@@ -353,6 +409,8 @@ export async function POST(request: Request) {
         { status: 400 }
       )
     }
+
+    const drawDates = normalizeDrawDates(payload.drawDates, payload.drawDate)
 
     const created = await prisma.$transaction(async (tx: unknown) => {
       const db = tx as typeof prisma
@@ -402,6 +460,26 @@ export async function POST(request: Request) {
         }
       })
 
+      if (drawDates.length > 0) {
+        await db.ticketCheck.createMany({
+          data: drawDates
+            .map((date) => parseDateOnly(date))
+            .filter((date): date is Date => Boolean(date))
+            .map((date) => ({
+              ticketId: ticket.id,
+              drawDate: date,
+              status: 'PENDIENTE' as const,
+              reason: 'Pendiente de comprobacion.',
+              winningNumbers: [],
+              winningStars: [],
+              matchesMain: 0,
+              matchesStars: 0,
+              checkedAt: new Date()
+            })),
+          skipDuplicates: true
+        })
+      }
+
       const priceCents = payload.priceCents ?? 0
       if (priceCents > 0) {
         await db.groupMovement.create({
@@ -437,6 +515,160 @@ export async function POST(request: Request) {
     }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'No se pudo guardar el boleto.' },
+      { status: 500 }
+    )
+  }
+}
+
+type TicketPatchInput = {
+  ticketId?: string
+  drawDate?: string
+  drawDates?: string[]
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const user = await requireSessionUser()
+    const payload = (await request.json()) as TicketPatchInput
+    const ticketId = payload.ticketId?.trim()
+    if (!ticketId) {
+      return NextResponse.json({ error: 'ticketId es obligatorio.' }, { status: 400 })
+    }
+
+    const ticket = await prisma.ticket.findUnique({
+      where: { id: ticketId },
+      include: {
+        draw: true,
+        checks: true
+      }
+    })
+    if (!ticket || !ticket.draw) {
+      return NextResponse.json({ error: 'ticketId no existe.' }, { status: 404 })
+    }
+
+    await requireGroupAccess(user.id, ticket.groupId, { ownerOnly: true })
+
+    const normalizedDrawDates = normalizeDrawDates(payload.drawDates, payload.drawDate)
+    if (normalizedDrawDates.length === 0) {
+      return NextResponse.json(
+        { error: 'drawDate o drawDates son obligatorios.' },
+        { status: 400 }
+      )
+    }
+
+    const drawDateIssues = validateDrawDatesForType(ticket.draw.type, normalizedDrawDates)
+    if (drawDateIssues.length > 0) {
+      return NextResponse.json(
+        { error: 'Validacion de fechas fallida.', issues: drawDateIssues },
+        { status: 400 }
+      )
+    }
+
+    const primaryDrawDate = normalizedDrawDates[normalizedDrawDates.length - 1]
+    const parsedPrimaryDate = parseDateOnly(primaryDrawDate)
+    if (!parsedPrimaryDate) {
+      return NextResponse.json({ error: 'drawDate no es valida.' }, { status: 400 })
+    }
+
+    const normalizedDateSet = new Set(normalizedDrawDates)
+
+    const updated = await prisma.$transaction(async (tx: unknown) => {
+      const db = tx as typeof prisma
+
+      const draw = await db.draw.upsert({
+        where: {
+          type_drawDate: {
+            type: ticket.draw.type,
+            drawDate: parsedPrimaryDate
+          }
+        },
+        update: {},
+        create: {
+          type: ticket.draw.type,
+          drawDate: parsedPrimaryDate
+        }
+      })
+
+      await db.ticket.update({
+        where: { id: ticketId },
+        data: {
+          drawId: draw.id
+        }
+      })
+
+      const existingChecks = await db.ticketCheck.findMany({
+        where: { ticketId },
+        select: { drawDate: true }
+      })
+      const existingDateSet = new Set(
+        existingChecks.map((check) => toDateKey(check.drawDate))
+      )
+
+      await db.ticketCheck.deleteMany({
+        where: {
+          ticketId,
+          drawDate: {
+            notIn: normalizedDrawDates
+              .map((date) => parseDateOnly(date))
+              .filter((date): date is Date => Boolean(date))
+          }
+        }
+      })
+
+      const missingDates = normalizedDrawDates.filter((date) => !existingDateSet.has(date))
+      if (missingDates.length > 0) {
+        await db.ticketCheck.createMany({
+          data: missingDates
+            .map((date) => parseDateOnly(date))
+            .filter((date): date is Date => Boolean(date))
+            .map((date) => ({
+              ticketId,
+              drawDate: date,
+              status: 'PENDIENTE' as const,
+              reason: 'Pendiente de comprobacion.',
+              winningNumbers: [],
+              winningStars: [],
+              matchesMain: 0,
+              matchesStars: 0,
+              checkedAt: new Date()
+            })),
+          skipDuplicates: true
+        })
+      }
+
+      const checks = await db.ticketCheck.findMany({
+        where: { ticketId },
+        orderBy: { drawDate: 'desc' }
+      })
+      const ticketData = await db.ticket.findUnique({
+        where: { id: ticketId },
+        include: {
+          group: true,
+          draw: true,
+          lines: {
+            include: { numbers: true }
+          },
+          receipt: true,
+          checks: {
+            orderBy: { drawDate: 'desc' }
+          }
+        }
+      })
+
+      return {
+        checksCount: checks.length,
+        normalizedDrawDates: Array.from(normalizedDateSet).sort((a, b) => a.localeCompare(b)),
+        ticket: ticketData
+      }
+    })
+
+    return NextResponse.json({ data: updated.ticket })
+  } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status })
+    }
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'No se pudo actualizar el boleto.' },
       { status: 500 }
     )
   }

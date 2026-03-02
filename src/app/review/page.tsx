@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 
 type DrawType = "PRIMITIVA" | "EUROMILLONES";
 type TicketStatus = "PENDIENTE" | "COMPROBADO" | "PREMIO";
+type PrimitivaCoverageMode = "SINGLE" | "WEEKLY";
 type MovementType =
   | "OPENING"
   | "ADJUSTMENT"
@@ -130,6 +131,7 @@ const DRAW_LABELS: Record<DrawType, string> = {
 const REVIEW_CACHE_TTL_MS = 60 * 60 * 1000;
 const REVIEW_TICKETS_CACHE_KEY = "review:api:tickets";
 const REVIEW_GROUPS_CACHE_KEY = "review:api:groups";
+const PRIMITIVA_DRAW_WEEKDAYS = new Set([1, 4, 6]);
 
 const formatDate = (value?: string | null) => {
   if (!value) return "Sin fecha";
@@ -201,6 +203,39 @@ const getStarNumbers = (line?: TicketLine) =>
         .map((number) => number.value)
     : [];
 
+const getPrimitivaWeeklyDrawDates = (drawDate: string) => {
+  const source = new Date(`${drawDate}T00:00:00.000Z`);
+  if (Number.isNaN(source.getTime())) return [];
+  const weekday = source.getUTCDay();
+  const mondayOffset = weekday === 0 ? -6 : 1 - weekday;
+  const monday = new Date(source);
+  monday.setUTCDate(source.getUTCDate() + mondayOffset);
+
+  return [0, 3, 5].map((offset) => {
+    const value = new Date(monday);
+    value.setUTCDate(monday.getUTCDate() + offset);
+    return value.toISOString().slice(0, 10);
+  });
+};
+
+const inferPrimitivaCoverageMode = (ticket: Ticket) => {
+  if (ticket.draw?.type !== "PRIMITIVA") return "SINGLE" as const;
+  const drawDate = toDateInput(ticket.draw?.drawDate);
+  if (!drawDate) return "SINGLE" as const;
+  const expectedWeekly = getPrimitivaWeeklyDrawDates(drawDate);
+  const currentDates = sortChecksByDate(ticket.checks)
+    .map((check) => toDateInput(check.drawDate))
+    .filter((value): value is string => Boolean(value))
+    .sort((a, b) => a.localeCompare(b));
+  if (
+    expectedWeekly.length === currentDates.length &&
+    expectedWeekly.every((date, index) => date === currentDates[index])
+  ) {
+    return "WEEKLY" as const;
+  }
+  return "SINGLE" as const;
+};
+
 function ReviewPageContent() {
   const ARCHIVED_PAGE_SIZE = 2;
   const router = useRouter();
@@ -229,6 +264,11 @@ function ReviewPageContent() {
   const [manualPrizeInput, setManualPrizeInput] = useState<string>("");
   const [savingPrize, setSavingPrize] = useState(false);
   const [prizeError, setPrizeError] = useState<string | null>(null);
+  const [editingTicket, setEditingTicket] = useState(false);
+  const [editTicketError, setEditTicketError] = useState<string | null>(null);
+  const [editDrawDate, setEditDrawDate] = useState<string>("");
+  const [editPrimitivaCoverageMode, setEditPrimitivaCoverageMode] =
+    useState<PrimitivaCoverageMode>("SINGLE");
   const [movementTypeFilter, setMovementTypeFilter] = useState<"ALL" | MovementType>(
     "ALL"
   );
@@ -337,10 +377,18 @@ function ReviewPageContent() {
   }, [loadData]);
 
   useEffect(() => {
-    if (!selectedTicket) return;
+    if (!selectedTicket) {
+      setEditDrawDate("");
+      setEditPrimitivaCoverageMode("SINGLE");
+      setEditTicketError(null);
+      return;
+    }
     setCheckDrawDate(toDateInput(selectedTicket.draw?.drawDate));
     setManualPrizeInput("");
     setPrizeError(null);
+    setEditDrawDate(toDateInput(selectedTicket.draw?.drawDate));
+    setEditPrimitivaCoverageMode(inferPrimitivaCoverageMode(selectedTicket));
+    setEditTicketError(null);
   }, [selectedTicket]);
 
   useEffect(() => {
@@ -495,6 +543,60 @@ function ReviewPageContent() {
     () => new Set(toNumberArray(activeCheck?.winningStars)),
     [activeCheck]
   );
+
+  const handleSaveTicketDrawScope = useCallback(async () => {
+    if (!selectedTicket?.draw) return;
+    if (!editDrawDate) {
+      setEditTicketError("Selecciona la fecha base del boleto.");
+      return;
+    }
+    const parsedBaseDate = new Date(`${editDrawDate}T00:00:00.000Z`);
+    if (Number.isNaN(parsedBaseDate.getTime())) {
+      setEditTicketError("La fecha base no es válida.");
+      return;
+    }
+    if (
+      selectedTicket.draw.type === "PRIMITIVA" &&
+      !PRIMITIVA_DRAW_WEEKDAYS.has(parsedBaseDate.getUTCDay())
+    ) {
+      setEditTicketError("Primitiva solo admite lunes, jueves o sábado.");
+      return;
+    }
+
+    setEditingTicket(true);
+    setEditTicketError(null);
+    try {
+      const drawDates =
+        selectedTicket.draw.type === "PRIMITIVA" && editPrimitivaCoverageMode === "WEEKLY"
+          ? getPrimitivaWeeklyDrawDates(editDrawDate)
+          : [editDrawDate];
+      const response = await fetch("/api/tickets", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ticketId: selectedTicket.id,
+          drawDate: editDrawDate,
+          drawDates,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        const issues = Array.isArray(payload?.issues) ? payload.issues.join(" ") : null;
+        throw new Error(issues || payload?.error || "No se pudo actualizar el boleto.");
+      }
+      setSelectedTicket(payload.data ?? null);
+      setCheckDrawDate(editDrawDate);
+      await loadData(true);
+    } catch (error) {
+      setEditTicketError(
+        error instanceof Error ? error.message : "No se pudo actualizar el boleto."
+      );
+    } finally {
+      setEditingTicket(false);
+    }
+  }, [editDrawDate, editPrimitivaCoverageMode, loadData, selectedTicket]);
 
   return (
     <div className="relative min-h-screen bg-[#f7f2ea] text-slate-900">
@@ -1087,6 +1189,69 @@ function ReviewPageContent() {
             </div>
 
             <div className="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+              <div className="mb-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Configuración de sorteos del boleto
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleSaveTicketDrawScope}
+                    disabled={editingTicket}
+                    className="rounded-full border border-slate-300 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600"
+                  >
+                    {editingTicket ? "Guardando..." : "Guardar cambios"}
+                  </button>
+                </div>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                      Fecha base
+                    </label>
+                    <input
+                      type="date"
+                      value={editDrawDate}
+                      onChange={(event) => setEditDrawDate(event.target.value)}
+                      className="rounded-full border border-slate-200 px-3 py-1 text-[11px] text-slate-700"
+                    />
+                  </div>
+                  {selectedTicket.draw?.type === "PRIMITIVA" ? (
+                    <div className="flex flex-col gap-2">
+                      <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                        Cobertura
+                      </label>
+                      <select
+                        value={editPrimitivaCoverageMode}
+                        onChange={(event) =>
+                          setEditPrimitivaCoverageMode(
+                            event.target.value as PrimitivaCoverageMode
+                          )
+                        }
+                        className="rounded-full border border-slate-200 px-3 py-1 text-[11px] text-slate-700"
+                      >
+                        <option value="SINGLE">Solo este sorteo</option>
+                        <option value="WEEKLY">Semana completa (L-J-S)</option>
+                      </select>
+                    </div>
+                  ) : null}
+                </div>
+                {selectedTicket.draw?.type === "PRIMITIVA" &&
+                editPrimitivaCoverageMode === "WEEKLY" &&
+                editDrawDate ? (
+                  <p className="mt-2 text-xs text-slate-500">
+                    Se aplicará a:{" "}
+                    {getPrimitivaWeeklyDrawDates(editDrawDate)
+                      .map((value) =>
+                        new Date(`${value}T00:00:00.000Z`).toLocaleDateString("es-ES")
+                      )
+                      .join(" · ")}
+                  </p>
+                ) : null}
+                {editTicketError ? (
+                  <p className="mt-2 text-xs text-rose-700">{editTicketError}</p>
+                ) : null}
+              </div>
+
               <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
                 <span>Comprobación de premio (base local)</span>
                 <div className="flex items-center gap-2">
