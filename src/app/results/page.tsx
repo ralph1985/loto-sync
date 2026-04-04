@@ -361,9 +361,6 @@ export default function ResultsPage() {
             <h2 className="text-lg font-semibold">Alta manual</h2>
             <p className="text-sm text-base-content/70">Primitiva (lunes, jueves o sábado).</p>
           </div>
-          <button type="button" onClick={() => setShowCreateModal(false)} className="btn btn-sm btn-ghost">
-            Cerrar
-          </button>
         </div>
 
         <form

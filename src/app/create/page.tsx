@@ -196,7 +196,15 @@ const TicketDetailModal = ({
         onClick={onClose}
       />
       <div className="relative max-h-[70vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_30px_80px_rgba(15,23,42,0.35)]">
-        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Cerrar modal"
+          className="absolute right-3 top-3 z-20 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
+        >
+          ✕
+        </button>
+        <div className="pr-8 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
             <div className="text-xs uppercase tracking-wide text-slate-400">
               {ticket.group?.name ?? "Grupo"} · {ticket.status}
@@ -214,13 +222,6 @@ const TicketDetailModal = ({
                 : "Sin Joker"}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
-          >
-            Cerrar
-          </button>
         </div>
 
         <div className="mt-5 grid gap-4 md:grid-cols-[1.2fr_0.8fr]">
