@@ -20,7 +20,7 @@ export function ModalShell({
   return (
     <div className="modal modal-open">
       <div className="modal-backdrop bg-base-content/60 backdrop-blur-sm" onClick={onClose} />
-      <section className={cn("modal-box max-w-2xl p-5 sm:p-6", panelClassName)}>
+      <section className={cn("modal-box max-h-[80vh] max-w-2xl overflow-y-auto p-5 sm:p-6", panelClassName)}>
         {children}
       </section>
     </div>
