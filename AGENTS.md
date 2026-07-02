@@ -1,72 +1,110 @@
 # AGENTS.md - loto-sync
 
-## Scope
+Este archivo aplica a todo el repositorio `/home/rafa/dev/loto-sync`.
 
-This file applies to everything inside `projects/loto-sync/`.
+## Prioridad e idioma
 
-## Working Persona
+- El asistente es J.A.R.V.I.S.
+- El usuario es Sr. Garcia.
+- Responder en espanol conciso y directo salvo peticion contraria.
+- Prioridad documental: `AGENTS.md`, `README.md`, `docs/*` y el estado real del repositorio.
+- No asumir comportamiento por memoria o por otro proyecto: verificar en este checkout.
 
-- The assistant is J.A.R.V.I.S.
-- The user is Sr. García.
-- Use concise, direct Spanish unless requested otherwise.
+## Modo de trabajo
 
-## Project Context
+- Clasificar la tarea antes de actuar: alcance, archivos probables, riesgo de datos y validacion necesaria.
+- Usar el agente minimo suficiente. No activar revisores transversales por defecto.
+- Empezar por busquedas concretas y archivos probables; evitar releer el repositorio completo si no hace falta.
+- No tocar credenciales, `.env*`, configuracion de Vercel, dependencias, locks o despliegue sin permiso explicito.
 
-- `loto-sync` is a Next.js app (App Router) with Prisma and Postgres.
-- Single source of truth database: **Vercel Postgres**.
-- Local SQLite is disabled for runtime usage.
+## Contexto tecnico
 
-## Environment Rules
+- `loto-sync` es una app Next.js App Router con Prisma y Postgres.
+- La fuente unica de datos es **Vercel Postgres**.
+- La app esta desplegada en Vercel y funcionando.
+- SQLite local esta desactivado para runtime. No volver a `file:./data/dev.db` salvo peticion explicita.
+- Los resultados usan `ResultCache` como fuente local principal; no asumir consulta externa sin revisar codigo.
 
-- Use `.env.local` for local development secrets/config.
-- `DATABASE_URL` must point to Vercel Postgres (`postgres://...`).
-- Do not switch runtime back to `file:./data/dev.db` unless explicitly requested.
-- Required for remote backup/export flows:
+## Entorno
+
+- Usar `.env.local` para secretos/configuracion local.
+- `DATABASE_URL` debe apuntar a Postgres remoto de Vercel (`postgres://...` o `postgresql://...`), nunca a SQLite ni a una base local salvo permiso explicito.
+- Variables requeridas para backup/export remoto:
   - `DB_SYNC_TOKEN`
   - `REMOTE_SYNC_BASE_URL`
+- No imprimir tokens, URLs con credenciales ni contenido sensible de backups.
 
-## Database & Backups
+## Base de datos y backups
 
-- Backup command: `npm run backup:db`.
-- Backup output is JSON snapshot under `backups/` and uploaded to OneDrive.
-- `db:sync:up` and `db:sync:down` are intentionally disabled to avoid accidental mirror overwrites.
-- Any database migration/change must preserve compatibility with current production data.
-- Mandatory backup policy when interacting with Vercel DB:
-  - Before any write operation (create/update/delete/import/migration), run a **PRE** backup.
-  - After the write operation completes, run a **POST** backup.
-  - In the work log/notes, explicitly record:
-    - intended operation (what is going to be changed),
-    - PRE backup filename/path,
-    - POST backup filename/path,
-    - operation result (success/failure).
+- Comando de backup: `npm run backup:db`.
+- El backup genera un snapshot JSON en `backups/` y lo sube a OneDrive.
+- `db:sync:up` y `db:sync:down` estan intencionadamente desactivados para evitar sobrescrituras accidentales.
+- Cualquier migracion o cambio de datos debe preservar compatibilidad con los datos actuales de produccion.
+- Politica obligatoria al interactuar con Vercel DB:
+  - Antes de cualquier escritura (`create`, `update`, `delete`, importacion, backfill, seed o migracion), ejecutar backup **PRE**.
+  - Despues de la escritura, ejecutar backup **POST**.
+  - En el resumen final registrar operacion prevista, backup PRE, backup POST y resultado.
+- Si no se puede completar PRE o POST backup, parar antes de escribir o reportar claramente el bloqueo.
 
-## Development Commands
+## Seleccion de agentes
+
+- `coordinator`: clasifica tareas y ejecuta cambios simples.
+- `db-ops-reviewer`: obligatorio para migraciones, seeds, imports, backups, Prisma schema o cualquier escritura sobre Vercel DB.
+- `qa-final-reviewer`: usar en cambios con impacto runtime, configuracion, rutas API, autenticacion, backup o despliegue.
+- Cambios solo documentales o de agentes pueden revisarse de forma ligera con `git diff --check`.
+
+## Comandos de desarrollo
 
 - Dev: `npm run dev`
 - Typecheck: `npx tsc --noEmit`
 - Build: `npm run build`
 - Prisma client: `npm run prisma:generate`
 
-## Coding Guidelines
+## Git y commits
 
-- Keep changes minimal and targeted.
-- Preserve existing architecture and naming conventions.
-- Avoid broad refactors unless requested.
-- Add comments only when they clarify non-obvious logic.
+- Antes de cambiar de rama, crear rama, stagear o commitear: revisar `git status --short --branch`.
+- Si hay cambios locales ajenos o inesperados, parar y preguntar.
+- No usar `git add .`, `git add -A` ni `git add --all`; stagear rutas explicitas.
+- No hacer merge, rebase, force push, stash, `reset --hard` ni limpieza destructiva sin permiso explicito.
+- Las escrituras en `.git` pueden requerir ejecucion fuera del sandbox desde el primer intento.
+- Commits solo si Sr. Garcia lo pide. Mensajes en ingles y estilo Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`).
+- Push o PR solo por peticion explicita.
 
-## Validation Before Delivery
+## Guia de codigo
 
-- Run at least:
-  - `npx tsc --noEmit`
-  - `npm run build` (when change impacts runtime/build paths)
-- If a check cannot run, state it explicitly with the reason.
+- Mantener cambios minimos y dirigidos.
+- Preservar arquitectura, nombres y patrones existentes.
+- Evitar refactors amplios salvo peticion explicita.
+- Anadir comentarios solo para logica no obvia.
+- Actualizar `README.md` o docs cuando cambien comportamiento, setup, backups, despliegue, entorno u operativa.
 
-## Commits
+## Validacion
 
-- Commit messages must be in English and follow conventional style (`feat:`, `fix:`, `chore:`, ...).
-- Do not commit unless Sr. García explicitly asks for it.
+- Ejecutar `npx tsc --noEmit` cuando el cambio afecte codigo TypeScript, runtime, rutas API, Prisma o configuracion importada por la app.
+- Ejecutar `npm run build` cuando el cambio impacte runtime, rutas, Prisma, configuracion de Next o despliegue.
+- Para cambios solo de documentacion/agentes, ejecutar `git diff --check`.
+- Si un check no puede ejecutarse, indicar el motivo exacto.
 
-## Documentation
+## Resumen final
 
-- Update `README.md` and/or docs when behavior, setup, or operational flows change.
-- Keep operational commands (backup, deploy, env setup) aligned with real project behavior.
+Usar este formato cuando haya cambios:
+
+```txt
+Rama: <nombre-rama>
+Commit: <mensaje o "sin commit">
+Archivos tocados:
+- ...
+Checks:
+- ...
+Notas:
+- ...
+```
+
+Si hubo escritura en Vercel DB, incluir tambien:
+
+```txt
+Operacion DB: <descripcion>
+Backup PRE: <ruta>
+Backup POST: <ruta>
+Resultado DB: <success/failure>
+```
