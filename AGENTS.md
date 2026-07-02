@@ -1,6 +1,6 @@
 # AGENTS.md - loto-sync
 
-Este archivo aplica a todo el repositorio `/home/rafa/dev/loto-sync`.
+Este archivo aplica a todo este repositorio.
 
 ## Prioridad e idioma
 
@@ -21,7 +21,7 @@ Este archivo aplica a todo el repositorio `/home/rafa/dev/loto-sync`.
 
 - `loto-sync` es una app Next.js App Router con Prisma y Postgres.
 - La fuente unica de datos es **Vercel Postgres**.
-- La app esta desplegada en Vercel y funcionando.
+- El despliegue objetivo de la app es Vercel.
 - SQLite local esta desactivado para runtime. No volver a `file:./data/dev.db` salvo peticion explicita.
 - Los resultados usan `ResultCache` como fuente local principal; no asumir consulta externa sin revisar codigo.
 
