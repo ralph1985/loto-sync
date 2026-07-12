@@ -164,6 +164,15 @@ const formatPrice = (priceCents?: number | null) => {
   return `${(priceCents / 100).toFixed(2)} EUR`;
 };
 
+const parseEuroAmountToCents = (value: string) => {
+  const normalized = value.trim().replace(",", ".");
+  if (!normalized) return null;
+  if (!/^\d+(\.\d{1,2})?$/.test(normalized)) return null;
+  const parsed = Number.parseFloat(normalized);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return Math.round(parsed * 100);
+};
+
 const toNumberArray = (value: unknown): number[] => {
   if (!Array.isArray(value)) return [];
   return value
@@ -276,10 +285,19 @@ function ReviewPageContent() {
   const [loadingMovements, setLoadingMovements] = useState(false);
   const [movementsError, setMovementsError] = useState<string | null>(null);
   const [showMovementsModal, setShowMovementsModal] = useState(false);
+  const [showContributionModal, setShowContributionModal] = useState(false);
+  const [contributionAmountInput, setContributionAmountInput] = useState("");
+  const [contributionNoteInput, setContributionNoteInput] = useState("");
+  const [savingContribution, setSavingContribution] = useState(false);
+  const [contributionError, setContributionError] = useState<string | null>(null);
   const [archivedVisibleCount, setArchivedVisibleCount] = useState(0);
 
   const loadData = useCallback(async (forceRefresh = false) => {
     const now = Date.now();
+    if (forceRefresh && typeof window !== "undefined") {
+      window.localStorage.removeItem(REVIEW_TICKETS_CACHE_KEY);
+      window.localStorage.removeItem(REVIEW_GROUPS_CACHE_KEY);
+    }
     const readCache = <T,>(key: string): T | null => {
       if (forceRefresh || typeof window === "undefined") return null;
       const raw = window.localStorage.getItem(key);
@@ -478,45 +496,60 @@ function ReviewPageContent() {
     return groups.find((group) => group.id === groupFilter)?.balanceCents ?? 0;
   }, [groupFilter, groups]);
 
-  useEffect(() => {
-    if (groupFilter === "ALL") {
-      setGroupMovements([]);
-      setMovementsError(null);
-      setShowMovementsModal(false);
-      return;
-    }
+  const loadMovements = useCallback(
+    async (options?: { signal?: AbortSignal; type?: "ALL" | MovementType }) => {
+      if (groupFilter === "ALL") {
+        setGroupMovements([]);
+        setMovementsError(null);
+        return;
+      }
 
-    let isActive = true;
-    const loadMovements = async () => {
       setLoadingMovements(true);
       setMovementsError(null);
+      let aborted = false;
       try {
-        const query =
-          movementTypeFilter === "ALL" ? "" : `?type=${movementTypeFilter}`;
-        const response = await fetch(`/api/groups/${groupFilter}/movements${query}`);
+        const selectedType = options?.type ?? movementTypeFilter;
+        const query = selectedType === "ALL" ? "" : `?type=${selectedType}`;
+        const response = await fetch(`/api/groups/${groupFilter}/movements${query}`, {
+          signal: options?.signal,
+        });
         const payload = await response.json();
         if (!response.ok) {
           throw new Error(payload?.error || "No se pudo cargar historial de bote.");
         }
-        if (!isActive) return;
         setGroupMovements(payload.data ?? []);
       } catch (movementLoadError) {
-        if (!isActive) return;
+        if (movementLoadError instanceof DOMException && movementLoadError.name === "AbortError") {
+          aborted = true;
+          return;
+        }
         setMovementsError(
           movementLoadError instanceof Error
             ? movementLoadError.message
             : "No se pudo cargar historial de bote."
         );
       } finally {
-        if (isActive) setLoadingMovements(false);
+        if (!aborted) setLoadingMovements(false);
       }
-    };
+    },
+    [groupFilter, movementTypeFilter]
+  );
 
-    loadMovements();
+  useEffect(() => {
+    if (groupFilter === "ALL") {
+      setGroupMovements([]);
+      setMovementsError(null);
+      setShowMovementsModal(false);
+      setShowContributionModal(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    loadMovements({ signal: controller.signal });
     return () => {
-      isActive = false;
+      controller.abort();
     };
-  }, [groupFilter, movementTypeFilter, tickets]);
+  }, [groupFilter, loadMovements, tickets]);
 
   useEffect(() => {
     setArchivedVisibleCount(0);
@@ -543,6 +576,83 @@ function ReviewPageContent() {
     () => new Set(toNumberArray(activeCheck?.winningStars)),
     [activeCheck]
   );
+
+  const openContributionModal = useCallback(() => {
+    setContributionAmountInput("");
+    setContributionNoteInput("");
+    setContributionError(null);
+    setShowContributionModal(true);
+  }, []);
+
+  const closeContributionModal = useCallback(() => {
+    if (savingContribution) return;
+    setShowContributionModal(false);
+    setContributionAmountInput("");
+    setContributionNoteInput("");
+    setContributionError(null);
+  }, [savingContribution]);
+
+  const handleRefreshData = useCallback(async () => {
+    setError(null);
+    try {
+      await loadData(true);
+      await loadMovements();
+    } catch (refreshError) {
+      setError(
+        refreshError instanceof Error
+          ? refreshError.message
+          : "No se pudieron actualizar los datos."
+      );
+    }
+  }, [loadData, loadMovements]);
+
+  const handleSaveContribution = useCallback(async () => {
+    if (groupFilter === "ALL") return;
+    const amountCents = parseEuroAmountToCents(contributionAmountInput);
+    if (!amountCents) {
+      setContributionError("Introduce un importe positivo con maximo 2 decimales.");
+      return;
+    }
+
+    setSavingContribution(true);
+    setContributionError(null);
+    try {
+      const response = await fetch(`/api/groups/${groupFilter}/movements`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          amountCents,
+          note: contributionNoteInput.trim() || undefined,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload?.error || "No se pudo registrar la aportacion.");
+      }
+
+      await loadData(true);
+      setMovementTypeFilter("ALL");
+      await loadMovements({ type: "ALL" });
+      closeContributionModal();
+    } catch (saveError) {
+      setContributionError(
+        saveError instanceof Error
+          ? saveError.message
+          : "No se pudo registrar la aportacion."
+      );
+    } finally {
+      setSavingContribution(false);
+    }
+  }, [
+    closeContributionModal,
+    contributionAmountInput,
+    contributionNoteInput,
+    groupFilter,
+    loadData,
+    loadMovements,
+  ]);
 
   const handleSaveTicketDrawScope = useCallback(async () => {
     if (!selectedTicket?.draw) return;
@@ -691,19 +801,28 @@ function ReviewPageContent() {
               <div className="mt-2 flex flex-wrap gap-2">
                 <button
                   type="button"
-                  onClick={() => loadData(true)}
+                  onClick={() => handleRefreshData()}
                   className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600"
                 >
-                  Recargar
+                  Actualizar datos
                 </button>
                 {groupFilter !== "ALL" ? (
-                  <button
-                    type="button"
-                    onClick={() => setShowMovementsModal(true)}
-                    className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600"
-                  >
-                    Ver historial
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={openContributionModal}
+                      className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-700"
+                    >
+                      Recargar bote
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowMovementsModal(true)}
+                      className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600"
+                    >
+                      Ver historial
+                    </button>
+                  </>
                 ) : null}
               </div>
             </div>
@@ -1054,6 +1173,105 @@ function ReviewPageContent() {
           ) : null}
         </section>
       </main>
+
+      {showContributionModal && groupFilter !== "ALL" ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-10">
+          <div
+            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+            onClick={closeContributionModal}
+          />
+          <form
+            className="relative w-full max-w-md rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_30px_80px_rgba(15,23,42,0.35)] sm:p-6"
+            onSubmit={(event) => {
+              event.preventDefault();
+              handleSaveContribution();
+            }}
+          >
+            <button
+              type="button"
+              onClick={closeContributionModal}
+              disabled={savingContribution}
+              aria-label="Cerrar modal"
+              className="absolute right-3 top-3 z-20 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-slate-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              X
+            </button>
+            <div className="mb-5 pr-8">
+              <h3 className="text-lg font-semibold text-slate-900">Recargar bote</h3>
+              <p className="mt-1 text-sm text-slate-500">
+                {groups.find((group) => group.id === groupFilter)?.name ?? "Grupo"}
+              </p>
+              <p className="mt-1 text-sm font-semibold text-slate-900">
+                Bote actual: {formatPrice(selectedGroupBalanceCents)}
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex flex-col gap-2">
+                <label
+                  htmlFor="contribution-amount"
+                  className="text-xs font-semibold uppercase tracking-wide text-slate-500"
+                >
+                  Importe
+                </label>
+                <input
+                  id="contribution-amount"
+                  inputMode="decimal"
+                  value={contributionAmountInput}
+                  onChange={(event) => {
+                    setContributionAmountInput(event.target.value);
+                    setContributionError(null);
+                  }}
+                  placeholder="10,00"
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
+                  disabled={savingContribution}
+                  autoFocus
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label
+                  htmlFor="contribution-note"
+                  className="text-xs font-semibold uppercase tracking-wide text-slate-500"
+                >
+                  Nota opcional
+                </label>
+                <textarea
+                  id="contribution-note"
+                  value={contributionNoteInput}
+                  onChange={(event) => setContributionNoteInput(event.target.value)}
+                  className="min-h-24 resize-y rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
+                  disabled={savingContribution}
+                />
+              </div>
+
+              {contributionError ? (
+                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                  {contributionError}
+                </div>
+              ) : null}
+
+              <div className="flex flex-wrap justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={closeContributionModal}
+                  disabled={savingContribution}
+                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingContribution}
+                  className="rounded-full border border-emerald-600 bg-emerald-600 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {savingContribution ? "Guardando..." : "Guardar aportacion"}
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      ) : null}
 
       {showMovementsModal && groupFilter !== "ALL" ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-10">
