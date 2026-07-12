@@ -49,3 +49,62 @@ export async function GET(
     return NextResponse.json({ error: 'No se pudo cargar historial.' }, { status: 500 })
   }
 }
+
+export async function POST(
+  request: Request,
+  context: { params: Promise<{ groupId: string }> }
+) {
+  try {
+    const actor = await requireSessionUser()
+    const { groupId } = await context.params
+    await requireGroupAccess(actor.id, groupId)
+
+    const payload = await request.json().catch(() => null) as {
+      amountCents?: unknown
+      note?: unknown
+    } | null
+    const amountCents = payload?.amountCents
+    const note = typeof payload?.note === 'string' ? payload.note.trim() : ''
+
+    if (typeof amountCents !== 'number' || !Number.isInteger(amountCents) || amountCents <= 0) {
+      return NextResponse.json(
+        { error: 'amountCents debe ser un entero positivo.' },
+        { status: 400 }
+      )
+    }
+
+    const movement = await prisma.$transaction(async (tx) => {
+      const created = await tx.groupMovement.create({
+        data: {
+          groupId,
+          type: 'CONTRIBUTION',
+          amountCents,
+          occurredAt: new Date(),
+          note: note || null
+        }
+      })
+
+      await tx.auditLog.create({
+        data: {
+          actorId: actor.id,
+          entityType: 'GROUP',
+          entityId: groupId,
+          action: 'CREATE_GROUP_CONTRIBUTION',
+          payload: {
+            movementId: created.id,
+            amountCents
+          }
+        }
+      })
+
+      return created
+    })
+
+    return NextResponse.json({ data: movement }, { status: 201 })
+  } catch (error) {
+    if (error instanceof ApiAuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status })
+    }
+    return NextResponse.json({ error: 'No se pudo registrar la aportacion.' }, { status: 500 })
+  }
+}
