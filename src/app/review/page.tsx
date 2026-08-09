@@ -2,13 +2,12 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 
-import { ModalShell } from "@/components/ui/modal-shell";
 import { ContributionModal } from "@/components/review/contribution-modal";
 import { MovementsModal } from "@/components/review/movements-modal";
 import { ReviewFilters } from "@/components/review/review-filters";
+import { TicketReviewModal } from "@/components/review/ticket-review-modal";
 import {
   buildDrawLabel,
-  formatDate,
   formatDateTime,
   formatPrice,
   getMainNumbers,
@@ -583,6 +582,84 @@ function ReviewPageContent() {
     }
   }, [editDrawDate, editPrimitivaCoverageMode, loadData, selectedTicket]);
 
+  const handleVerifyTicket = useCallback(async () => {
+    if (!selectedTicket) return;
+    setVerifying(true);
+    setVerifyError(null);
+    setVerifyResult(null);
+    try {
+      const query = new URLSearchParams({ ticketId: selectedTicket.id });
+      if (checkDrawDate) query.set("drawDate", checkDrawDate);
+      const response = await fetch(`/api/results/verify?${query.toString()}`);
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload?.error || "Error al comprobar.");
+      setVerifyResult(payload.data);
+      await loadData(true);
+    } catch (verifyLoadError) {
+      setVerifyError(
+        verifyLoadError instanceof Error ? verifyLoadError.message : "Error al comprobar."
+      );
+    } finally {
+      setVerifying(false);
+    }
+  }, [checkDrawDate, loadData, selectedTicket]);
+
+  const handleRecheckTicket = useCallback(async () => {
+    if (!selectedTicket) return;
+    setRechecking(true);
+    setVerifyError(null);
+    try {
+      const response = await fetch("/api/results/recheck", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ticketId: selectedTicket.id }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload?.error || "No se pudo recomprobar.");
+      await loadData(true);
+    } catch (recheckError) {
+      setVerifyError(
+        recheckError instanceof Error
+          ? recheckError.message
+          : "No se pudo recomprobar."
+      );
+    } finally {
+      setRechecking(false);
+    }
+  }, [loadData, selectedTicket]);
+
+  const handleSaveManualPrize = useCallback(async () => {
+    if (!selectedTicket) return;
+    setPrizeError(null);
+    const parsed = Number.parseFloat(manualPrizeInput.replace(",", "."));
+    if (Number.isNaN(parsed) || parsed < 0) {
+      setPrizeError("Introduce un importe válido.");
+      return;
+    }
+
+    setSavingPrize(true);
+    try {
+      const response = await fetch("/api/results/prize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ticketId: selectedTicket.id,
+          drawDate: checkDrawDate || undefined,
+          prizeCents: Math.round(parsed * 100),
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload?.error || "No se pudo guardar.");
+      await loadData(true);
+    } catch (prizeSaveError) {
+      setPrizeError(
+        prizeSaveError instanceof Error ? prizeSaveError.message : "No se pudo guardar."
+      );
+    } finally {
+      setSavingPrize(false);
+    }
+  }, [checkDrawDate, loadData, manualPrizeInput, selectedTicket]);
+
   return (
     <div className="relative min-h-screen bg-[#f7f2ea] text-slate-900">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
@@ -999,370 +1076,33 @@ function ReviewPageContent() {
         />
       ) : null}
 
-      {selectedTicket ? (
-        <ModalShell
-          open
-          onClose={() => setSelectedTicket(null)}
-          ariaLabel="Detalle del boleto"
-          panelClassName="max-w-4xl border border-slate-200 bg-white p-6 shadow-[0_30px_80px_rgba(15,23,42,0.35)]"
-        >
-            <div className="pr-8 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-              <div>
-                <div className="text-xs uppercase tracking-wide text-slate-400">
-                  {selectedTicket.group?.name ?? "Grupo"} · {selectedTicket.status}
-                </div>
-                <h3 className="mt-1 text-2xl font-semibold text-slate-900">
-                  {buildDrawLabel(selectedTicket.draw)}
-                </h3>
-                <p className="text-sm text-slate-500">
-                  {formatDateTime(selectedTicket.createdAt)}
-                </p>
-                <p className="text-xs text-slate-500">
-                  {formatPrice(selectedTicket.priceCents)} ·{" "}
-                  {selectedTicket.draw?.type === "PRIMITIVA"
-                    ? selectedTicket.playsJoker
-                      ? `Joker ${selectedTicket.jokerNumber ?? "-"}`
-                      : "Sin Joker"
-                    : "Joker no aplica"}
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-3">
-              <div className="mb-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Configuración de sorteos del boleto
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleSaveTicketDrawScope}
-                    disabled={editingTicket}
-                    className="rounded-full border border-slate-300 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600"
-                  >
-                    {editingTicket ? "Guardando..." : "Guardar cambios"}
-                  </button>
-                </div>
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                      Fecha base
-                    </label>
-                    <input
-                      type="date"
-                      value={editDrawDate}
-                      onChange={(event) => setEditDrawDate(event.target.value)}
-                      className="rounded-full border border-slate-200 px-3 py-1 text-[11px] text-slate-700"
-                    />
-                  </div>
-                  {selectedTicket.draw?.type === "PRIMITIVA" ? (
-                    <div className="flex flex-col gap-2">
-                      <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                        Cobertura
-                      </label>
-                      <select
-                        value={editPrimitivaCoverageMode}
-                        onChange={(event) =>
-                          setEditPrimitivaCoverageMode(
-                            event.target.value as PrimitivaCoverageMode
-                          )
-                        }
-                        className="rounded-full border border-slate-200 px-3 py-1 text-[11px] text-slate-700"
-                      >
-                        <option value="SINGLE">Solo este sorteo</option>
-                        <option value="WEEKLY">Semana completa (L-J-S)</option>
-                      </select>
-                    </div>
-                  ) : null}
-                </div>
-                {selectedTicket.draw?.type === "PRIMITIVA" &&
-                editPrimitivaCoverageMode === "WEEKLY" &&
-                editDrawDate ? (
-                  <p className="mt-2 text-xs text-slate-500">
-                    Se aplicará a:{" "}
-                    {getPrimitivaWeeklyDrawDates(editDrawDate)
-                      .map((value) =>
-                        new Date(`${value}T00:00:00.000Z`).toLocaleDateString("es-ES")
-                      )
-                      .join(" · ")}
-                  </p>
-                ) : null}
-                {editTicketError ? (
-                  <p className="mt-2 text-xs text-rose-700">{editTicketError}</p>
-                ) : null}
-              </div>
-
-              <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
-                <span>Comprobación de premio (base local)</span>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="date"
-                    value={checkDrawDate}
-                    onChange={(event) => setCheckDrawDate(event.target.value)}
-                    className="rounded-full border border-slate-200 px-3 py-1 text-[11px] text-slate-600"
-                  />
-                  <button
-                    type="button"
-                    disabled={rechecking}
-                    onClick={async () => {
-                      setVerifying(true);
-                      setVerifyError(null);
-                      setVerifyResult(null);
-                      try {
-                        const query = new URLSearchParams({
-                          ticketId: selectedTicket.id,
-                        });
-                        if (checkDrawDate) query.set("drawDate", checkDrawDate);
-                        const response = await fetch(
-                          `/api/results/verify?${query.toString()}`
-                        );
-                        const payload = await response.json();
-                        if (!response.ok) {
-                          throw new Error(payload?.error || "Error al comprobar.");
-                        }
-                        setVerifyResult(payload.data);
-                        await loadData(true);
-                      } catch (verifyLoadError) {
-                        setVerifyError(
-                          verifyLoadError instanceof Error
-                            ? verifyLoadError.message
-                            : "Error al comprobar."
-                        );
-                      } finally {
-                        setVerifying(false);
-                      }
-                    }}
-                    className="rounded-full border border-slate-200 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500 transition hover:border-slate-400 hover:text-slate-700"
-                  >
-                    {verifying ? "Comprobando..." : "Comprobar"}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={verifying}
-                    onClick={async () => {
-                      setRechecking(true);
-                      setVerifyError(null);
-                      try {
-                        const response = await fetch("/api/results/recheck", {
-                          method: "POST",
-                          headers: {
-                            "Content-Type": "application/json",
-                          },
-                          body: JSON.stringify({
-                            ticketId: selectedTicket.id,
-                          }),
-                        });
-                        const payload = await response.json();
-                        if (!response.ok) {
-                          throw new Error(payload?.error || "No se pudo recomprobar.");
-                        }
-                        await loadData(true);
-                      } catch (recheckError) {
-                        setVerifyError(
-                          recheckError instanceof Error
-                            ? recheckError.message
-                            : "No se pudo recomprobar."
-                        );
-                      } finally {
-                        setRechecking(false);
-                      }
-                    }}
-                    className="rounded-full border border-slate-200 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500 transition hover:border-slate-400 hover:text-slate-700"
-                  >
-                    {rechecking ? "Recomprobando..." : "Recomprobar semanas"}
-                  </button>
-                </div>
-              </div>
-
-              {verifyError ? (
-                <div className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
-                  {verifyError}
-                </div>
-              ) : null}
-
-              {verifyResult ? (
-                <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
-                  {verifyResult.status === "PENDIENTE"
-                    ? verifyResult.reason ?? "Pendiente de sorteo."
-                    : `Aciertos: ${verifyResult.matches?.main ?? 0}${
-                        verifyResult.matches?.stars
-                          ? ` + ${verifyResult.matches.stars} estrellas`
-                          : ""
-                      }`}
-                </div>
-              ) : null}
-
-              <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                  <span>Premio manual (EUR):</span>
-                  <input
-                    value={manualPrizeInput}
-                    onChange={(event) => setManualPrizeInput(event.target.value)}
-                    placeholder="0.00"
-                    inputMode="decimal"
-                    className="w-24 rounded-full border border-slate-300 px-3 py-1 text-[11px] text-slate-700"
-                  />
-                  <button
-                    type="button"
-                    disabled={savingPrize}
-                    onClick={async () => {
-                      setPrizeError(null);
-                      const parsed = Number.parseFloat(
-                        manualPrizeInput.replace(",", ".")
-                      );
-                      if (Number.isNaN(parsed) || parsed < 0) {
-                        setPrizeError("Introduce un importe válido.");
-                        return;
-                      }
-
-                      setSavingPrize(true);
-                      try {
-                        const response = await fetch("/api/results/prize", {
-                          method: "POST",
-                          headers: {
-                            "Content-Type": "application/json",
-                          },
-                          body: JSON.stringify({
-                            ticketId: selectedTicket.id,
-                            drawDate: checkDrawDate || undefined,
-                            prizeCents: Math.round(parsed * 100),
-                          }),
-                        });
-                        const payload = await response.json();
-                        if (!response.ok) {
-                          throw new Error(payload?.error || "No se pudo guardar.");
-                        }
-                        await loadData(true);
-                      } catch (prizeSaveError) {
-                        setPrizeError(
-                          prizeSaveError instanceof Error
-                            ? prizeSaveError.message
-                            : "No se pudo guardar."
-                        );
-                      } finally {
-                        setSavingPrize(false);
-                      }
-                    }}
-                    className="rounded-full border border-slate-300 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600"
-                  >
-                    {savingPrize ? "Guardando..." : "Guardar premio"}
-                  </button>
-                </div>
-                {prizeError ? (
-                  <p className="mt-2 text-xs text-rose-700">{prizeError}</p>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="mt-5 grid gap-4 md:grid-cols-[1.2fr_0.8fr]">
-              <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
-                <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Números
-                </h4>
-                <div className="mt-3 space-y-3">
-                  {(selectedTicket.lines ?? []).map((line) => {
-                    const main = getMainNumbers(line);
-                    const stars = getStarNumbers(line);
-                    return (
-                      <div
-                        key={line.id}
-                        className="rounded-2xl border border-slate-200 bg-white px-4 py-3"
-                      >
-                        <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                          Línea {line.lineIndex}
-                        </div>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {main.map((value, index) => (
-                            <span
-                              key={`${line.id}-main-${index}`}
-                              className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                                winningMainNumbers.has(value)
-                                  ? "bg-emerald-500 text-white"
-                                  : "bg-slate-900 text-white"
-                              }`}
-                            >
-                              {value}
-                            </span>
-                          ))}
-                        </div>
-                        {stars.length > 0 ? (
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            {stars.map((value, index) => (
-                              <span
-                                key={`${line.id}-star-${index}`}
-                                className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                                  winningStars.has(value)
-                                    ? "bg-emerald-200 text-emerald-900"
-                                    : "bg-[#f9c784] text-slate-900"
-                                }`}
-                              >
-                                {value}
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="mt-2 text-xs text-slate-500">
-                            Complementario: {line.complement ?? "-"} · Reintegro: {" "}
-                            {line.reintegro ?? "-"}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {(selectedTicket.checks?.length ?? 0) > 0 ? (
-                  <div className="mt-4 rounded-2xl border border-slate-200 bg-white px-3 py-2">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Historial de comprobaciones
-                    </p>
-                    <div className="mt-2 space-y-1 text-xs text-slate-600">
-                      {sortChecksByDate(selectedTicket.checks).map((check) => (
-                        <div
-                          key={check.id}
-                          className="flex flex-wrap items-center justify-between gap-2"
-                        >
-                          <span>
-                            {formatDate(check.drawDate)} · {check.status} · {check.matchesMain}
-                            {check.matchesStars
-                              ? ` + ${check.matchesStars} estrellas`
-                              : ""}
-                          </span>
-                          <span>{formatPrice(check.prizeCents ?? null)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
-                <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Resguardo
-                </h4>
-                {selectedTicket.receipt?.blobUrl ? (
-                  <div className="mt-3 space-y-3">
-                    <img
-                      src={selectedTicket.receipt.blobUrl}
-                      alt="Resguardo"
-                      className="w-full rounded-2xl border border-slate-200 object-cover"
-                    />
-                    <a
-                      href={selectedTicket.receipt.blobUrl}
-                      className="text-xs font-semibold uppercase tracking-wide text-slate-500"
-                    >
-                      Abrir imagen
-                    </a>
-                  </div>
-                ) : (
-                  <p className="mt-3 text-sm text-slate-500">
-                    No hay resguardo adjunto.
-                  </p>
-                )}
-              </div>
-            </div>
-        </ModalShell>
-      ) : null}
+      <TicketReviewModal
+        ticket={selectedTicket}
+        onClose={() => setSelectedTicket(null)}
+        editDrawDate={editDrawDate}
+        onEditDrawDateChange={setEditDrawDate}
+        editCoverageMode={editPrimitivaCoverageMode}
+        onEditCoverageModeChange={setEditPrimitivaCoverageMode}
+        onSaveDrawScope={handleSaveTicketDrawScope}
+        editingTicket={editingTicket}
+        editTicketError={editTicketError}
+        weeklyDrawDates={getPrimitivaWeeklyDrawDates}
+        checkDrawDate={checkDrawDate}
+        onCheckDrawDateChange={setCheckDrawDate}
+        onVerify={handleVerifyTicket}
+        verifying={verifying}
+        onRecheck={handleRecheckTicket}
+        rechecking={rechecking}
+        verifyError={verifyError}
+        verifyResult={verifyResult}
+        manualPrizeInput={manualPrizeInput}
+        onManualPrizeChange={setManualPrizeInput}
+        onSavePrize={handleSaveManualPrize}
+        savingPrize={savingPrize}
+        prizeError={prizeError}
+        winningMainNumbers={winningMainNumbers}
+        winningStars={winningStars}
+      />
     </div>
   );
 }
