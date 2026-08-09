@@ -1,27 +1,15 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { NumberBadge } from "@/components/ui/number-badge";
 import { RecentTickets } from "@/components/create/recent-tickets";
-import { TicketCreateForm, type LineState } from "@/components/create/ticket-create-form";
+import { TicketCreateForm } from "@/components/create/ticket-create-form";
 import { TicketDetailModal } from "@/components/tickets/ticket-detail-modal";
-import { buildDrawLabel, formatDate, formatPrice } from "@/features/tickets/formatters";
-import type {
-  Draw,
-  DrawType,
-  Group,
-  PrimitivaCoverageMode,
-  Ticket,
-} from "@/features/tickets/types";
-import {
-  API_GROUPS_CACHE_KEY,
-  API_TICKETS_CACHE_KEY,
-  readApiCache,
-  writeApiCache,
-} from "@/lib/api-cache";
-import { loadSessionClient } from "@/lib/session-client";
+import { buildDrawLabel, formatPrice } from "@/features/tickets/formatters";
+import type { DrawType, Ticket } from "@/features/tickets/types";
+import { useCreateData } from "@/hooks/use-create-data";
+import { useTicketCreation } from "@/hooks/use-ticket-creation";
 
 const DRAW_TYPES: { id: DrawType; label: string; description: string }[] = [
   {
@@ -36,212 +24,57 @@ const DRAW_TYPES: { id: DrawType; label: string; description: string }[] = [
   },
 ];
 
-const createEmptyLine = (): LineState => ({
-  mainInput: "",
-  starInput: "",
-  complement: "",
-  reintegro: "",
-});
-
-const getPrimitivaWeeklyDrawDates = (drawDate: string) => {
-  const source = new Date(`${drawDate}T00:00:00.000Z`);
-  if (Number.isNaN(source.getTime())) return [];
-  const weekday = source.getUTCDay();
-  const mondayOffset = weekday === 0 ? -6 : 1 - weekday;
-  const monday = new Date(source);
-  monday.setUTCDate(source.getUTCDate() + mondayOffset);
-
-  const candidates = [0, 3, 5].map((offset) => {
-    const value = new Date(monday);
-    value.setUTCDate(monday.getUTCDate() + offset);
-    return value.toISOString().slice(0, 10);
-  });
-  return candidates;
-};
-
-const toIntArray = (input: string) =>
-  input
-    .split(/[\s,.-]+/)
-    .map((value) => value.trim())
-    .filter(Boolean)
-    .map((value) => Number.parseInt(value, 10))
-    .filter((value) => !Number.isNaN(value));
-
-const validateNumberSet = (
-  input: string,
-  expectedCount: number,
-  min: number,
-  max: number
-) => {
-  const values = toIntArray(input);
-  const errors: string[] = [];
-
-  if (values.length !== expectedCount) {
-    errors.push(`Necesitas ${expectedCount} numeros.`);
-  }
-
-  const uniques = new Set(values);
-  if (uniques.size !== values.length) {
-    errors.push("Hay numeros repetidos.");
-  }
-
-  if (values.some((value) => value < min || value > max)) {
-    errors.push(`Los numeros deben estar entre ${min} y ${max}.`);
-  }
-
-  return { values, errors };
-};
-
 export default function Home() {
-  const router = useRouter();
-  const [drawType, setDrawType] = useState<DrawType>("PRIMITIVA");
-  const [primitivaCoverageMode, setPrimitivaCoverageMode] =
-    useState<PrimitivaCoverageMode>("SINGLE");
-  const [drawDate, setDrawDate] = useState<string>("");
-  const [groupId, setGroupId] = useState<string>("");
-  const [priceInput, setPriceInput] = useState<string>("");
-  const [playsJoker, setPlaysJoker] = useState(false);
-  const [jokerNumber, setJokerNumber] = useState<string>("");
-  const [lines, setLines] = useState<LineState[]>([createEmptyLine()]);
-  const [notes, setNotes] = useState<string>("");
-  const [receipt, setReceipt] = useState<File | null>(null);
-  const [submitted, setSubmitted] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [loadingData, setLoadingData] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [loadingTickets, setLoadingTickets] = useState(true);
-  const [ticketsError, setTicketsError] = useState<string | null>(null);
+  const {
+    groups,
+    tickets,
+    loadingData,
+    loadError,
+    loadingTickets,
+    ticketsError,
+    canAccessCreate,
+    refreshInitialData,
+  } = useCreateData();
+  const {
+    drawType,
+    setDrawType,
+    primitivaCoverageMode,
+    setPrimitivaCoverageMode,
+    drawDate,
+    setDrawDate,
+    groupId,
+    setGroupId,
+    priceInput,
+    setPriceInput,
+    playsJoker,
+    setPlaysJoker,
+    jokerNumber,
+    setJokerNumber,
+    lines,
+    setLines,
+    notes,
+    setNotes,
+    receipt,
+    setReceipt,
+    submitted,
+    saving,
+    saveError,
+    saveSuccess,
+    validation,
+    selectedDraw,
+    handleLineChange,
+    handleSubmit,
+    weeklyDrawDates,
+    createEmptyLine,
+  } = useTicketCreation({ refreshInitialData });
   const [copiedTicketId, setCopiedTicketId] = useState<string | null>(null);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
-  const [canAccessCreate, setCanAccessCreate] = useState<boolean | null>(null);
-
-  const refreshInitialData = useCallback(async () => {
-    setLoadingData(true);
-    setLoadingTickets(true);
-    setLoadError(null);
-    setTicketsError(null);
-    try {
-      const [groupsResponse, ticketsResponse] = await Promise.all([
-        fetch("/api/groups"),
-        fetch("/api/tickets"),
-      ]);
-      if (!groupsResponse.ok || !ticketsResponse.ok) {
-        throw new Error("No se pudieron recargar los datos.");
-      }
-      const groupsPayload = await groupsResponse.json();
-      const ticketsPayload = await ticketsResponse.json();
-      const nextGroups = groupsPayload.data ?? [];
-      const nextTickets = ticketsPayload.data ?? [];
-      setGroups(nextGroups);
-      setTickets(nextTickets);
-      writeApiCache(API_GROUPS_CACHE_KEY, nextGroups);
-      writeApiCache(API_TICKETS_CACHE_KEY, nextTickets);
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "No se pudieron recargar los datos.";
-      setLoadError(message);
-      setTicketsError(message);
-    } finally {
-      setLoadingData(false);
-      setLoadingTickets(false);
-    }
-  }, []);
 
   useEffect(() => {
-    let isActive = true;
-
-    (async () => {
-      try {
-        const session = await loadSessionClient();
-        if (!isActive) return;
-        if (!session) {
-          router.replace("/login");
-          setCanAccessCreate(false);
-          return;
-        }
-        const memberships = Array.isArray(session.memberships)
-          ? session.memberships
-          : [];
-        const hasCreatePermission = memberships.some(
-          (membership: { role?: string }) => membership.role === "OWNER"
-        );
-        if (!hasCreatePermission) {
-          router.replace("/review");
-          setCanAccessCreate(false);
-          return;
-        }
-        setCanAccessCreate(true);
-      } catch {
-        if (!isActive) return;
-        router.replace("/review");
-        setCanAccessCreate(false);
-      }
-    })();
-
-    return () => {
-      isActive = false;
-    };
-  }, [router]);
-
-  useEffect(() => {
-    if (canAccessCreate !== true) return;
-    let isActive = true;
-
-    const load = async () => {
-      setLoadingData(true);
-      setLoadError(null);
-
-      try {
-        const cachedGroups = readApiCache<Group[]>(API_GROUPS_CACHE_KEY);
-        if (cachedGroups) {
-          if (!isActive) return;
-          setGroups(cachedGroups);
-          return;
-        }
-
-        const groupsResponse = await fetch("/api/groups");
-        if (!groupsResponse.ok) {
-          throw new Error("No se pudieron cargar los datos iniciales.");
-        }
-
-        const groupsPayload = await groupsResponse.json();
-        const nextGroups = groupsPayload.data ?? [];
-
-        if (!isActive) return;
-
-        setGroups(nextGroups);
-        writeApiCache(API_GROUPS_CACHE_KEY, nextGroups);
-      } catch (error) {
-        if (!isActive) return;
-        setLoadError(
-          error instanceof Error
-            ? error.message
-            : "No se pudieron cargar los datos iniciales."
-        );
-      } finally {
-        if (isActive) {
-          setLoadingData(false);
-        }
-      }
-    };
-
-    load();
-
-    return () => {
-      isActive = false;
-    };
-  }, [canAccessCreate]);
-
-  useEffect(() => {
-    if (loadingData) return;
-    if (groups.length === 1 && !groupId) {
+    if (!loadingData && groups.length === 1 && !groupId) {
       setGroupId(groups[0].id);
     }
-  }, [groupId, groups, loadingData]);
+  }, [groupId, groups, loadingData, setGroupId]);
 
   useEffect(() => {
     if (drawType !== "PRIMITIVA") {
@@ -249,284 +82,8 @@ export default function Home() {
       setJokerNumber("");
       setPrimitivaCoverageMode("SINGLE");
     }
-  }, [drawType]);
+  }, [drawType, setJokerNumber, setPlaysJoker, setPrimitivaCoverageMode]);
 
-  useEffect(() => {
-    if (canAccessCreate !== true) return;
-    let isActive = true;
-
-    const loadTickets = async () => {
-      setLoadingTickets(true);
-      setTicketsError(null);
-
-      try {
-        const cachedTickets = readApiCache<Ticket[]>(API_TICKETS_CACHE_KEY);
-        if (cachedTickets) {
-          if (!isActive) return;
-          setTickets(cachedTickets);
-          return;
-        }
-
-        const response = await fetch("/api/tickets");
-        if (!response.ok) {
-          throw new Error("No se pudieron cargar los boletos.");
-        }
-        const payload = await response.json();
-        const nextTickets = payload.data ?? [];
-        if (!isActive) return;
-        setTickets(nextTickets);
-        writeApiCache(API_TICKETS_CACHE_KEY, nextTickets);
-      } catch (error) {
-        if (!isActive) return;
-        setTicketsError(
-          error instanceof Error
-            ? error.message
-            : "No se pudieron cargar los boletos."
-        );
-      } finally {
-        if (isActive) {
-          setLoadingTickets(false);
-        }
-      }
-    };
-
-    loadTickets();
-
-    return () => {
-      isActive = false;
-    };
-  }, [canAccessCreate]);
-
-  const validation = useMemo(() => {
-    const issues: string[] = [];
-
-    if (!groupId) {
-      issues.push("Selecciona un grupo.");
-    }
-    if (!drawDate) {
-      issues.push("Selecciona la fecha del sorteo.");
-    }
-
-    if (receipt && !receipt.type.startsWith("image/")) {
-      issues.push("El resguardo debe ser una imagen.");
-    }
-
-    if (priceInput.trim()) {
-      const normalized = priceInput.replace(",", ".");
-      const parsed = Number.parseFloat(normalized);
-      if (Number.isNaN(parsed)) {
-        issues.push("El precio debe ser un numero.");
-      } else if (parsed < 0) {
-        issues.push("El precio no puede ser negativo.");
-      } else if (Math.abs(parsed * 100 - Math.round(parsed * 100)) > 1e-6) {
-        issues.push("El precio debe tener como maximo 2 decimales.");
-      }
-    }
-
-    if (drawType === "PRIMITIVA" && playsJoker) {
-      if (!/^\d{7}$/.test(jokerNumber.trim())) {
-        issues.push("El numero de Joker debe tener 7 digitos.");
-      }
-    }
-
-    const lineResults = lines.map((line) => {
-      const lineIssues: string[] = [];
-      const mainExpected = drawType === "PRIMITIVA" ? 6 : 5;
-      const mainRange = drawType === "PRIMITIVA" ? [1, 49] : [1, 50];
-      const main = validateNumberSet(
-        line.mainInput,
-        mainExpected,
-        mainRange[0],
-        mainRange[1]
-      );
-
-      lineIssues.push(...main.errors.map((error) => `Numeros: ${error}`));
-
-      let stars: number[] = [];
-
-      if (drawType === "EUROMILLONES") {
-        const star = validateNumberSet(line.starInput, 2, 1, 12);
-        stars = star.values;
-        lineIssues.push(...star.errors.map((error) => `Estrellas: ${error}`));
-      }
-
-      if (drawType === "PRIMITIVA" && line.complement.trim()) {
-        const complementValue = Number.parseInt(line.complement, 10);
-        if (Number.isNaN(complementValue)) {
-          lineIssues.push("Complementario debe ser un numero.");
-        } else if (complementValue < 1 || complementValue > 49) {
-          lineIssues.push("Complementario debe estar entre 1 y 49.");
-        } else if (main.values.includes(complementValue)) {
-          lineIssues.push("Complementario no puede repetirse.");
-        }
-      }
-
-      if (drawType === "PRIMITIVA" && line.reintegro.trim()) {
-        const reintegroValue = Number.parseInt(line.reintegro, 10);
-        if (Number.isNaN(reintegroValue)) {
-          lineIssues.push("Reintegro debe ser un numero.");
-        } else if (reintegroValue < 0 || reintegroValue > 9) {
-          lineIssues.push("Reintegro debe estar entre 0 y 9.");
-        }
-      }
-
-      return {
-        issues: lineIssues,
-        main: main.values,
-        stars,
-      };
-    });
-
-    if (lines.length === 0) {
-      issues.push("Debes añadir al menos una linea.");
-    }
-
-    return {
-      issues,
-      lineResults,
-      isValid:
-        issues.length === 0 &&
-        lineResults.every((line) => line.issues.length === 0),
-    };
-  }, [drawDate, drawType, groupId, jokerNumber, lines, playsJoker, priceInput, receipt]);
-
-  const handleLineChange = (index: number, patch: Partial<LineState>) => {
-    setLines((current) =>
-      current.map((line, lineIndex) =>
-        lineIndex === index ? { ...line, ...patch } : line
-      )
-    );
-  };
-
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setSubmitted(true);
-    setSaveError(null);
-    setSaveSuccess(null);
-
-    if (!validation.isValid || saving) {
-      return;
-    }
-
-    setSaving(true);
-
-    try {
-      const normalizedPrice = priceInput.trim().replace(",", ".");
-      const parsedPrice = normalizedPrice
-        ? Number.parseFloat(normalizedPrice)
-        : null;
-      const priceCents =
-        parsedPrice === null || Number.isNaN(parsedPrice)
-          ? undefined
-          : Math.round(parsedPrice * 100);
-
-      const response = await fetch("/api/tickets", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          groupId,
-          drawType,
-          drawDate,
-          drawDates:
-            drawType === "PRIMITIVA" && primitivaCoverageMode === "WEEKLY"
-              ? getPrimitivaWeeklyDrawDates(drawDate)
-              : undefined,
-          priceCents,
-          playsJoker: drawType === "PRIMITIVA" ? playsJoker : undefined,
-          jokerNumber:
-            drawType === "PRIMITIVA" && playsJoker
-              ? jokerNumber.trim()
-              : undefined,
-          notes: notes.trim() || undefined,
-          lines: lines.map((line) => ({
-            mainNumbers: toIntArray(line.mainInput),
-            starNumbers:
-              drawType === "EUROMILLONES"
-                ? toIntArray(line.starInput)
-                : undefined,
-            complement: line.complement
-              ? Number.parseInt(line.complement, 10)
-              : undefined,
-            reintegro: line.reintegro
-              ? Number.parseInt(line.reintegro, 10)
-              : undefined,
-          })),
-        }),
-      });
-
-      const payload = await response.json();
-
-      if (!response.ok) {
-        const issues = Array.isArray(payload?.issues)
-          ? payload.issues.join(" ")
-          : payload?.error;
-        throw new Error(issues || "No se pudo guardar el boleto.");
-      }
-
-      let successMessage = "Boleto guardado correctamente.";
-
-      if (receipt) {
-        const formData = new FormData();
-        formData.append("ticketId", payload.data.id);
-        formData.append("file", receipt);
-
-        const uploadResponse = await fetch("/api/receipts", {
-          method: "POST",
-          body: formData,
-        });
-
-        if (!uploadResponse.ok) {
-          const uploadPayload = await uploadResponse.json();
-          const uploadMessage =
-            uploadPayload?.error || "No se pudo subir el resguardo.";
-          throw new Error(`${successMessage} ${uploadMessage}`);
-        }
-
-        successMessage = "Boleto y resguardo guardados correctamente.";
-      }
-
-      setSaveSuccess(successMessage);
-      setLines([createEmptyLine()]);
-      setNotes("");
-      setPriceInput("");
-      setPlaysJoker(false);
-      setJokerNumber("");
-      setPrimitivaCoverageMode("SINGLE");
-      setReceipt(null);
-      setSubmitted(false);
-      const refreshResponse = await fetch("/api/tickets");
-      if (refreshResponse.ok) {
-        const payload = await refreshResponse.json();
-        const nextTickets = payload.data ?? [];
-        setTickets(nextTickets);
-        writeApiCache(API_TICKETS_CACHE_KEY, nextTickets);
-      }
-      const refreshGroupsResponse = await fetch("/api/groups");
-      if (refreshGroupsResponse.ok) {
-        const groupsPayload = await refreshGroupsResponse.json();
-        const nextGroups = groupsPayload.data ?? [];
-        setGroups(nextGroups);
-        writeApiCache(API_GROUPS_CACHE_KEY, nextGroups);
-      }
-    } catch (error) {
-      setSaveError(
-        error instanceof Error ? error.message : "No se pudo guardar el boleto."
-      );
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const selectedDraw: Draw | null = drawDate
-    ? {
-        id: `${drawType}-${drawDate}`,
-        type: drawType,
-        drawDate,
-        label: `${DRAW_TYPES.find((item) => item.id === drawType)?.label ?? "Sorteo"} · ${formatDate(drawDate)}`,
-      }
-    : null;
   const selectedDrawType = drawType;
   const latestTickets = tickets.slice(0, 5);
   const selectedGroupBalanceCents =
@@ -605,7 +162,7 @@ export default function Home() {
             onDrawDateChange={setDrawDate}
             coverageMode={primitivaCoverageMode}
             onCoverageModeChange={setPrimitivaCoverageMode}
-            weeklyDrawDates={getPrimitivaWeeklyDrawDates}
+            weeklyDrawDates={weeklyDrawDates}
             priceInput={priceInput}
             onPriceChange={setPriceInput}
             playsJoker={playsJoker}
