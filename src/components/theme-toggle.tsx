@@ -35,7 +35,7 @@ export function ThemeToggle() {
       onClick={toggleTheme}
       aria-label="Cambiar tema"
       title="Cambiar tema"
-      className="theme-toggle fixed right-4 top-4 z-[100] rounded-xl"
+      className="theme-toggle fixed right-20 top-4 z-[100] rounded-xl"
     >
       <span className="icon-sun" aria-hidden="true">
         Sol
