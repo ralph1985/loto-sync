@@ -125,16 +125,16 @@ export default function Home() {
 
   return (
     <div className="relative min-h-[100dvh] bg-transparent text-slate-900">
-      <main className="relative mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pb-16 pt-6 sm:pt-8 md:px-8 lg:flex-row lg:gap-10 lg:px-10 lg:pt-16">
+      <main className="relative mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pb-16 pt-8 sm:px-6 md:px-8 lg:flex-row lg:gap-10 lg:px-10 lg:pt-10">
         <section className="flex flex-1 flex-col gap-6">
-          <header className="animate-fade-up space-y-3">
-            <span className="inline-flex w-fit items-center gap-2 rounded-full bg-white/70 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700">
+          <header className="animate-fade-up space-y-3 border-b border-base-300 pb-5 sm:pb-6">
+            <span className="inline-flex w-fit items-center gap-2 rounded-lg bg-primary/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-primary">
               Nuevo boleto
             </span>
-            <h1 className="text-3xl font-semibold leading-tight text-slate-900 sm:text-4xl md:text-5xl">
+            <h1 className="text-3xl font-bold leading-tight tracking-tight text-slate-900 sm:text-4xl">
               Alta rapida para tu grupo de loteria.
             </h1>
-            <p className="max-w-xl text-base text-slate-600">
+            <p className="max-w-xl text-sm leading-6 text-slate-600 sm:text-base">
               Guarda numeros, grupo y resguardo en un solo paso. Validaciones
               listas para Primitiva y Euromillones.
             </p>

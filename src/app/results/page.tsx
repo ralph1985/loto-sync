@@ -279,7 +279,7 @@ export default function ResultsPage() {
       <SurfaceCard>
         {success ? <InlineAlert tone="success" className="mb-4">{success}</InlineAlert> : null}
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="text-lg font-semibold">Resultados guardados</h2>
+          <h2 className="text-lg font-bold tracking-tight">Sorteos disponibles</h2>
           <div className="flex flex-wrap items-center gap-2">
             <select
               value={gameFilter}
@@ -312,7 +312,7 @@ export default function ResultsPage() {
             {displayedResults.map((result) => (
               <div
                 key={result.id}
-                className={`rounded-2xl border px-4 py-3 ${
+                className={`rounded-xl border px-4 py-3 ${
                   result.isMissing ? "border-warning/40 bg-warning/10" : "border-base-300 bg-base-200/40"
                 }`}
               >

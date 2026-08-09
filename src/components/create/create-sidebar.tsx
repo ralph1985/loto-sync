@@ -54,8 +54,8 @@ export function CreateSidebar({
 
   return (
     <aside className="animate-fade-up flex w-full flex-col gap-4 self-start lg:sticky lg:top-12 lg:max-w-md">
-      <div className="rounded-3xl border border-white/70 bg-white/80 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur sm:p-6">
-        <h3 className="text-lg font-semibold text-slate-900">Resumen</h3>
+      <div className="rounded-2xl border border-base-300 bg-base-100 p-4 shadow-sm sm:p-5">
+        <h3 className="text-lg font-bold tracking-tight text-slate-900">Resumen antes de guardar</h3>
         <p className="mt-1 text-sm text-slate-500">Vista rapida antes de guardar.</p>
         <div className="mt-4 space-y-4 text-sm text-slate-600">
           <SummaryItem label="Sorteo" value={selectedDraw?.label ?? (selectedDraw ? drawTypeLabel(selectedDraw.type) : "Sin definir")} />
@@ -67,7 +67,7 @@ export function CreateSidebar({
         </div>
         <div className="mt-6 space-y-4">
           {validation.lineResults.map((line, index) => (
-            <div key={index} className="rounded-2xl bg-slate-900 px-4 py-3 text-white">
+            <div key={index} className="rounded-xl bg-slate-900 px-4 py-3 text-white">
               <p className="text-xs uppercase tracking-wide text-white/60">Linea {index + 1}</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {line.main.length ? line.main.map((value, valueIndex) => (
@@ -110,11 +110,11 @@ function SummaryItem({ label, value }: { label: string; value: string }) {
 
 function GroupBalances({ groups }: { groups: Group[] }) {
   return <>
-    <details className="rounded-3xl border border-white/70 bg-white/90 p-4 text-sm text-slate-600 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur lg:hidden">
+    <details className="rounded-2xl border border-base-300 bg-base-100 p-4 text-sm text-slate-600 shadow-sm lg:hidden">
       <summary className="cursor-pointer list-none text-sm font-semibold uppercase tracking-wide text-slate-400">Bote por grupo</summary>
       <BalanceList groups={groups} mobile />
     </details>
-    <div className="hidden rounded-3xl border border-white/70 bg-white/90 p-6 text-sm text-slate-600 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur lg:block">
+    <div className="hidden rounded-2xl border border-base-300 bg-base-100 p-5 text-sm text-slate-600 shadow-sm lg:block">
       <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Bote por grupo</h4>
       <BalanceList groups={groups} />
     </div>
@@ -124,7 +124,7 @@ function GroupBalances({ groups }: { groups: Group[] }) {
 function BalanceList({ groups, mobile = false }: { groups: Group[]; mobile?: boolean }) {
   return <div className="mt-3 space-y-2">
     {groups.length > 0 ? groups.map((group) => (
-      <div key={`${mobile ? "mobile-" : ""}${group.id}`} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-3 py-2">
+      <div key={`${mobile ? "mobile-" : ""}${group.id}`} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2">
         <span>{group.name}</span><span className="font-semibold">{formatPrice(group.balanceCents ?? 0)}</span>
       </div>
     )) : <p className="text-sm text-slate-500">Sin grupos.</p>}
@@ -133,11 +133,11 @@ function BalanceList({ groups, mobile = false }: { groups: Group[]; mobile?: boo
 
 function Checklist() {
   return <>
-    <details className="rounded-3xl border border-white/70 bg-white/90 p-4 text-sm text-slate-600 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur lg:hidden">
+    <details className="rounded-2xl border border-base-300 bg-base-100 p-4 text-sm text-slate-600 shadow-sm lg:hidden">
       <summary className="cursor-pointer list-none text-sm font-semibold uppercase tracking-wide text-slate-400">Checklist MVP</summary>
       <ChecklistItems />
     </details>
-    <div className="hidden rounded-3xl border border-white/70 bg-white/90 p-6 text-sm text-slate-600 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur lg:block">
+    <div className="hidden rounded-2xl border border-base-300 bg-base-100 p-5 text-sm text-slate-600 shadow-sm lg:block">
       <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Checklist MVP</h4>
       <ChecklistItems />
     </div>
