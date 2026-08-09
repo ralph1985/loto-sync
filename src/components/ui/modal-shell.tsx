@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 
 import { cn } from "@/components/ui/cn";
 
@@ -21,22 +21,37 @@ export function ModalShell({
   ariaLabel = "Diálogo",
   closeDisabled = false,
 }: ModalShellProps) {
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+  const closeDisabledRef = useRef(closeDisabled);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    closeDisabledRef.current = closeDisabled;
+    onCloseRef.current = onClose;
+  }, [closeDisabled, onClose]);
+
   useEffect(() => {
     if (!open) return;
 
+    previouslyFocusedRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    closeButtonRef.current?.focus();
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !closeDisabled) onClose();
+      if (event.key === "Escape" && !closeDisabledRef.current) onCloseRef.current();
     };
 
     document.addEventListener("keydown", handleKeyDown);
     return () => {
       document.body.style.overflow = previousOverflow;
       document.removeEventListener("keydown", handleKeyDown);
+      if (previouslyFocusedRef.current?.isConnected) previouslyFocusedRef.current.focus();
     };
-  }, [closeDisabled, onClose, open]);
+  }, [open]);
 
   if (!open) return null;
 
@@ -44,6 +59,7 @@ export function ModalShell({
     <div className="modal modal-open" role="dialog" aria-modal="true" aria-label={ariaLabel}>
       <div
         className="modal-backdrop bg-base-content/60 backdrop-blur-sm"
+        aria-hidden="true"
         onClick={closeDisabled ? undefined : onClose}
       />
       <section
@@ -54,6 +70,7 @@ export function ModalShell({
       >
         <button
           type="button"
+          ref={closeButtonRef}
           onClick={onClose}
           disabled={closeDisabled}
           aria-label="Cerrar modal"

@@ -171,6 +171,7 @@ function TicketVerificationPanel({
         <div className="flex items-center gap-2">
           <input
             type="date"
+            aria-label="Fecha de comprobación"
             value={checkDrawDate}
             onChange={(event) => onCheckDrawDateChange(event.target.value)}
             className="rounded-full border border-slate-200 px-3 py-1 text-[11px] text-slate-600"
@@ -213,6 +214,7 @@ function TicketVerificationPanel({
         <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
           <span>Premio manual (EUR):</span>
           <input
+            aria-label="Premio manual en euros"
             value={manualPrizeInput}
             onChange={(event) => onManualPrizeChange(event.target.value)}
             placeholder="0.00"

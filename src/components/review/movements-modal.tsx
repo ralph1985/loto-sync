@@ -50,6 +50,7 @@ export function MovementsModal({
           </p>
         </div>
         <select
+          aria-label="Filtrar movimientos"
           value={movementTypeFilter}
           onChange={(event) => onFilterChange(event.target.value as "ALL" | MovementType)}
           className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600"
