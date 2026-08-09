@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev --webpack",
     "build": "prisma generate && next build",
+    "test:unit": "node --experimental-strip-types --test src/features/tickets/create-logic.test.ts",
     "start": "next start",
     "lint": "eslint",
     "postinstall": "prisma generate",
