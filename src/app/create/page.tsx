@@ -1,11 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { InlineAlert } from "@/components/ui/inline-alert";
 import { NumberBadge } from "@/components/ui/number-badge";
+import { RecentTickets } from "@/components/create/recent-tickets";
 import { TicketCreateForm, type LineState } from "@/components/create/ticket-create-form";
 import { TicketDetailModal } from "@/components/tickets/ticket-detail-modal";
 import { buildDrawLabel, formatDate, formatPrice } from "@/features/tickets/formatters";
@@ -854,112 +853,14 @@ export default function Home() {
             </ul>
           </div>
 
-          <div className="rounded-3xl border border-white/70 bg-white/90 p-4 text-sm text-slate-600 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur sm:p-6">
-            <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
-              Boletos recientes
-            </h4>
-            {ticketsError ? (
-              <InlineAlert tone="error" className="mt-3">{ticketsError}</InlineAlert>
-            ) : null}
-            {loadingTickets ? (
-              <div className="mt-4 space-y-3">
-                {[0, 1, 2].map((item) => (
-                  <div
-                    key={item}
-                    className="h-16 rounded-2xl border border-slate-200 bg-white/70 animate-pulse"
-                  />
-                ))}
-              </div>
-            ) : latestTickets.length === 0 ? (
-              <p className="mt-3 text-sm text-slate-500">
-                Aun no hay boletos guardados.
-              </p>
-            ) : (
-              <div className="mt-4 flex flex-col gap-3">
-                {latestTickets.map((ticket) => {
-                  const drawLabel = buildDrawLabel(ticket.draw);
-                  const groupLabel = ticket.group?.name ?? "Grupo";
-                  const lineCount = ticket.lines?.length ?? 0;
-                  const firstLine = ticket.lines?.[0];
-                  const mainNumbers = firstLine
-                    ? firstLine.numbers
-                        .filter((number) => number.kind === "MAIN")
-                        .sort((a, b) => a.position - b.position)
-                        .map((number) => number.value)
-                    : [];
-                  const stars = firstLine
-                    ? firstLine.numbers
-                        .filter((number) => number.kind === "STAR")
-                        .sort((a, b) => a.position - b.position)
-                        .map((number) => number.value)
-                    : [];
-                  return (
-                    <div
-                      key={ticket.id}
-                      className="rounded-2xl border border-slate-200 bg-white px-4 py-3"
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs uppercase tracking-wide text-slate-400">
-                        <span>
-                          {groupLabel} · {ticket.status}
-                        </span>
-                        <span>{formatDate(ticket.createdAt)}</span>
-                      </div>
-                      <div className="mt-1 text-sm font-semibold text-slate-900">
-                        {drawLabel}
-                      </div>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {mainNumbers.length > 0 ? (
-                          mainNumbers.map((value, index) => (
-                            <NumberBadge key={`${ticket.id}-main-${index}`} value={value} tone="neutral" />
-                          ))
-                        ) : (
-                          <span className="text-xs text-slate-400">
-                            Sin numeros
-                          </span>
-                        )}
-                        {stars.length > 0
-                          ? stars.map((value, index) => (
-                              <NumberBadge key={`${ticket.id}-star-${index}`} value={value} tone="accent" />
-                            ))
-                          : null}
-                      </div>
-                      <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
-                        <span>
-                          {lineCount} linea(s) · {formatPrice(ticket.priceCents)}
-                          {ticket.draw?.type === "PRIMITIVA"
-                            ? ticket.playsJoker
-                              ? ` · Joker ${ticket.jokerNumber ?? "-"}`
-                              : " · Sin Joker"
-                            : ""}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleCopy(ticket)}
-                            className="rounded-full border border-slate-200 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500 transition hover:border-slate-400 hover:text-slate-700"
-                          >
-                            {copiedTicketId === ticket.id
-                              ? "Copiado"
-                              : "Copiar"}
-                          </button>
-                          <Link
-                            href="#"
-                            onClick={(event) => {
-                              event.preventDefault();
-                              setSelectedTicket(ticket);
-                            }}
-                            className="rounded-full border border-slate-200 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500 transition hover:border-slate-400 hover:text-slate-700"
-                          >
-                            Ver detalle
-                          </Link>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+          <RecentTickets
+            tickets={latestTickets}
+            loading={loadingTickets}
+            error={ticketsError}
+            copiedTicketId={copiedTicketId}
+            onCopy={handleCopy}
+            onSelect={setSelectedTicket}
+          />
         </aside>
       </main>
       <TicketDetailModal
