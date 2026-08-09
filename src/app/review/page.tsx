@@ -3,6 +3,9 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 
 import { ModalShell } from "@/components/ui/modal-shell";
+import { ContributionModal } from "@/components/review/contribution-modal";
+import { MovementsModal } from "@/components/review/movements-modal";
+import { ReviewFilters } from "@/components/review/review-filters";
 import {
   buildDrawLabel,
   formatDate,
@@ -34,15 +37,6 @@ const DRAW_TYPE_OPTIONS: { value: "ALL" | DrawType; label: string }[] = [
   { value: "ALL", label: "Todos" },
   { value: "PRIMITIVA", label: "Primitiva" },
   { value: "EUROMILLONES", label: "Euromillones" },
-];
-
-const MOVEMENT_TYPE_OPTIONS: { value: "ALL" | MovementType; label: string }[] = [
-  { value: "ALL", label: "Todos" },
-  { value: "OPENING", label: "Saldo inicial" },
-  { value: "CONTRIBUTION", label: "Aportación" },
-  { value: "TICKET_EXPENSE", label: "Gasto boleto" },
-  { value: "PRIZE", label: "Premio" },
-  { value: "ADJUSTMENT", label: "Ajuste" },
 ];
 
 const REVIEW_CACHE_TTL_MS = 60 * 60 * 1000;
@@ -612,103 +606,20 @@ function ReviewPageContent() {
           </div>
         </header>
 
-        <section className="rounded-3xl border border-white/70 bg-white/90 p-5 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur">
-          <div className="grid gap-3 md:grid-cols-4">
-            <div className="flex flex-col gap-2">
-              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Grupo
-              </label>
-              <select
-                value={groupFilter}
-                onChange={(event) => setGroupFilter(event.target.value)}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
-              >
-                <option value="ALL">Todos</option>
-                {groups.map((group) => (
-                  <option key={group.id} value={group.id}>
-                    {group.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Estado
-              </label>
-              <select
-                value={statusFilter}
-                onChange={(event) =>
-                  setStatusFilter(event.target.value as "ALL" | TicketStatus)
-                }
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
-              >
-                {STATUS_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Sorteo
-              </label>
-              <select
-                value={drawTypeFilter}
-                onChange={(event) =>
-                  setDrawTypeFilter(event.target.value as "ALL" | DrawType)
-                }
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
-              >
-                {DRAW_TYPE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Bote
-              </p>
-              <p className="mt-1 text-lg font-semibold text-slate-900">
-                {groupFilter === "ALL"
-                  ? "Selecciona grupo"
-                  : formatPrice(selectedGroupBalanceCents)}
-              </p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleRefreshData()}
-                  className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600"
-                >
-                  Actualizar datos
-                </button>
-                {groupFilter !== "ALL" ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={openContributionModal}
-                      className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-700"
-                    >
-                      Recargar bote
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowMovementsModal(true)}
-                      className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600"
-                    >
-                      Ver historial
-                    </button>
-                  </>
-                ) : null}
-              </div>
-            </div>
-          </div>
-        </section>
+        <ReviewFilters
+          groups={groups}
+          groupFilter={groupFilter}
+          statusFilter={statusFilter}
+          drawTypeFilter={drawTypeFilter}
+          selectedGroupBalanceCents={selectedGroupBalanceCents}
+          onGroupChange={setGroupFilter}
+          onStatusChange={setStatusFilter}
+          onDrawTypeChange={setDrawTypeFilter}
+          onRefresh={handleRefreshData}
+          onOpenContribution={openContributionModal}
+          onOpenMovements={() => setShowMovementsModal(true)}
+          formatPrice={formatPrice}
+        />
 
         <section className="flex flex-col gap-4">
           {error ? (
@@ -1056,183 +967,36 @@ function ReviewPageContent() {
       </main>
 
       {showContributionModal && groupFilter !== "ALL" ? (
-        <ModalShell
+        <ContributionModal
           open
+          groupName={groups.find((group) => group.id === groupFilter)?.name ?? "Grupo"}
+          balanceCents={selectedGroupBalanceCents}
+          amount={contributionAmountInput}
+          note={contributionNoteInput}
+          saving={savingContribution}
+          error={contributionError}
           onClose={closeContributionModal}
-          closeDisabled={savingContribution}
-          ariaLabel="Recargar bote"
-          panelClassName="max-w-md border border-slate-200 bg-white p-0 shadow-[0_30px_80px_rgba(15,23,42,0.35)]"
-        >
-          <form
-            className="w-full p-5 sm:p-6"
-            onSubmit={(event) => {
-              event.preventDefault();
-              handleSaveContribution();
-            }}
-          >
-            <div className="mb-5 pr-8">
-              <h3 className="text-lg font-semibold text-slate-900">Recargar bote</h3>
-              <p className="mt-1 text-sm text-slate-500">
-                {groups.find((group) => group.id === groupFilter)?.name ?? "Grupo"}
-              </p>
-              <p className="mt-1 text-sm font-semibold text-slate-900">
-                Bote actual: {formatPrice(selectedGroupBalanceCents)}
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex flex-col gap-2">
-                <label
-                  htmlFor="contribution-amount"
-                  className="text-xs font-semibold uppercase tracking-wide text-slate-500"
-                >
-                  Importe
-                </label>
-                <input
-                  id="contribution-amount"
-                  inputMode="decimal"
-                  value={contributionAmountInput}
-                  onChange={(event) => {
-                    setContributionAmountInput(event.target.value);
-                    setContributionError(null);
-                  }}
-                  placeholder="10,00"
-                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
-                  disabled={savingContribution}
-                  autoFocus
-                />
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <label
-                  htmlFor="contribution-note"
-                  className="text-xs font-semibold uppercase tracking-wide text-slate-500"
-                >
-                  Nota opcional
-                </label>
-                <textarea
-                  id="contribution-note"
-                  value={contributionNoteInput}
-                  onChange={(event) => setContributionNoteInput(event.target.value)}
-                  className="min-h-24 resize-y rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
-                  disabled={savingContribution}
-                />
-              </div>
-
-              {contributionError ? (
-                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                  {contributionError}
-                </div>
-              ) : null}
-
-              <div className="flex flex-wrap justify-end gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={closeContributionModal}
-                  disabled={savingContribution}
-                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={savingContribution}
-                  className="rounded-full border border-emerald-600 bg-emerald-600 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {savingContribution ? "Guardando..." : "Guardar aportacion"}
-                </button>
-              </div>
-            </div>
-          </form>
-        </ModalShell>
+          onAmountChange={(value) => {
+            setContributionAmountInput(value);
+            setContributionError(null);
+          }}
+          onNoteChange={setContributionNoteInput}
+          onSubmit={handleSaveContribution}
+        />
       ) : null}
 
       {showMovementsModal && groupFilter !== "ALL" ? (
-        <ModalShell
+        <MovementsModal
           open
+          groupName={groups.find((group) => group.id === groupFilter)?.name ?? "Grupo"}
+          balanceCents={selectedGroupBalanceCents}
+          movementTypeFilter={movementTypeFilter}
+          movements={groupMovements}
+          loading={loadingMovements}
+          error={movementsError}
           onClose={() => setShowMovementsModal(false)}
-          ariaLabel="Historial de bote"
-          panelClassName="max-w-3xl border border-slate-200 bg-white p-4 shadow-[0_30px_80px_rgba(15,23,42,0.35)] sm:p-6"
-        >
-            <div className="mb-4 pr-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900">Historial de bote</h3>
-                <p className="text-sm text-slate-500">
-                  {groups.find((group) => group.id === groupFilter)?.name ?? "Grupo"}
-                </p>
-                <p className="mt-1 text-sm font-semibold text-slate-900">
-                  Bote pendiente: {formatPrice(selectedGroupBalanceCents)}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <select
-                  value={movementTypeFilter}
-                  onChange={(event) =>
-                    setMovementTypeFilter(event.target.value as "ALL" | MovementType)
-                  }
-                  className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600"
-                >
-                  {MOVEMENT_TYPE_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="max-h-[60vh] overflow-y-auto pr-1">
-              {movementsError ? (
-                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                  {movementsError}
-                </div>
-              ) : loadingMovements ? (
-                <p className="text-sm text-slate-500">Cargando historial...</p>
-              ) : groupMovements.length === 0 ? (
-                <p className="text-sm text-slate-500">No hay movimientos para este filtro.</p>
-              ) : (
-                <div className="space-y-2">
-                  {groupMovements.map((movement) => {
-                    const isPositive = movement.amountCents >= 0;
-                    const typeLabel =
-                      MOVEMENT_TYPE_OPTIONS.find((item) => item.value === movement.type)?.label ??
-                      movement.type;
-                    return (
-                      <div
-                        key={movement.id}
-                        className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                          <span className="font-semibold uppercase tracking-wide text-slate-500">
-                            {typeLabel}
-                          </span>
-                          <span className="text-slate-400">
-                            {formatDateTime(movement.occurredAt)}
-                          </span>
-                        </div>
-                        <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
-                          <span
-                            className={`text-sm font-semibold ${
-                              isPositive ? "text-emerald-700" : "text-rose-700"
-                            }`}
-                          >
-                            {isPositive ? "+" : ""}
-                            {formatPrice(movement.amountCents)}
-                          </span>
-                          <span className="text-xs font-semibold text-slate-500">
-                            Balance: {formatPrice(movement.runningBalanceCents)}
-                          </span>
-                        </div>
-                        {movement.note ? (
-                          <p className="mt-1 text-xs text-slate-500">{movement.note}</p>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-        </ModalShell>
+          onFilterChange={setMovementTypeFilter}
+        />
       ) : null}
 
       {selectedTicket ? (
