@@ -43,14 +43,14 @@ export function ReviewFilters({
   formatPrice,
 }: ReviewFiltersProps) {
   return (
-    <section className="rounded-3xl border border-white/70 bg-white/90 p-5 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur">
-      <div className="grid gap-3 md:grid-cols-4">
+    <section className="rounded-2xl border border-base-300 bg-base-100 p-4 shadow-sm sm:p-5">
+      <div className="grid gap-4 md:grid-cols-4">
         <label className="flex flex-col gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Grupo</span>
+          <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">Grupo</span>
           <select
             value={groupFilter}
             onChange={(event) => onGroupChange(event.target.value)}
-            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
+            className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
           >
             <option value="ALL">Todos</option>
             {groups.map((group) => (
@@ -62,11 +62,11 @@ export function ReviewFilters({
         </label>
 
         <label className="flex flex-col gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Estado</span>
+          <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">Estado</span>
           <select
             value={statusFilter}
             onChange={(event) => onStatusChange(event.target.value as "ALL" | TicketStatus)}
-            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
+            className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
           >
             {STATUS_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
@@ -77,11 +77,11 @@ export function ReviewFilters({
         </label>
 
         <label className="flex flex-col gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Sorteo</span>
+          <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">Sorteo</span>
           <select
             value={drawTypeFilter}
             onChange={(event) => onDrawTypeChange(event.target.value as "ALL" | DrawType)}
-            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
+            className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
           >
             {DRAW_TYPE_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
@@ -91,9 +91,9 @@ export function ReviewFilters({
           </select>
         </label>
 
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Bote</p>
-          <p className="mt-1 text-lg font-semibold text-slate-900">
+        <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
+          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-primary">Bote del grupo</p>
+          <p className="mt-1 text-xl font-bold tracking-tight text-slate-900">
             {groupFilter === "ALL" ? "Selecciona grupo" : formatPrice(selectedGroupBalanceCents)}
           </p>
           <div className="mt-2 flex flex-wrap gap-2">

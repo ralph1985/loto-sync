@@ -31,23 +31,23 @@ export function TicketReviewCard({
 
   return (
     <article
-      className={`rounded-3xl border bg-white/95 p-3 shadow-[0_16px_44px_rgba(15,23,42,0.08)] sm:p-4 ${
+      className={`rounded-2xl border bg-base-100 p-4 shadow-sm sm:p-5 ${
         active ? "border-emerald-300" : "border-white/70"
       }`}
     >
       <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
         <div className="space-y-3">
-          <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide">
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">
+          <div className="flex flex-wrap items-center gap-2 text-[10px] font-bold uppercase tracking-[0.12em]">
+              <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-slate-700">
               {ticket.group?.name ?? "Grupo"}
             </span>
             {active ? (
-              <span className="rounded-full bg-emerald-100 px-3 py-1 text-emerald-700">
+                <span className="rounded-lg bg-emerald-100 px-2.5 py-1 text-emerald-700">
                 Activo
               </span>
             ) : null}
             <span
-              className={`rounded-full px-3 py-1 ${
+                className={`rounded-lg px-2.5 py-1 ${
                 ticket.status === "PREMIO"
                   ? "bg-emerald-100 text-emerald-700"
                   : ticket.status === "COMPROBADO"
@@ -58,18 +58,18 @@ export function TicketReviewCard({
               {ticket.status}
             </span>
             {ticket.receipt?.blobUrl ? (
-              <span className="rounded-full bg-emerald-50 px-3 py-1 text-emerald-700">
+                <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-emerald-700">
                 Resguardo
               </span>
             ) : (
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">
+                <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-slate-600">
                 Sin resguardo
               </span>
             )}
           </div>
 
           <div>
-            <h3 className="text-xl font-semibold text-slate-900">
+            <h3 className="text-lg font-bold tracking-tight text-slate-900 sm:text-xl">
               {buildDrawLabel(ticket.draw)}
             </h3>
             <p className="text-sm text-slate-500">Alta: {formatDateTime(ticket.createdAt)}</p>
@@ -80,8 +80,8 @@ export function TicketReviewCard({
             <TicketMetric label="Premio acumulado" value={formatPrice(totalPrizeCents)} />
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-2.5 sm:p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            <div className="rounded-xl border border-slate-200 bg-white p-3 sm:p-4">
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
               Números apostados
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
@@ -89,7 +89,7 @@ export function TicketReviewCard({
                 mainNumbers.map((value, index) => (
                   <span
                     key={`${ticket.id}-main-${index}`}
-                    className="rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white"
+                    className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white"
                   >
                     {value}
                   </span>
@@ -100,13 +100,13 @@ export function TicketReviewCard({
               {stars.map((value, index) => (
                 <span
                   key={`${ticket.id}-star-${index}`}
-                  className="rounded-full bg-[#f9c784] px-3 py-1 text-xs font-semibold text-slate-900"
+                    className="rounded-lg bg-[#f9c784] px-3 py-1.5 text-xs font-semibold text-slate-900"
                 >
                   {value}
                 </span>
               ))}
               {ticket.draw?.type === "PRIMITIVA" ? (
-                <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">
+                <span className="rounded-lg bg-emerald-100 px-3 py-1.5 text-xs font-semibold text-emerald-800">
                   R {reintegro ?? "-"}
                 </span>
               ) : null}

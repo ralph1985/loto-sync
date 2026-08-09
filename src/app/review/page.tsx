@@ -161,16 +161,16 @@ function ReviewPageContent() {
   return (
     <div className="relative min-h-[100dvh] bg-transparent text-slate-900">
       <main className="relative mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 pb-16 pt-8 md:px-10 md:pt-12">
-        <header className="flex flex-col gap-2 rounded-3xl border border-white/70 bg-white/85 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur sm:p-6">
+        <header className="flex flex-col gap-2 border-b border-base-300 pb-5 sm:pb-6">
           <div className="space-y-2">
-            <span className="inline-flex w-fit items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700">
+            <span className="inline-flex w-fit items-center gap-2 rounded-lg bg-primary/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-primary">
               Revisión
             </span>
-            <h1 className="text-2xl font-semibold leading-tight text-slate-900 sm:text-3xl md:text-4xl">
+            <h1 className="text-2xl font-bold leading-tight tracking-tight text-slate-900 sm:text-3xl md:text-4xl">
               Revisión de boletos por grupo
             </h1>
-            <p className="max-w-2xl text-sm text-slate-600">
-              Resumen compacto arriba y comparativas semanales desplegables por boleto.
+            <p className="max-w-2xl text-sm leading-6 text-slate-600">
+              Filtra tus boletos, revisa el estado de cada apuesta y consulta los premios desde un solo lugar.
             </p>
           </div>
         </header>
