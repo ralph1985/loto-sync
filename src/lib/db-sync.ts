@@ -12,6 +12,7 @@ export type SyncDataset = {
   Draw: Array<Record<string, unknown>>
   GroupMember: Array<Record<string, unknown>>
   GroupInvitation: Array<Record<string, unknown>>
+  GroupEmailRecipient: Array<Record<string, unknown>>
   Ticket: Array<Record<string, unknown>>
   TicketLine: Array<Record<string, unknown>>
   TicketLineNumber: Array<Record<string, unknown>>
@@ -34,6 +35,7 @@ const TABLES: SyncTableConfig[] = [
   { name: 'Draw', dateFields: ['drawDate', 'createdAt', 'updatedAt'] },
   { name: 'GroupMember', dateFields: ['createdAt'] },
   { name: 'GroupInvitation', dateFields: ['createdAt', 'updatedAt'] },
+  { name: 'GroupEmailRecipient', dateFields: ['createdAt', 'updatedAt'] },
   { name: 'Ticket', dateFields: ['createdAt', 'updatedAt'] },
   { name: 'TicketLine', dateFields: ['createdAt'] },
   { name: 'TicketLineNumber', dateFields: ['createdAt'] },
@@ -83,13 +85,14 @@ export const shouldBlockOverwrite = (source: SyncSummary, target: SyncSummary) =
 }
 
 export const exportSyncDataset = async (): Promise<SyncDataset> => {
-  const [users, groups, draws, groupMembers, invitations, tickets, lines, lineNumbers, receipts, checks, movements, cache, auditLogs] =
+  const [users, groups, draws, groupMembers, invitations, emailRecipients, tickets, lines, lineNumbers, receipts, checks, movements, cache, auditLogs] =
     await Promise.all([
       prisma.user.findMany(),
       prisma.group.findMany(),
       prisma.draw.findMany(),
       prisma.groupMember.findMany(),
       prisma.groupInvitation.findMany(),
+      prisma.groupEmailRecipient.findMany(),
       prisma.ticket.findMany(),
       prisma.ticketLine.findMany(),
       prisma.ticketLineNumber.findMany(),
@@ -106,6 +109,7 @@ export const exportSyncDataset = async (): Promise<SyncDataset> => {
     Draw: draws,
     GroupMember: groupMembers,
     GroupInvitation: invitations,
+    GroupEmailRecipient: emailRecipients,
     Ticket: tickets,
     TicketLine: lines,
     TicketLineNumber: lineNumbers,
@@ -157,6 +161,8 @@ const normalizeDataset = (dataset: SyncDataset): SyncDataset => {
     )
   })
 
+  const emailRecipients = dataset.GroupEmailRecipient.filter((row) => groupIds.has(toId(row.groupId)))
+
   const tickets = dataset.Ticket.filter((row) => {
     const groupId = toId(row.groupId)
     const drawId = toId(row.drawId)
@@ -196,6 +202,7 @@ const normalizeDataset = (dataset: SyncDataset): SyncDataset => {
     Draw: draws,
     GroupMember: memberships,
     GroupInvitation: invitations,
+    GroupEmailRecipient: emailRecipients,
     Ticket: tickets,
     TicketLine: lines,
     TicketLineNumber: lineNumbers,
@@ -220,6 +227,7 @@ export const replaceSyncDataset = async (dataset: SyncDataset) => {
     await tx.ticketLine.deleteMany()
     await tx.ticket.deleteMany()
     await tx.groupInvitation.deleteMany()
+    await tx.groupEmailRecipient.deleteMany()
     await tx.groupMember.deleteMany()
     await tx.draw.deleteMany()
     await tx.group.deleteMany()
@@ -284,6 +292,20 @@ export const replaceSyncDataset = async (dataset: SyncDataset) => {
           role: String(row.role),
           status: String(row.status),
           note: row.note ? String(row.note) : null,
+          createdAt: toDate(row.createdAt),
+          updatedAt: toDate(row.updatedAt)
+        }))
+      })
+    }
+
+    if (normalized.GroupEmailRecipient.length > 0) {
+      await tx.groupEmailRecipient.createMany({
+        data: normalized.GroupEmailRecipient.map((row) => ({
+          id: String(row.id),
+          groupId: String(row.groupId),
+          email: String(row.email).toLowerCase(),
+          label: row.label ? String(row.label) : null,
+          enabled: row.enabled !== false,
           createdAt: toDate(row.createdAt),
           updatedAt: toDate(row.updatedAt)
         }))

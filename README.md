@@ -55,6 +55,7 @@ Endpoints disponibles:
 - `GET/DELETE /api/auth/session` (sesion de usuario actual / logout)
 - `GET/POST /api/users` (listar/crear usuarios, API interna)
 - `GET /api/groups`
+- `GET/POST/DELETE /api/groups/:groupId/email-recipients` (destinatarios de correo del grupo; solo el owner puede modificar)
 - `GET /api/groups/:groupId/movements` (historial de bote, filtro opcional `type`)
 - `GET/POST /api/groups/:groupId/members`
 - `GET/POST /api/groups/:groupId/invitations`
@@ -140,7 +141,7 @@ En este PC se ejecuta los martes, viernes y domingos a las 04:30 con cron. La sa
 
 ## Automatización de resultados de Primitiva
 
-El worker local consulta por IMAP los mensajes nuevos del buzón configurado, conserva el `.eml`, usa Codex en modo solo lectura para extraer un JSON validable, importa el resultado en `ResultCache`, recalcula los boletos afectados y envía el informe mediante el SMTP de DonDominio.
+El worker local consulta por IMAP los mensajes nuevos del buzón configurado, conserva el `.eml`, usa Codex en modo solo lectura para extraer un JSON validable, importa el resultado en `ResultCache`, recalcula los boletos afectados y envía un informe SMTP independiente por grupo. Cada informe incluye el saldo/bote calculado desde `GroupMovement`, los boletos del grupo y sus aciertos/fallos.
 
 Configuración adicional en `.env.local`:
 

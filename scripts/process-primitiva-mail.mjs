@@ -100,20 +100,24 @@ async function processMessage({ source, parsed, uid }) {
   const resultPath = resolve(resultDir, `${result.date}-${safeId}.json`);
   writeFileSync(resultPath, `${JSON.stringify(result, null, 2)}\n`);
   const resultHash = createHash('sha256').update(JSON.stringify(result)).digest('hex');
-
-  await runBackup('PRE');
-  const report = await importAndBuildReport(result);
-  await runBackup('POST');
-  await sendReport(result, report, resultHash);
-
-  state.processed[messageId] = {
+  const stateEntry = {
+    ...(state.processed[messageId] ?? {}),
+    messageId,
     uid,
     drawDate: result.date,
     resultHash,
     emlPath,
     resultPath,
-    sentAt: new Date().toISOString()
+    sentGroups: state.processed[messageId]?.sentGroups ?? {}
   };
+
+  await runBackup('PRE');
+  const report = await importAndBuildReport(result);
+  await runBackup('POST');
+  await sendGroupReports(result, report, resultHash, stateEntry);
+
+  stateEntry.sentAt = new Date().toISOString();
+  state.processed[messageId] = stateEntry;
   writeState(state);
   if (uid !== null) await client.messageFlagsAdd(uid, ['\\Seen'], { uid: true });
   processed += 1;
@@ -266,11 +270,27 @@ async function importAndBuildReport(result) {
     },
     include: {
       draw: true,
-      group: true,
+      group: {
+        include: {
+          emailRecipients: {
+            where: { enabled: true },
+            orderBy: { email: 'asc' }
+          }
+        }
+      },
       lines: { include: { numbers: true }, orderBy: { lineIndex: 'asc' } },
       checks: { where: { drawDate }, select: { prizeCents: true } }
     }
   });
+  const groupIds = [...new Set(tickets.map((ticket) => ticket.groupId))];
+  const balances = groupIds.length
+    ? await prisma.groupMovement.groupBy({
+        by: ['groupId'],
+        where: { groupId: { in: groupIds } },
+        _sum: { amountCents: true }
+      })
+    : [];
+  const balanceByGroup = new Map(balances.map((item) => [item.groupId, item._sum.amountCents ?? 0]));
 
   const reportRows = [];
   await prisma.$transaction(async (tx) => {
@@ -299,11 +319,25 @@ async function importAndBuildReport(result) {
       const allChecks = await tx.ticketCheck.findMany({ where: { ticketId: ticket.id }, select: { status: true, prizeCents: true } });
       const nextStatus = allChecks.some((check) => check.status === 'PREMIO' || (check.prizeCents ?? 0) > 0) ? 'PREMIO' : 'COMPROBADO';
       await tx.ticket.update({ where: { id: ticket.id }, data: { status: nextStatus } });
-      reportRows.push({ ticketId: ticket.id, group: ticket.group?.name ?? ticket.groupId, lines: lineReports });
+      reportRows.push({
+        ticketId: ticket.id,
+        groupId: ticket.groupId,
+        group: ticket.group?.name ?? ticket.groupId,
+        recipients: ticket.group?.emailRecipients.map((recipient) => recipient.email) ?? [],
+        balanceCents: balanceByGroup.get(ticket.groupId) ?? 0,
+        lines: lineReports
+      });
     }
   });
 
-  return { result, tickets: reportRows };
+  const groups = [...new Map(reportRows.map((row) => [row.groupId, row])).values()].map((firstRow) => ({
+    groupId: firstRow.groupId,
+    group: firstRow.group,
+    balanceCents: firstRow.balanceCents,
+    recipients: firstRow.recipients,
+    tickets: reportRows.filter((row) => row.groupId === firstRow.groupId)
+  }));
+  return { result, groups };
 }
 
 function buildPayload(result) {
@@ -320,14 +354,27 @@ function buildPayload(result) {
   };
 }
 
-async function sendReport(result, report, resultHash) {
+async function sendGroupReports(result, report, resultHash, stateEntry) {
+  for (const group of report.groups) {
+    if (group.recipients.length === 0) {
+      throw new Error(`El grupo ${group.group} no tiene destinatarios de correo activos.`);
+    }
+    if (stateEntry.sentGroups[group.groupId]) continue;
+    await sendGroupReport(result, group, resultHash);
+    stateEntry.sentGroups[group.groupId] = new Date().toISOString();
+    state.processed[stateEntry.messageId ?? `pending-${result.date}`] = stateEntry;
+    writeState(state);
+  }
+}
+
+async function sendGroupReport(result, group, resultHash) {
   const from = process.env.RESULTS_REPORT_FROM ?? 'loto@conquense.dev';
-  const recipients = process.env.RESULTS_REPORT_BCC.split(/[\n,]+/).map((item) => item.trim()).filter(Boolean);
-  const tickets = report.tickets.map((ticket, index) => {
+  const tickets = group.tickets.map((ticket, index) => {
     const lines = ticket.lines.map((line, lineIndex) => `  Línea ${lineIndex + 1}: ${line.numbers.join(', ') || 'sin números'} | aciertos: ${line.hits.join(', ') || 'ninguno'} | fallados: ${line.missed.join(', ') || 'ninguno'}`).join('\n');
     return `Boleto ${index + 1} (${ticket.ticketId}) — grupo: ${ticket.group}\n${lines}`;
   }).join('\n\n');
-  const text = [`La Primitiva — sorteo ${result.date}`, `Combinación: ${result.numbers.join(', ')}`, `Complementario: ${result.complementario ?? 'no indicado'}`, `Reintegro: ${result.reintegro ?? 'no indicado'}`, '', tickets || 'No hay boletos correspondientes a este sorteo.'].join('\n');
+  const balance = (group.balanceCents / 100).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
+  const text = [`La Primitiva — ${group.group} — sorteo ${result.date}`, `Bote restante del grupo: ${balance}`, `Combinación: ${result.numbers.join(', ')}`, `Complementario: ${result.complementario ?? 'no indicado'}`, `Reintegro: ${result.reintegro ?? 'no indicado'}`, '', tickets || 'No hay boletos correspondientes a este sorteo.'].join('\n');
   const transporter = nodemailer.createTransport({
     host: process.env.RESULTS_SMTP_HOST ?? 'smtp.dondominio.com',
     port: Number(process.env.RESULTS_SMTP_PORT ?? '587'),
@@ -341,9 +388,9 @@ async function sendReport(result, report, resultHash) {
   await transporter.sendMail({
     from,
     to: [from],
-    bcc: recipients,
-    subject: `La Primitiva — resultados ${result.date}`,
+    bcc: group.recipients,
+    subject: `La Primitiva — ${group.group} — resultados ${result.date}`,
     text,
-    headers: { 'X-Loto-Result-Key': `primitiva/${result.date}/${resultHash}` }
+    headers: { 'X-Loto-Result-Key': `primitiva/${result.date}/${group.groupId}/${resultHash}` }
   });
 }
