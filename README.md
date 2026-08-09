@@ -136,7 +136,30 @@ npm run backup:db
 
 Genera un fichero local `backups/vercel-postgres-YYYYMMDD-HHMMSS.json`. No realiza subidas a OneDrive.
 
-Para automatizarla en este PC, se puede programar diariamente a las 03:00 con cron. La salida queda registrada en `backups/backup-cron.log`.
+En este PC se ejecuta los martes, viernes y domingos a las 04:30 con cron. La salida queda registrada en `backups/backup-cron.log`.
+
+## Automatización de resultados de Primitiva
+
+El worker local consulta por IMAP los mensajes nuevos del buzón configurado, conserva el `.eml`, usa Codex en modo solo lectura para extraer un JSON validable, importa el resultado en `ResultCache`, recalcula los boletos afectados y envía el informe mediante el SMTP de DonDominio.
+
+Configuración adicional en `.env.local`:
+
+- `RESULTS_IMAP_HOST`, `RESULTS_IMAP_PORT`, `RESULTS_IMAP_SECURE`, `RESULTS_IMAP_USER`, `RESULTS_IMAP_PASSWORD` y `RESULTS_IMAP_MAILBOX`.
+- `RESULTS_IMAP_FROM` y `RESULTS_IMAP_SUBJECT`, obligatorios para filtrar el correo real de Loterías del Estado.
+- `RESULTS_CODEX_BIN`, `RESULTS_SMTP_HOST`, `RESULTS_SMTP_PORT`, `RESULTS_SMTP_SECURE`, `RESULTS_SMTP_USER`, `RESULTS_SMTP_PASSWORD` (opcional si reutiliza `RESULTS_IMAP_PASSWORD`), `RESULTS_REPORT_FROM` y `RESULTS_REPORT_BCC`.
+- `RESULTS_RETENTION_DAYS` (por defecto, `90`).
+
+Las contraseñas IMAP/SMTP y los destinatarios solo deben estar en `.env.local`. El proceso ejecuta `npm run backup:db` antes y después de cualquier escritura remota. Si falla una fase, conserva el correo sin marcarlo como procesado para reintentarlo.
+
+La retención local es de 90 días para los correos `.eml`, resultados JSON y logs. El estado de idempotencia se conserva hasta 12 meses y después se compacta.
+
+Ejecución manual:
+
+```bash
+npm run results:process
+# prueba completa sobre un correo descargado, sin tocar el buzón IMAP
+node scripts/process-primitiva-mail.mjs --file ./resultado.eml
+```
 
 Los comandos `db:sync:up` y `db:sync:down` quedan desactivados para evitar sobrescrituras de una base local.
 
