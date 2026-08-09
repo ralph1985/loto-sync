@@ -2,104 +2,26 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 
-type DrawType = "PRIMITIVA" | "EUROMILLONES";
-type TicketStatus = "PENDIENTE" | "COMPROBADO" | "PREMIO";
-type PrimitivaCoverageMode = "SINGLE" | "WEEKLY";
-type MovementType =
-  | "OPENING"
-  | "ADJUSTMENT"
-  | "CONTRIBUTION"
-  | "TICKET_EXPENSE"
-  | "PRIZE";
-
-type Group = {
-  id: string;
-  name: string;
-  balanceCents?: number;
-};
-
-type Draw = {
-  id: string;
-  type: DrawType;
-  drawDate: string;
-  label?: string | null;
-};
-
-type TicketLineNumber = {
-  id: string;
-  kind: "MAIN" | "STAR";
-  position: number;
-  value: number;
-};
-
-type TicketLine = {
-  id: string;
-  lineIndex: number;
-  complement?: number | null;
-  reintegro?: number | null;
-  numbers: TicketLineNumber[];
-};
-
-type Receipt = {
-  id: string;
-  blobUrl: string;
-};
-
-type TicketCheck = {
-  id: string;
-  drawDate: string;
-  status: TicketStatus;
-  reason?: string | null;
-  winningNumbers?: number[] | null;
-  winningStars?: number[] | null;
-  winningComplementario?: number | null;
-  winningReintegro?: number | null;
-  matchesMain: number;
-  matchesStars: number;
-  prizeCents?: number | null;
-  prizeSource?: string | null;
-  checkedAt: string;
-};
-
-type Ticket = {
-  id: string;
-  status: TicketStatus;
-  createdAt: string;
-  priceCents?: number | null;
-  playsJoker?: boolean;
-  jokerNumber?: string | null;
-  group?: Group | null;
-  draw?: Draw | null;
-  lines?: TicketLine[];
-  receipt?: Receipt | null;
-  checks?: TicketCheck[];
-};
-
-type VerifyResponse = {
-  status: TicketStatus;
-  reason?: string;
-  matches?: {
-    main: number;
-    stars: number;
-  };
-  check?: TicketCheck;
-  ticketStatus?: TicketStatus;
-  result?: {
-    game: DrawType;
-    drawDate: string;
-    numbers: number[];
-    stars?: number[];
-  };
-};
-
-type GroupMovement = {
-  id: string;
-  type: MovementType;
-  amountCents: number;
-  occurredAt: string;
-  note?: string | null;
-  runningBalanceCents: number;
-};
+import { ModalShell } from "@/components/ui/modal-shell";
+import {
+  buildDrawLabel,
+  formatDate,
+  formatDateTime,
+  formatPrice,
+  getMainNumbers,
+  getStarNumbers,
+} from "@/features/tickets/formatters";
+import type {
+  DrawType,
+  Group,
+  GroupMovement,
+  MovementType,
+  PrimitivaCoverageMode,
+  Ticket,
+  TicketCheck,
+  TicketStatus,
+  VerifyResponse,
+} from "@/features/tickets/types";
 
 const STATUS_OPTIONS: { value: "ALL" | TicketStatus; label: string }[] = [
   { value: "ALL", label: "Todos" },
@@ -123,25 +45,10 @@ const MOVEMENT_TYPE_OPTIONS: { value: "ALL" | MovementType; label: string }[] = 
   { value: "ADJUSTMENT", label: "Ajuste" },
 ];
 
-const DRAW_LABELS: Record<DrawType, string> = {
-  PRIMITIVA: "Primitiva",
-  EUROMILLONES: "Euromillones",
-};
-
 const REVIEW_CACHE_TTL_MS = 60 * 60 * 1000;
 const REVIEW_TICKETS_CACHE_KEY = "review:api:tickets";
 const REVIEW_GROUPS_CACHE_KEY = "review:api:groups";
 const PRIMITIVA_DRAW_WEEKDAYS = new Set([1, 4, 6]);
-
-const formatDate = (value?: string | null) => {
-  if (!value) return "Sin fecha";
-  return new Date(value).toLocaleDateString("es-ES");
-};
-
-const formatDateTime = (value?: string | null) => {
-  if (!value) return "Sin fecha";
-  return new Date(value).toLocaleString("es-ES");
-};
 
 const formatDrawChip = (value?: string | null) => {
   if (!value) return "Sin fecha";
@@ -157,11 +64,6 @@ const formatDrawChip = (value?: string | null) => {
 const toDateInput = (value?: string | null) => {
   if (!value) return "";
   return new Date(value).toISOString().slice(0, 10);
-};
-
-const formatPrice = (priceCents?: number | null) => {
-  if (priceCents === null || priceCents === undefined) return "Sin precio";
-  return `${(priceCents / 100).toFixed(2)} EUR`;
 };
 
 const parseEuroAmountToCents = (value: string) => {
@@ -186,31 +88,10 @@ const toNumberArray = (value: unknown): number[] => {
     .filter((item) => Number.isFinite(item));
 };
 
-const buildDrawLabel = (draw?: Draw | null) => {
-  if (!draw) return "Sorteo";
-  return draw.label ?? `${DRAW_LABELS[draw.type]} · ${formatDate(draw.drawDate)}`;
-};
-
 const sortChecksByDate = (checks?: TicketCheck[]) =>
   [...(checks ?? [])].sort(
     (a, b) => new Date(b.drawDate).getTime() - new Date(a.drawDate).getTime()
   );
-
-const getMainNumbers = (line?: TicketLine) =>
-  line
-    ? line.numbers
-        .filter((number) => number.kind === "MAIN")
-        .sort((a, b) => a.position - b.position)
-        .map((number) => number.value)
-    : [];
-
-const getStarNumbers = (line?: TicketLine) =>
-  line
-    ? line.numbers
-        .filter((number) => number.kind === "STAR")
-        .sort((a, b) => a.position - b.position)
-        .map((number) => number.value)
-    : [];
 
 const getPrimitivaWeeklyDrawDates = (drawDate: string) => {
   const source = new Date(`${drawDate}T00:00:00.000Z`);
@@ -1175,27 +1056,20 @@ function ReviewPageContent() {
       </main>
 
       {showContributionModal && groupFilter !== "ALL" ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-10">
-          <div
-            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
-            onClick={closeContributionModal}
-          />
+        <ModalShell
+          open
+          onClose={closeContributionModal}
+          closeDisabled={savingContribution}
+          ariaLabel="Recargar bote"
+          panelClassName="max-w-md border border-slate-200 bg-white p-0 shadow-[0_30px_80px_rgba(15,23,42,0.35)]"
+        >
           <form
-            className="relative w-full max-w-md rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_30px_80px_rgba(15,23,42,0.35)] sm:p-6"
+            className="w-full p-5 sm:p-6"
             onSubmit={(event) => {
               event.preventDefault();
               handleSaveContribution();
             }}
           >
-            <button
-              type="button"
-              onClick={closeContributionModal}
-              disabled={savingContribution}
-              aria-label="Cerrar modal"
-              className="absolute right-3 top-3 z-20 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-slate-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              X
-            </button>
             <div className="mb-5 pr-8">
               <h3 className="text-lg font-semibold text-slate-900">Recargar bote</h3>
               <p className="mt-1 text-sm text-slate-500">
@@ -1270,24 +1144,16 @@ function ReviewPageContent() {
               </div>
             </div>
           </form>
-        </div>
+        </ModalShell>
       ) : null}
 
       {showMovementsModal && groupFilter !== "ALL" ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-10">
-          <div
-            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
-            onClick={() => setShowMovementsModal(false)}
-          />
-          <div className="relative max-h-[70vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-slate-200 bg-white p-4 shadow-[0_30px_80px_rgba(15,23,42,0.35)] sm:p-6">
-            <button
-              type="button"
-              onClick={() => setShowMovementsModal(false)}
-              aria-label="Cerrar modal"
-              className="absolute right-3 top-3 z-20 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
-            >
-              ✕
-            </button>
+        <ModalShell
+          open
+          onClose={() => setShowMovementsModal(false)}
+          ariaLabel="Historial de bote"
+          panelClassName="max-w-3xl border border-slate-200 bg-white p-4 shadow-[0_30px_80px_rgba(15,23,42,0.35)] sm:p-6"
+        >
             <div className="mb-4 pr-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h3 className="text-lg font-semibold text-slate-900">Historial de bote</h3>
@@ -1366,26 +1232,16 @@ function ReviewPageContent() {
                 </div>
               )}
             </div>
-          </div>
-        </div>
+        </ModalShell>
       ) : null}
 
       {selectedTicket ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-10">
-          <div
-            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
-            onClick={() => setSelectedTicket(null)}
-          />
-
-          <div className="relative max-h-[70vh] w-full max-w-4xl overflow-y-auto rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_30px_80px_rgba(15,23,42,0.35)]">
-            <button
-              type="button"
-              onClick={() => setSelectedTicket(null)}
-              aria-label="Cerrar modal"
-              className="absolute right-3 top-3 z-20 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
-            >
-              ✕
-            </button>
+        <ModalShell
+          open
+          onClose={() => setSelectedTicket(null)}
+          ariaLabel="Detalle del boleto"
+          panelClassName="max-w-4xl border border-slate-200 bg-white p-6 shadow-[0_30px_80px_rgba(15,23,42,0.35)]"
+        >
             <div className="pr-8 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div>
                 <div className="text-xs uppercase tracking-wide text-slate-400">
@@ -1741,8 +1597,7 @@ function ReviewPageContent() {
                 )}
               </div>
             </div>
-          </div>
-        </div>
+        </ModalShell>
       ) : null}
     </div>
   );

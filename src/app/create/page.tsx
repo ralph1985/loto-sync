@@ -4,55 +4,18 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { ModalShell } from "@/components/ui/modal-shell";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { NumberBadge } from "@/components/ui/number-badge";
+import { buildDrawLabel, formatDate, formatPrice } from "@/features/tickets/formatters";
+import type {
+  Draw,
+  DrawType,
+  Group,
+  PrimitivaCoverageMode,
+  Ticket,
+} from "@/features/tickets/types";
 import { loadSessionClient } from "@/lib/session-client";
-
-type DrawType = "PRIMITIVA" | "EUROMILLONES";
-type PrimitivaCoverageMode = "SINGLE" | "WEEKLY";
-
-type Group = {
-  id: string;
-  name: string;
-  balanceCents?: number;
-};
-
-type Draw = {
-  id: string;
-  type: DrawType;
-  drawDate: string;
-  label?: string | null;
-};
-
-type TicketLineNumber = {
-  id: string;
-  kind: "MAIN" | "STAR";
-  position: number;
-  value: number;
-};
-
-type TicketLine = {
-  id: string;
-  lineIndex: number;
-  complement?: number | null;
-  reintegro?: number | null;
-  numbers: TicketLineNumber[];
-};
-
-type Ticket = {
-  id: string;
-  status: "PENDIENTE" | "COMPROBADO" | "PREMIO";
-  createdAt: string;
-  priceCents?: number | null;
-  playsJoker?: boolean;
-  jokerNumber?: string | null;
-  group?: Group | null;
-  draw?: Draw | null;
-  lines?: TicketLine[];
-  receipt?: {
-    blobUrl: string;
-  } | null;
-};
 
 type LineState = {
   mainInput: string;
@@ -164,22 +127,6 @@ const validateNumberSet = (
   return { values, errors };
 };
 
-const formatDate = (value?: string | null) => {
-  if (!value) return "Sin fecha";
-  return new Date(value).toLocaleDateString("es-ES");
-};
-
-const formatPrice = (priceCents?: number | null) => {
-  if (priceCents === null || priceCents === undefined) return "Sin precio";
-  return `${(priceCents / 100).toFixed(2)} EUR`;
-};
-
-const buildDrawLabel = (draw?: Draw | null) => {
-  if (!draw) return "Sorteo";
-  const fallback = DRAW_TYPES.find((item) => item.id === draw.type)?.label;
-  return draw.label ?? `${fallback ?? "Sorteo"} · ${formatDate(draw.drawDate)}`;
-};
-
 const TicketDetailModal = ({
   ticket,
   onClose,
@@ -190,20 +137,12 @@ const TicketDetailModal = ({
   if (!ticket) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-10">
-      <div
-        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      <div className="relative max-h-[70vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_30px_80px_rgba(15,23,42,0.35)]">
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Cerrar modal"
-          className="absolute right-3 top-3 z-20 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
-        >
-          ✕
-        </button>
+    <ModalShell
+      open={Boolean(ticket)}
+      onClose={onClose}
+      ariaLabel="Detalle del boleto"
+      panelClassName="max-w-3xl border border-slate-200 bg-white p-6 shadow-[0_30px_80px_rgba(15,23,42,0.35)]"
+    >
         <div className="pr-8 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
             <div className="text-xs uppercase tracking-wide text-slate-400">
@@ -305,8 +244,7 @@ const TicketDetailModal = ({
             )}
           </div>
         </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 };
 
