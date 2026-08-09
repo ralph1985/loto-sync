@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { NumberBadge } from "@/components/ui/number-badge";
+import { TicketCreateForm, type LineState } from "@/components/create/ticket-create-form";
 import { TicketDetailModal } from "@/components/tickets/ticket-detail-modal";
 import { buildDrawLabel, formatDate, formatPrice } from "@/features/tickets/formatters";
 import type {
@@ -16,13 +17,6 @@ import type {
   Ticket,
 } from "@/features/tickets/types";
 import { loadSessionClient } from "@/lib/session-client";
-
-type LineState = {
-  mainInput: string;
-  starInput: string;
-  complement: string;
-  reintegro: string;
-};
 
 const DRAW_TYPES: { id: DrawType; label: string; description: string }[] = [
   {
@@ -626,340 +620,45 @@ export default function Home() {
             </p>
           </header>
 
-          <form className="flex flex-col gap-6" onSubmit={handleSubmit}>
-            <section className="animate-fade-up rounded-3xl border border-white/70 bg-white/80 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur sm:p-6">
-              <h2 className="text-lg font-semibold text-slate-900">Seleccion</h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Define sorteo, grupo y fecha del boleto.
-              </p>
-              <div className="mt-3">
-                <button
-                  type="button"
-                  onClick={() => refreshInitialData()}
-                  className="btn btn-xs btn-outline"
-                >
-                  Recargar datos
-                </button>
-              </div>
-              {loadError ? (
-                <InlineAlert tone="error" className="mt-4">{loadError}</InlineAlert>
-              ) : null}
-              <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Sorteo
-                  </label>
-                  <select
-                    value={drawType}
-                    onChange={(event) => setDrawType(event.target.value as DrawType)}
-                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
-                  >
-                    {DRAW_TYPES.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.label}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="text-xs text-slate-500">
-                    {DRAW_TYPES.find((item) => item.id === drawType)?.description}
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Grupo
-                  </label>
-                  <select
-                    value={groupId}
-                    onChange={(event) => setGroupId(event.target.value)}
-                    disabled={loadingData || !!loadError}
-                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none disabled:opacity-60"
-                  >
-                    <option value="">
-                      {loadingData ? "Cargando..." : "Selecciona grupo"}
-                    </option>
-                    {groups.map((group) => (
-                      <option key={group.id} value={group.id}>
-                        {group.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Fecha sorteo
-                  </label>
-                  <input
-                    type="date"
-                    value={drawDate}
-                    onChange={(event) => setDrawDate(event.target.value)}
-                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
-                  />
-                </div>
-
-                {drawType === "PRIMITIVA" ? (
-                  <div className="flex flex-col gap-2">
-                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Cobertura
-                    </label>
-                    <select
-                      value={primitivaCoverageMode}
-                      onChange={(event) =>
-                        setPrimitivaCoverageMode(
-                          event.target.value as PrimitivaCoverageMode
-                        )
-                      }
-                      className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
-                    >
-                      <option value="SINGLE">Solo este sorteo</option>
-                      <option value="WEEKLY">Semana completa (L-J-S)</option>
-                    </select>
-                    {drawDate && primitivaCoverageMode === "WEEKLY" ? (
-                      <p className="text-xs text-slate-500">
-                        Se aplicará a:{" "}
-                        {getPrimitivaWeeklyDrawDates(drawDate)
-                          .map((value) =>
-                            new Date(`${value}T00:00:00.000Z`).toLocaleDateString("es-ES")
-                          )
-                          .join(" · ")}
-                      </p>
-                    ) : null}
-                  </div>
-                ) : null}
-
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Precio (EUR)
-                  </label>
-                  <input
-                    value={priceInput}
-                    onChange={(event) => setPriceInput(event.target.value)}
-                    placeholder="Ej: 2.00"
-                    inputMode="decimal"
-                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
-                  />
-                </div>
-              </div>
-              {drawType === "PRIMITIVA" ? (
-                <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                  <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
-                    <input
-                      type="checkbox"
-                      checked={playsJoker}
-                      onChange={(event) => setPlaysJoker(event.target.checked)}
-                      className="h-4 w-4 rounded border-slate-300"
-                    />
-                    Jugar Joker
-                  </label>
-                  <div className="flex flex-col gap-2">
-                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Numero Joker
-                    </label>
-                    <input
-                      value={jokerNumber}
-                      onChange={(event) =>
-                        setJokerNumber(event.target.value.replace(/\D/g, "").slice(0, 7))
-                      }
-                      placeholder="7 digitos"
-                      inputMode="numeric"
-                      disabled={!playsJoker}
-                      className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none disabled:opacity-60"
-                    />
-                  </div>
-                </div>
-              ) : null}
-            </section>
-
-            <section className="animate-fade-up rounded-3xl border border-white/70 bg-white/90 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur sm:p-6">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h2 className="text-lg font-semibold text-slate-900">Numeros</h2>
-                  <p className="mt-1 text-sm text-slate-500">
-                    Usa comas o espacios para separar numeros.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setLines((current) => [...current, createEmptyLine()])}
-                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
-                >
-                  + Linea
-                </button>
-              </div>
-
-              <div className="mt-5 flex flex-col gap-6">
-                {lines.map((line, index) => {
-                  const lineValidation = validation.lineResults[index];
-                  return (
-                    <div
-                      key={index}
-                      className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          Linea {index + 1}
-                        </span>
-                        {lines.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setLines((current) =>
-                                current.filter((_, lineIndex) => lineIndex !== index)
-                              )
-                            }
-                            className="text-xs font-semibold uppercase tracking-wide text-slate-400 transition hover:text-slate-600"
-                          >
-                            Quitar
-                          </button>
-                        )}
-                      </div>
-
-                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                        <div className="flex flex-col gap-2">
-                          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Numeros principales
-                          </label>
-                          <input
-                            value={line.mainInput}
-                            onChange={(event) =>
-                              handleLineChange(index, { mainInput: event.target.value })
-                            }
-                            placeholder={
-                              selectedDrawType === "PRIMITIVA"
-                                ? "Ej: 4 9 13 28 33 41"
-                                : "Ej: 7 18 24 33 49"
-                            }
-                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
-                          />
-                        </div>
-
-                        {selectedDrawType === "EUROMILLONES" ? (
-                          <div className="flex flex-col gap-2">
-                            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                              Estrellas
-                            </label>
-                            <input
-                              value={line.starInput}
-                              onChange={(event) =>
-                                handleLineChange(index, { starInput: event.target.value })
-                              }
-                              placeholder="Ej: 2 11"
-                              className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
-                            />
-                          </div>
-                        ) : (
-                          <div className="grid gap-3 sm:grid-cols-2">
-                            <div className="flex flex-col gap-2">
-                              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                Complementario
-                              </label>
-                              <input
-                                value={line.complement}
-                                onChange={(event) =>
-                                  handleLineChange(index, { complement: event.target.value })
-                                }
-                                placeholder="Ej: 12"
-                                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
-                              />
-                            </div>
-                            <div className="flex flex-col gap-2">
-                              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                Reintegro
-                              </label>
-                              <input
-                                value={line.reintegro}
-                                onChange={(event) =>
-                                  handleLineChange(index, { reintegro: event.target.value })
-                                }
-                                placeholder="Ej: 6"
-                                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
-                              />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {lineValidation?.issues.length ? (
-                        <div className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700">
-                          {lineValidation.issues.map((issue, issueIndex) => (
-                            <p key={issueIndex}>{issue}</p>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-
-            <section className="animate-fade-up rounded-3xl border border-white/70 bg-white/90 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur sm:p-6">
-              <h2 className="text-lg font-semibold text-slate-900">Resguardo</h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Opcional, pero recomendable para comprobaciones.
-              </p>
-              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(event) => setReceipt(event.target.files?.[0] ?? null)}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 file:mr-3 file:rounded-full file:border-0 file:bg-slate-900 file:px-4 file:py-2 file:text-xs file:font-semibold file:uppercase file:tracking-wide file:text-white"
-                />
-                {receipt ? (
-                  <span className="text-xs text-slate-500">
-                    {receipt.name} ({Math.round(receipt.size / 1024)} KB)
-                  </span>
-                ) : null}
-              </div>
-            </section>
-
-            <section className="animate-fade-up rounded-3xl border border-white/70 bg-white/90 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur sm:p-6">
-              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Notas
-              </label>
-              <textarea
-                value={notes}
-                onChange={(event) => setNotes(event.target.value)}
-                placeholder="Ej: Boleto compartido con Marta y Luis."
-                rows={3}
-                className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
-              />
-            </section>
-
-            <section className="animate-fade-up rounded-3xl border border-white/70 bg-white/90 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur sm:p-6">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="text-sm text-slate-500">
-                  {selectedDraw ? selectedDraw.label ?? "Sorteo" : "Sorteo"} ·{" "}
-                  {lines.length} linea(s)
-                </div>
-                <button
-                  type="submit"
-                  disabled={!validation.isValid || saving}
-                  className={`rounded-full px-6 py-3 text-sm font-semibold uppercase tracking-wide transition ${
-                    validation.isValid && !saving
-                      ? "bg-slate-900 text-white hover:bg-slate-700"
-                      : "cursor-not-allowed bg-slate-200 text-slate-500"
-                  }`}
-                >
-                  {saving ? "Guardando..." : "Guardar boleto"}
-                </button>
-              </div>
-
-              {saveSuccess ? (
-                <InlineAlert tone="success" className="mt-4">{saveSuccess}</InlineAlert>
-              ) : null}
-
-              {saveError ? (
-                <InlineAlert tone="error" className="mt-4">{saveError}</InlineAlert>
-              ) : null}
-
-              {submitted && !validation.isValid ? (
-                <InlineAlert tone="error" className="mt-4">
-                  Revisa las validaciones para continuar.
-                </InlineAlert>
-              ) : null}
-            </section>
-          </form>
+          <TicketCreateForm
+            drawTypes={DRAW_TYPES}
+            drawType={drawType}
+            onDrawTypeChange={setDrawType}
+            groups={groups}
+            groupId={groupId}
+            onGroupChange={setGroupId}
+            loadingData={loadingData}
+            loadError={loadError}
+            onRefreshData={refreshInitialData}
+            drawDate={drawDate}
+            onDrawDateChange={setDrawDate}
+            coverageMode={primitivaCoverageMode}
+            onCoverageModeChange={setPrimitivaCoverageMode}
+            weeklyDrawDates={getPrimitivaWeeklyDrawDates}
+            priceInput={priceInput}
+            onPriceChange={setPriceInput}
+            playsJoker={playsJoker}
+            onPlaysJokerChange={setPlaysJoker}
+            jokerNumber={jokerNumber}
+            onJokerNumberChange={setJokerNumber}
+            lines={lines}
+            validation={validation}
+            onAddLine={() => setLines((current) => [...current, createEmptyLine()])}
+            onRemoveLine={(index) =>
+              setLines((current) => current.filter((_, lineIndex) => lineIndex !== index))
+            }
+            onLineChange={handleLineChange}
+            receipt={receipt}
+            onReceiptChange={setReceipt}
+            notes={notes}
+            onNotesChange={setNotes}
+            selectedDraw={selectedDraw}
+            saving={saving}
+            submitted={submitted}
+            saveSuccess={saveSuccess}
+            saveError={saveError}
+            onSubmit={handleSubmit}
+          />
         </section>
 
         <aside className="animate-fade-up flex w-full flex-col gap-4 self-start lg:sticky lg:top-12 lg:max-w-md">
