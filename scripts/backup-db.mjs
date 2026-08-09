@@ -1,12 +1,8 @@
-import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { basename, resolve } from 'node:path';
+import { resolve } from 'node:path';
 
 const lotoRoot = resolve(process.cwd());
 const backupDir = resolve(lotoRoot, 'backups');
-const onedriveDir = resolve(lotoRoot, process.env.ONEDRIVE_SYNC_DIR ?? '../onedrive-file-sync');
-const remoteDir = (process.env.ONEDRIVE_REMOTE_DIR ?? 'backups/loto-sync').replace(/\/+$/, '');
-
 loadLocalEnvFiles(resolve(lotoRoot, '.env.local'));
 loadLocalEnvFiles(resolve(lotoRoot, '.env'));
 
@@ -21,18 +17,12 @@ if (!existsSync(backupDir)) {
   mkdirSync(backupDir, { recursive: true });
 }
 
-if (!existsSync(onedriveDir)) {
-  console.error(`OneDrive sync project not found: ${onedriveDir}`);
-  process.exit(1);
-}
-
 const dataset = await fetchRemoteExport(remoteBaseUrl, syncToken);
 
 const now = new Date();
 const pad = (value) => String(value).padStart(2, '0');
 const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
 const backupPath = resolve(backupDir, `vercel-postgres-${stamp}.json`);
-const remotePath = `${remoteDir}/${basename(backupPath)}`;
 
 const payload = JSON.stringify(
   {
@@ -45,24 +35,7 @@ const payload = JSON.stringify(
 );
 
 writeFileSync(backupPath, payload, 'utf8');
-console.log(`Remote backup ready: ${backupPath}`);
-console.log(`Uploading to OneDrive path: ${remotePath}`);
-
-const result = spawnSync('./run.sh', ['--local', backupPath, '--remote', remotePath], {
-  cwd: onedriveDir,
-  stdio: 'inherit'
-});
-
-if (result.error) {
-  console.error(result.error instanceof Error ? result.error.message : String(result.error));
-  process.exit(1);
-}
-
-if (typeof result.status === 'number' && result.status !== 0) {
-  process.exit(result.status);
-}
-
-console.log('OneDrive upload completed.');
+console.log(`Local backup ready: ${backupPath}`);
 
 function loadLocalEnvFiles(filePath) {
   if (!existsSync(filePath)) return;

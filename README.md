@@ -128,13 +128,15 @@ Los resguardos se guardan en `uploads/` y se sirven via `GET /api/uploads/<path>
 
 ## Backup de base de datos
 
-La copia de seguridad se hace desde Vercel Postgres via API segura y se sube a OneDrive:
+La copia de seguridad se exporta desde Vercel Postgres mediante la API segura y se guarda localmente:
 
 ```bash
 npm run backup:db
 ```
 
-Genera un fichero `backups/vercel-postgres-YYYYMMDD-HHMMSS.json` y lo sube al directorio remoto configurado.
+Genera un fichero local `backups/vercel-postgres-YYYYMMDD-HHMMSS.json`. No realiza subidas a OneDrive.
+
+Para automatizarla en este PC, se puede programar diariamente a las 03:00 con cron. La salida queda registrada en `backups/backup-cron.log`.
 
 Los comandos `db:sync:up` y `db:sync:down` quedan desactivados para evitar sobrescrituras de una base local.
 
