@@ -330,11 +330,15 @@ function TicketReceiptPanel({ ticket }: { ticket: Ticket }) {
     <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
       <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Resguardo</h4>
       {ticket.receipt?.blobUrl ? (
-        <div className="mt-3 space-y-3">
-          <img
-            src={ticket.receipt.blobUrl}
-            alt="Resguardo"
-            className="w-full rounded-2xl border border-slate-200 object-cover"
+            <div className="mt-3 space-y-3">
+              {/* Receipt URLs are dynamic storage/blob URLs; next/image cannot whitelist them safely. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={ticket.receipt.blobUrl}
+                alt="Resguardo"
+                loading="lazy"
+                decoding="async"
+                className="w-full rounded-2xl border border-slate-200 object-cover"
           />
           <a
             href={ticket.receipt.blobUrl}
