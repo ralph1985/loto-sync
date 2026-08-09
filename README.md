@@ -147,10 +147,10 @@ Configuración adicional en `.env.local`:
 
 - `RESULTS_IMAP_HOST`, `RESULTS_IMAP_PORT`, `RESULTS_IMAP_SECURE`, `RESULTS_IMAP_USER`, `RESULTS_IMAP_PASSWORD` y `RESULTS_IMAP_MAILBOX`.
 - `RESULTS_IMAP_FROM` y `RESULTS_IMAP_SUBJECT`, obligatorios para filtrar el correo real de Loterías del Estado.
-- `RESULTS_CODEX_BIN`, `RESULTS_SMTP_HOST`, `RESULTS_SMTP_PORT`, `RESULTS_SMTP_SECURE`, `RESULTS_SMTP_USER`, `RESULTS_SMTP_PASSWORD` (opcional si reutiliza `RESULTS_IMAP_PASSWORD`), `RESULTS_REPORT_FROM` y `RESULTS_REPORT_BCC`.
+- `RESULTS_CODEX_BIN`, `RESULTS_SMTP_HOST`, `RESULTS_SMTP_PORT`, `RESULTS_SMTP_SECURE`, `RESULTS_SMTP_USER`, `RESULTS_SMTP_PASSWORD` (opcional si reutiliza `RESULTS_IMAP_PASSWORD`) y `RESULTS_REPORT_FROM`.
 - `RESULTS_RETENTION_DAYS` (por defecto, `90`).
 
-Las contraseñas IMAP/SMTP y los destinatarios solo deben estar en `.env.local`. El proceso ejecuta `npm run backup:db` antes y después de cualquier escritura remota. Si falla una fase, conserva el correo sin marcarlo como procesado para reintentarlo.
+Las contraseñas IMAP/SMTP solo deben estar en `.env.local`. Los destinatarios se gestionan por grupo mediante la API de destinatarios de correo. El proceso ejecuta `npm run backup:db` antes y después de cualquier escritura remota. Si falla una fase, conserva el correo sin marcarlo como procesado para reintentarlo.
 
 La retención local es de 90 días para los correos `.eml`, resultados JSON y logs. El estado de idempotencia se conserva hasta 12 meses y después se compacta.
 
