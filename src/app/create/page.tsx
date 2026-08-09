@@ -124,13 +124,7 @@ export default function Home() {
   }
 
   return (
-    <div className="relative min-h-screen bg-[#f7f2ea] text-slate-900">
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -left-24 top-12 h-72 w-72 rounded-full bg-[#f9c784]/50 blur-3xl animate-glow" />
-        <div className="absolute right-[-120px] top-48 h-96 w-96 rounded-full bg-[#9bb7ff]/35 blur-3xl animate-glow" />
-        <div className="absolute bottom-[-160px] left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-[#f5a1b0]/30 blur-[120px]" />
-      </div>
-
+    <div className="relative min-h-[100dvh] bg-transparent text-slate-900">
       <main className="relative mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pb-16 pt-6 sm:pt-8 md:px-8 lg:flex-row lg:gap-10 lg:px-10 lg:pt-16">
         <section className="flex flex-1 flex-col gap-6">
           <header className="animate-fade-up space-y-3">
