@@ -13,6 +13,7 @@
     "db:push": "prisma db push",
     "db:seed": "node prisma/seed.js",
     "backup:db": "node scripts/backup-db.mjs",
+    "results:process": "node scripts/process-primitiva-mail.mjs",
     "db:sync:up": "node scripts/sync-db-mirror.mjs up",
     "db:sync:up:force": "node scripts/sync-db-mirror.mjs up --force",
     "db:sync:down": "node scripts/sync-db-mirror.mjs down",
@@ -21,6 +22,9 @@
   "dependencies": {
     "@prisma/adapter-pg": "7.4.2",
     "@prisma/client": "7.4.2",
+    "imapflow": "^1.0.196",
+    "mailparser": "^3.7.4",
+    "nodemailer": "^7.0.6",
     "next": "16.1.6",
     "pg": "8.16.3",
     "react": "19.2.3",
