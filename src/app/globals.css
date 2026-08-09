@@ -1,7 +1,7 @@
 @import "tailwindcss";
 @plugin "daisyui" {
   logs: false;
-  exclude: radialprogress;
+  exclude: properties, radialprogress;
 }
 
 :root {
