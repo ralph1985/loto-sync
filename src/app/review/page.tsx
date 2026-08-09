@@ -5,14 +5,12 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { ContributionModal } from "@/components/review/contribution-modal";
 import { MovementsModal } from "@/components/review/movements-modal";
 import { ReviewFilters } from "@/components/review/review-filters";
+import { TicketReviewList } from "@/components/review/ticket-review-list";
 import { TicketReviewModal } from "@/components/review/ticket-review-modal";
 import {
-  buildDrawLabel,
-  formatDateTime,
   formatPrice,
-  getMainNumbers,
-  getStarNumbers,
 } from "@/features/tickets/formatters";
+import { sortChecksByDate, toNumberArray } from "@/features/tickets/review-utils";
 import type {
   DrawType,
   Group,
@@ -47,17 +45,6 @@ const DRAW_TYPE_OPTIONS: { value: "ALL" | DrawType; label: string }[] = [
 
 const PRIMITIVA_DRAW_WEEKDAYS = new Set([1, 4, 6]);
 
-const formatDrawChip = (value?: string | null) => {
-  if (!value) return "Sin fecha";
-  const date = new Date(value);
-  const weekday = date.toLocaleDateString("es-ES", { weekday: "short" });
-  const day = date.toLocaleDateString("es-ES", {
-    day: "2-digit",
-    month: "2-digit",
-  });
-  return `${weekday.replace(".", "")} ${day}`;
-};
-
 const toDateInput = (value?: string | null) => {
   if (!value) return "";
   return new Date(value).toISOString().slice(0, 10);
@@ -71,24 +58,6 @@ const parseEuroAmountToCents = (value: string) => {
   if (!Number.isFinite(parsed) || parsed <= 0) return null;
   return Math.round(parsed * 100);
 };
-
-const toNumberArray = (value: unknown): number[] => {
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((item) =>
-      typeof item === "number"
-        ? item
-        : typeof item === "string"
-        ? Number.parseInt(item, 10)
-        : NaN
-    )
-    .filter((item) => Number.isFinite(item));
-};
-
-const sortChecksByDate = (checks?: TicketCheck[]) =>
-  [...(checks ?? [])].sort(
-    (a, b) => new Date(b.drawDate).getTime() - new Date(a.drawDate).getTime()
-  );
 
 const getPrimitivaWeeklyDrawDates = (drawDate: string) => {
   const source = new Date(`${drawDate}T00:00:00.000Z`);
@@ -675,349 +644,32 @@ function ReviewPageContent() {
           formatPrice={formatPrice}
         />
 
-        <section className="flex flex-col gap-4">
-          {error ? (
-            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-              {error}
-            </div>
-          ) : loading ? (
-            <div className="rounded-2xl border border-slate-200 bg-white/80 px-4 py-6 text-sm text-slate-500">
-              Cargando boletos...
-            </div>
-          ) : filteredTickets.length === 0 ? (
-            <div className="rounded-2xl border border-slate-200 bg-white/80 px-4 py-6 text-sm text-slate-500">
-              No hay boletos que coincidan con los filtros.
-            </div>
-          ) : visibleTickets.length === 0 ? (
-            <div className="rounded-2xl border border-slate-200 bg-white/80 px-4 py-6 text-sm text-slate-500">
-              No hay apuestas para mostrar.
-            </div>
-          ) : (
-            visibleTickets.map((ticket) => {
-              const firstLine = ticket.lines?.[0];
-              const mainNumbers = getMainNumbers(firstLine);
-              const stars = getStarNumbers(firstLine);
-              const reintegro = firstLine?.reintegro ?? null;
-              const checksSorted = sortChecksByDate(ticket.checks);
-              const isComparativesExpanded = expandedTickets[ticket.id] ?? false;
-              const isActiveTicket = ticket.id === activeTicketId;
-              const totalPrizeCents = checksSorted.reduce(
-                (sum, check) => sum + (check.prizeCents ?? 0),
-                0
-              );
-
-              return (
-                <article
-                  key={ticket.id}
-                  className={`rounded-3xl border bg-white/95 p-3 shadow-[0_16px_44px_rgba(15,23,42,0.08)] sm:p-4 ${
-                    isActiveTicket ? "border-emerald-300" : "border-white/70"
-                  }`}
-                >
-                  <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
-                    <div className="space-y-3">
-                      <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide">
-                        <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">
-                          {ticket.group?.name ?? "Grupo"}
-                        </span>
-                        {isActiveTicket ? (
-                          <span className="rounded-full bg-emerald-100 px-3 py-1 text-emerald-700">
-                            Activo
-                          </span>
-                        ) : null}
-                        <span
-                          className={`rounded-full px-3 py-1 ${
-                            ticket.status === "PREMIO"
-                              ? "bg-emerald-100 text-emerald-700"
-                              : ticket.status === "COMPROBADO"
-                              ? "bg-sky-100 text-sky-700"
-                              : "bg-amber-100 text-amber-700"
-                          }`}
-                        >
-                          {ticket.status}
-                        </span>
-                        {ticket.receipt?.blobUrl ? (
-                          <span className="rounded-full bg-emerald-50 px-3 py-1 text-emerald-700">
-                            Resguardo
-                          </span>
-                        ) : (
-                          <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">
-                            Sin resguardo
-                          </span>
-                        )}
-                      </div>
-
-                      <div>
-                        <h3 className="text-xl font-semibold text-slate-900">
-                          {buildDrawLabel(ticket.draw)}
-                        </h3>
-                        <p className="text-sm text-slate-500">
-                          Alta: {formatDateTime(ticket.createdAt)}
-                        </p>
-                      </div>
-
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
-                          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                            Precio
-                          </p>
-                          <p className="text-sm font-semibold text-slate-900">
-                            {formatPrice(ticket.priceCents)}
-                          </p>
-                        </div>
-                        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
-                          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                            Premio acumulado
-                          </p>
-                          <p className="text-sm font-semibold text-slate-900">
-                            {formatPrice(totalPrizeCents)}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="rounded-2xl border border-slate-200 bg-white p-2.5 sm:p-3">
-                        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                          Números apostados
-                        </p>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {mainNumbers.length > 0 ? (
-                            mainNumbers.map((value, index) => (
-                              <span
-                                key={`${ticket.id}-main-${index}`}
-                                className="rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white"
-                              >
-                                {value}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="text-xs text-slate-400">Sin números</span>
-                          )}
-                          {stars.map((value, index) => (
-                            <span
-                              key={`${ticket.id}-star-${index}`}
-                              className="rounded-full bg-[#f9c784] px-3 py-1 text-xs font-semibold text-slate-900"
-                            >
-                              {value}
-                            </span>
-                          ))}
-                          {ticket.draw?.type === "PRIMITIVA" ? (
-                            <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">
-                              R {reintegro ?? "-"}
-                            </span>
-                          ) : null}
-                        </div>
-                      </div>
-
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-2.5 sm:p-3">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setExpandedTickets((current) => ({
-                              ...current,
-                              [ticket.id]: !(current[ticket.id] ?? false),
-                            }))
-                          }
-                          className="mb-2 flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-left transition hover:border-slate-300 hover:bg-slate-50"
-                        >
-                          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
-                            Comparativas semanales ({checksSorted.length})
-                          </span>
-                          <span className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500">
-                            {isComparativesExpanded ? "Plegar" : "Desplegar"}
-                            <span
-                              className={`inline-block transition-transform ${
-                                isComparativesExpanded ? "rotate-180" : ""
-                              }`}
-                              aria-hidden="true"
-                            >
-                              ▾
-                            </span>
-                          </span>
-                        </button>
-
-                        {isComparativesExpanded && checksSorted.length > 0 ? (
-                          <div className="space-y-2">
-                            {checksSorted.map((check) => {
-                              const winningMain = toNumberArray(check.winningNumbers);
-                              const winningStars = toNumberArray(check.winningStars);
-                              const reintegroHit =
-                                reintegro !== null &&
-                                check.winningReintegro !== null &&
-                                reintegro === check.winningReintegro;
-
-                              return (
-                                <div
-                                  key={`${ticket.id}-cmp-${check.id}`}
-                                  className="rounded-xl border border-slate-200 bg-white p-2.5 sm:p-3"
-                                >
-                                  <div className="mb-2 flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600">
-                                    <span>{formatDrawChip(check.drawDate)}</span>
-                                    <span className="rounded-full bg-sky-100 px-2 py-0.5 text-sky-700">
-                                      {check.matchesMain}
-                                      {check.matchesStars ? ` + ${check.matchesStars}*` : ""}
-                                    </span>
-                                    {(check.prizeCents ?? 0) > 0 ? (
-                                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-700">
-                                        {formatPrice(check.prizeCents)}
-                                      </span>
-                                    ) : null}
-                                  </div>
-
-                                  <div className="space-y-2">
-                                    <div className="grid grid-cols-[72px_minmax(0,1fr)] items-start gap-x-2">
-                                      <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                                        Apostado
-                                      </span>
-                                      <div className="flex flex-wrap items-center gap-2">
-                                        {mainNumbers.map((value, index) => {
-                                          const hit = winningMain.includes(value);
-                                          return (
-                                            <span
-                                              key={`${ticket.id}-bet-main-${check.id}-${index}`}
-                                              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                                                hit
-                                                  ? "bg-emerald-500 text-white"
-                                                  : "bg-slate-800 text-white"
-                                              }`}
-                                            >
-                                              {value}
-                                            </span>
-                                          );
-                                        })}
-                                        {stars.map((value, index) => {
-                                          const hit = winningStars.includes(value);
-                                          return (
-                                            <span
-                                              key={`${ticket.id}-bet-star-${check.id}-${index}`}
-                                              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                                                hit
-                                                  ? "bg-emerald-200 text-emerald-900"
-                                                  : "bg-[#f9c784] text-slate-900"
-                                              }`}
-                                            >
-                                              {value}
-                                            </span>
-                                          );
-                                        })}
-                                        {ticket.draw?.type === "PRIMITIVA" ? (
-                                          <span
-                                            className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                                              reintegroHit
-                                                ? "bg-emerald-500 text-white"
-                                                : "bg-slate-800 text-white"
-                                            }`}
-                                          >
-                                            R {reintegro ?? "-"}
-                                          </span>
-                                        ) : null}
-                                      </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-[72px_minmax(0,1fr)] items-start gap-x-2">
-                                      <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                                        Resultado
-                                      </span>
-                                      <div className="flex flex-wrap items-center gap-2">
-                                        {winningMain.length > 0 ? (
-                                          winningMain.map((value, index) => {
-                                            const hit = mainNumbers.includes(value);
-                                            return (
-                                              <span
-                                                key={`${ticket.id}-win-main-${check.id}-${index}`}
-                                                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                                                  hit
-                                                    ? "bg-emerald-500 text-white"
-                                                    : "bg-slate-200 text-slate-700"
-                                                }`}
-                                              >
-                                                {value}
-                                              </span>
-                                            );
-                                          })
-                                        ) : (
-                                          <span className="text-xs text-slate-400">
-                                            Sin resultado cargado
-                                          </span>
-                                        )}
-                                        {winningStars.map((value, index) => {
-                                          const hit = stars.includes(value);
-                                          return (
-                                            <span
-                                              key={`${ticket.id}-win-star-${check.id}-${index}`}
-                                              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                                                hit
-                                                  ? "bg-emerald-200 text-emerald-900"
-                                                  : "bg-slate-200 text-slate-700"
-                                              }`}
-                                            >
-                                              {value}
-                                            </span>
-                                          );
-                                        })}
-                                        {ticket.draw?.type === "PRIMITIVA" ? (
-                                          <span
-                                            className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                                              reintegroHit
-                                                ? "bg-emerald-500 text-white"
-                                                : "bg-slate-200 text-slate-700"
-                                            }`}
-                                          >
-                                            R {check.winningReintegro ?? "-"}
-                                          </span>
-                                        ) : null}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ) : isComparativesExpanded ? (
-                          <p className="text-xs text-slate-500">Sin comprobaciones todavía.</p>
-                        ) : null}
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col items-end gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedTicket(ticket);
-                          setVerifyResult(null);
-                          setVerifyError(null);
-                        }}
-                        className="rounded-full border border-slate-200 bg-white px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
-                      >
-                        Ver detalle
-                      </button>
-                    </div>
-                  </div>
-                </article>
-              );
-            })
-          )}
-          {!loading && !error && filteredTickets.length > 0 && secondaryTickets.length > 0 ? (
-            <div className="mt-2 flex justify-center">
-              <button
-                type="button"
-                onClick={() =>
-                  setArchivedVisibleCount((current) =>
-                    Math.min(current + ARCHIVED_PAGE_SIZE, secondaryTickets.length)
-                  )
-                }
-                disabled={!hasMoreSecondaryTickets}
-                className={`rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wide ${
-                  hasMoreSecondaryTickets
-                    ? "border border-slate-200 bg-white text-slate-600"
-                    : "cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-400"
-                }`}
-              >
-                {hasMoreSecondaryTickets
-                  ? "Mostrar 2 más"
-                  : "No hay más apuestas"}
-              </button>
-            </div>
-          ) : null}
-        </section>
+        <TicketReviewList
+          error={error}
+          loading={loading}
+          filteredTickets={filteredTickets}
+          visibleTickets={visibleTickets}
+          secondaryTickets={secondaryTickets}
+          activeTicketId={activeTicketId}
+          expandedTickets={expandedTickets}
+          hasMoreSecondaryTickets={hasMoreSecondaryTickets}
+          onToggleComparisons={(ticketId) => {
+            setExpandedTickets((current) => ({
+              ...current,
+              [ticketId]: !(current[ticketId] ?? false),
+            }));
+          }}
+          onSelectTicket={(ticket) => {
+            setSelectedTicket(ticket);
+            setVerifyResult(null);
+            setVerifyError(null);
+          }}
+          onShowMore={() =>
+            setArchivedVisibleCount((current) =>
+              Math.min(current + ARCHIVED_PAGE_SIZE, secondaryTickets.length)
+            )
+          }
+        />
       </main>
 
       {showContributionModal && groupFilter !== "ALL" ? (
