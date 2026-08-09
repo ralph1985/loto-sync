@@ -15,6 +15,12 @@ import type {
   PrimitivaCoverageMode,
   Ticket,
 } from "@/features/tickets/types";
+import {
+  API_GROUPS_CACHE_KEY,
+  API_TICKETS_CACHE_KEY,
+  readApiCache,
+  writeApiCache,
+} from "@/lib/api-cache";
 import { loadSessionClient } from "@/lib/session-client";
 
 const DRAW_TYPES: { id: DrawType; label: string; description: string }[] = [
@@ -29,40 +35,6 @@ const DRAW_TYPES: { id: DrawType; label: string; description: string }[] = [
     description: "5 numeros + 2 estrellas",
   },
 ];
-
-const API_CACHE_TTL_MS = 60 * 60 * 1000;
-const API_TICKETS_CACHE_KEY = "review:api:tickets";
-const API_GROUPS_CACHE_KEY = "review:api:groups";
-
-const readApiCache = <T,>(key: string): T | null => {
-  if (typeof window === "undefined") return null;
-  const raw = window.localStorage.getItem(key);
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as { cachedAt?: number; data?: T };
-    if (
-      typeof parsed.cachedAt === "number" &&
-      Date.now() - parsed.cachedAt < API_CACHE_TTL_MS &&
-      parsed.data !== undefined
-    ) {
-      return parsed.data;
-    }
-  } catch {
-    window.localStorage.removeItem(key);
-  }
-  return null;
-};
-
-const writeApiCache = <T,>(key: string, data: T) => {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(
-    key,
-    JSON.stringify({
-      cachedAt: Date.now(),
-      data,
-    })
-  );
-};
 
 const createEmptyLine = (): LineState => ({
   mainInput: "",

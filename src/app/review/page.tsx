@@ -24,6 +24,13 @@ import type {
   TicketStatus,
   VerifyResponse,
 } from "@/features/tickets/types";
+import {
+  API_GROUPS_CACHE_KEY,
+  API_TICKETS_CACHE_KEY,
+  invalidateApiCache,
+  readApiCache,
+  writeApiCache,
+} from "@/lib/api-cache";
 
 const STATUS_OPTIONS: { value: "ALL" | TicketStatus; label: string }[] = [
   { value: "ALL", label: "Todos" },
@@ -38,9 +45,6 @@ const DRAW_TYPE_OPTIONS: { value: "ALL" | DrawType; label: string }[] = [
   { value: "EUROMILLONES", label: "Euromillones" },
 ];
 
-const REVIEW_CACHE_TTL_MS = 60 * 60 * 1000;
-const REVIEW_TICKETS_CACHE_KEY = "review:api:tickets";
-const REVIEW_GROUPS_CACHE_KEY = "review:api:groups";
 const PRIMITIVA_DRAW_WEEKDAYS = new Set([1, 4, 6]);
 
 const formatDrawChip = (value?: string | null) => {
@@ -167,43 +171,16 @@ function ReviewPageContent() {
   const [archivedVisibleCount, setArchivedVisibleCount] = useState(0);
 
   const loadData = useCallback(async (forceRefresh = false) => {
-    const now = Date.now();
-    if (forceRefresh && typeof window !== "undefined") {
-      window.localStorage.removeItem(REVIEW_TICKETS_CACHE_KEY);
-      window.localStorage.removeItem(REVIEW_GROUPS_CACHE_KEY);
+    if (forceRefresh) {
+      invalidateApiCache(API_TICKETS_CACHE_KEY, API_GROUPS_CACHE_KEY);
     }
-    const readCache = <T,>(key: string): T | null => {
-      if (forceRefresh || typeof window === "undefined") return null;
-      const raw = window.localStorage.getItem(key);
-      if (!raw) return null;
-      try {
-        const parsed = JSON.parse(raw) as { cachedAt?: number; data?: T };
-        if (
-          typeof parsed.cachedAt === "number" &&
-          now - parsed.cachedAt < REVIEW_CACHE_TTL_MS &&
-          parsed.data !== undefined
-        ) {
-          return parsed.data;
-        }
-      } catch {
-        window.localStorage.removeItem(key);
-      }
-      return null;
-    };
 
-    const writeCache = <T,>(key: string, data: T) => {
-      if (typeof window === "undefined") return;
-      window.localStorage.setItem(
-        key,
-        JSON.stringify({
-          cachedAt: Date.now(),
-          data,
-        })
-      );
-    };
-
-    const cachedTickets = readCache<Ticket[]>(REVIEW_TICKETS_CACHE_KEY);
-    const cachedGroups = readCache<Group[]>(REVIEW_GROUPS_CACHE_KEY);
+    const cachedTickets = readApiCache<Ticket[]>(API_TICKETS_CACHE_KEY, {
+      forceRefresh,
+    });
+    const cachedGroups = readApiCache<Group[]>(API_GROUPS_CACHE_KEY, {
+      forceRefresh,
+    });
     if (cachedTickets && cachedGroups) {
       setTickets(cachedTickets);
       setSelectedTicket((current) =>
@@ -236,8 +213,8 @@ function ReviewPageContent() {
     );
     const nextGroups = groupsPayload.data ?? [];
     setGroups(nextGroups);
-    writeCache(REVIEW_TICKETS_CACHE_KEY, nextTickets);
-    writeCache(REVIEW_GROUPS_CACHE_KEY, nextGroups);
+    writeApiCache(API_TICKETS_CACHE_KEY, nextTickets);
+    writeApiCache(API_GROUPS_CACHE_KEY, nextGroups);
   }, []);
 
   useEffect(() => {
