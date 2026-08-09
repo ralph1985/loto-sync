@@ -39,6 +39,15 @@ body {
   font-family: var(--font-geist-sans);
 }
 
+:where(a, button, input, select, textarea, summary):focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: 3px;
+}
+
+html[data-theme="dark"] :where(a, button, input, select, textarea, summary):focus-visible {
+  outline-color: #93c5fd;
+}
+
 html[data-theme="dark"] .bg-\[\#f7f2ea\] {
   background-color: #070b14 !important;
 }

@@ -98,7 +98,7 @@ export function TicketCreateForm({
   onSubmit,
 }: TicketCreateFormProps) {
   return (
-    <form className="flex flex-col gap-6" onSubmit={onSubmit}>
+    <form className="flex flex-col gap-6" onSubmit={onSubmit} aria-busy={saving || loadingData}>
       <section className="animate-fade-up rounded-3xl border border-white/70 bg-white/80 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur sm:p-6">
         <h2 className="text-lg font-semibold text-slate-900">Seleccion</h2>
         <p className="mt-1 text-sm text-slate-500">Define sorteo, grupo y fecha del boleto.</p>
