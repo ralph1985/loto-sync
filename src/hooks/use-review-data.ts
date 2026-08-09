@@ -3,14 +3,8 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 
+import { loadGroupsAndTickets } from "@/features/tickets/data";
 import type { DrawType, Group, GroupMovement, MovementType, Ticket, TicketStatus } from "@/features/tickets/types";
-import {
-  API_GROUPS_CACHE_KEY,
-  API_TICKETS_CACHE_KEY,
-  invalidateApiCache,
-  readApiCache,
-  writeApiCache,
-} from "@/lib/api-cache";
 
 const STATUS_OPTIONS: { value: "ALL" | TicketStatus; label: string }[] = [
   { value: "ALL", label: "Todos" },
@@ -51,40 +45,12 @@ export function useReviewData({ setSelectedTicket }: UseReviewDataOptions) {
   const [archivedVisibleCount, setArchivedVisibleCount] = useState(0);
 
   const loadData = useCallback(async (forceRefresh = false) => {
-    if (forceRefresh) invalidateApiCache(API_TICKETS_CACHE_KEY, API_GROUPS_CACHE_KEY);
-
-    const cachedTickets = readApiCache<Ticket[]>(API_TICKETS_CACHE_KEY, { forceRefresh });
-    const cachedGroups = readApiCache<Group[]>(API_GROUPS_CACHE_KEY, { forceRefresh });
-    if (cachedTickets && cachedGroups) {
-      setTickets(cachedTickets);
-      setSelectedTicket((current) =>
-        current
-          ? cachedTickets.find((ticket) => ticket.id === current.id) ?? null
-          : current
-      );
-      setGroups(cachedGroups);
-      return;
-    }
-
-    const [ticketsResponse, groupsResponse] = await Promise.all([
-      fetch("/api/tickets"),
-      fetch("/api/groups"),
-    ]);
-    if (!ticketsResponse.ok || !groupsResponse.ok) {
-      throw new Error("No se pudieron cargar los boletos.");
-    }
-
-    const ticketsPayload = await ticketsResponse.json();
-    const groupsPayload = await groupsResponse.json();
-    const nextTickets = ticketsPayload.data ?? [];
-    const nextGroups = groupsPayload.data ?? [];
+    const { groups: nextGroups, tickets: nextTickets } = await loadGroupsAndTickets(forceRefresh);
     setTickets(nextTickets);
     setSelectedTicket((current) =>
-      current ? nextTickets.find((ticket: Ticket) => ticket.id === current.id) ?? null : current
+      current ? nextTickets.find((ticket) => ticket.id === current.id) ?? null : current
     );
     setGroups(nextGroups);
-    writeApiCache(API_TICKETS_CACHE_KEY, nextTickets);
-    writeApiCache(API_GROUPS_CACHE_KEY, nextGroups);
   }, [setSelectedTicket]);
 
   useEffect(() => {

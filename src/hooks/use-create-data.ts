@@ -3,13 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
+import { loadGroupsAndTickets } from "@/features/tickets/data";
 import type { Group, Ticket } from "@/features/tickets/types";
-import {
-  API_GROUPS_CACHE_KEY,
-  API_TICKETS_CACHE_KEY,
-  readApiCache,
-  writeApiCache,
-} from "@/lib/api-cache";
 import { loadSessionClient } from "@/lib/session-client";
 
 export function useCreateData() {
@@ -28,21 +23,9 @@ export function useCreateData() {
     setLoadError(null);
     setTicketsError(null);
     try {
-      const [groupsResponse, ticketsResponse] = await Promise.all([
-        fetch("/api/groups"),
-        fetch("/api/tickets"),
-      ]);
-      if (!groupsResponse.ok || !ticketsResponse.ok) {
-        throw new Error("No se pudieron recargar los datos.");
-      }
-      const groupsPayload = await groupsResponse.json();
-      const ticketsPayload = await ticketsResponse.json();
-      const nextGroups = groupsPayload.data ?? [];
-      const nextTickets = ticketsPayload.data ?? [];
+      const { groups: nextGroups, tickets: nextTickets } = await loadGroupsAndTickets(true);
       setGroups(nextGroups);
       setTickets(nextTickets);
-      writeApiCache(API_GROUPS_CACHE_KEY, nextGroups);
-      writeApiCache(API_TICKETS_CACHE_KEY, nextTickets);
     } catch (error) {
       const message = error instanceof Error ? error.message : "No se pudieron recargar los datos.";
       setLoadError(message);
@@ -87,60 +70,30 @@ export function useCreateData() {
   useEffect(() => {
     if (canAccessCreate !== true) return;
     let isActive = true;
-    const loadGroups = async () => {
+    const loadInitialData = async () => {
       setLoadingData(true);
-      setLoadError(null);
-      try {
-        const cachedGroups = readApiCache<Group[]>(API_GROUPS_CACHE_KEY);
-        if (cachedGroups) {
-          if (isActive) setGroups(cachedGroups);
-          return;
-        }
-        const response = await fetch("/api/groups");
-        if (!response.ok) throw new Error("No se pudieron cargar los datos iniciales.");
-        const payload = await response.json();
-        const nextGroups = payload.data ?? [];
-        if (!isActive) return;
-        setGroups(nextGroups);
-        writeApiCache(API_GROUPS_CACHE_KEY, nextGroups);
-      } catch (error) {
-        if (isActive) setLoadError(error instanceof Error ? error.message : "No se pudieron cargar los datos iniciales.");
-      } finally {
-        if (isActive) setLoadingData(false);
-      }
-    };
-    loadGroups();
-    return () => {
-      isActive = false;
-    };
-  }, [canAccessCreate]);
-
-  useEffect(() => {
-    if (canAccessCreate !== true) return;
-    let isActive = true;
-    const loadTickets = async () => {
       setLoadingTickets(true);
+      setLoadError(null);
       setTicketsError(null);
       try {
-        const cachedTickets = readApiCache<Ticket[]>(API_TICKETS_CACHE_KEY);
-        if (cachedTickets) {
-          if (isActive) setTickets(cachedTickets);
-          return;
-        }
-        const response = await fetch("/api/tickets");
-        if (!response.ok) throw new Error("No se pudieron cargar los boletos.");
-        const payload = await response.json();
-        const nextTickets = payload.data ?? [];
+        const { groups: nextGroups, tickets: nextTickets } = await loadGroupsAndTickets();
         if (!isActive) return;
+        setGroups(nextGroups);
         setTickets(nextTickets);
-        writeApiCache(API_TICKETS_CACHE_KEY, nextTickets);
       } catch (error) {
-        if (isActive) setTicketsError(error instanceof Error ? error.message : "No se pudieron cargar los boletos.");
+        if (isActive) {
+          const message = error instanceof Error ? error.message : "No se pudieron cargar los datos iniciales.";
+          setLoadError(message);
+          setTicketsError(message);
+        }
       } finally {
-        if (isActive) setLoadingTickets(false);
+        if (isActive) {
+          setLoadingData(false);
+          setLoadingTickets(false);
+        }
       }
     };
-    loadTickets();
+    loadInitialData();
     return () => {
       isActive = false;
     };
