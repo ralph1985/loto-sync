@@ -141,7 +141,7 @@ En este PC se ejecuta los martes, viernes y domingos a las 04:30 con cron. La sa
 
 ## Automatización de resultados de Primitiva
 
-El worker local consulta por IMAP los mensajes nuevos del buzón configurado, conserva el `.eml`, usa Codex en modo solo lectura para extraer un JSON validable, importa el resultado en `ResultCache`, recalcula los boletos afectados y envía un informe SMTP independiente por grupo. Cada informe incluye el saldo/bote calculado desde `GroupMovement`, los boletos del grupo y sus aciertos/fallos.
+El worker local consulta por IMAP los mensajes nuevos del buzón configurado, conserva el `.eml`, usa Codex en modo solo lectura para extraer un JSON validable, importa el resultado en `ResultCache`, recalcula los boletos afectados y envía un informe SMTP independiente por grupo. Cada informe incluye el saldo/bote calculado desde `GroupMovement`, los boletos del grupo y sus aciertos/fallos. En este PC se ejecuta cada 30 minutos durante las 12 horas posteriores a los sorteos de lunes, jueves y sábado (22:00–10:00 del día siguiente), y dos veces los días sin sorteo.
 
 Configuración adicional en `.env.local`:
 
