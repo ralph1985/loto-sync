@@ -65,7 +65,7 @@ export function ModalShell({
       />
       <section
         className={cn(
-          "modal-box relative max-h-[70vh] max-w-2xl overflow-y-auto p-5 sm:p-6",
+          "modal-box relative max-h-[82vh] max-w-2xl overflow-y-auto rounded-2xl border border-base-300 p-5 shadow-xl sm:p-6",
           panelClassName
         )}
       >

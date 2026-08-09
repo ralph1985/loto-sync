@@ -35,10 +35,17 @@ export default function LoginPage() {
   }, [router]);
 
   return (
-    <PageShell mainClassName="max-w-md px-4 py-10">
-      <SurfaceCard>
-        <h1 className="text-2xl font-semibold">Iniciar sesión</h1>
-        <p className="mt-1 text-sm text-base-content/70">Acceso privado de la aplicación.</p>
+    <PageShell mainClassName="max-w-md px-4 py-10 sm:pt-16">
+      <div className="mb-6 flex items-center gap-3 px-1">
+        <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary text-sm font-bold text-primary-content">LS</span>
+        <div>
+          <p className="font-bold tracking-tight">Loto Sync</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-base-content/50">Gestión de boletos</p>
+        </div>
+      </div>
+      <SurfaceCard className="rounded-2xl">
+        <h1 className="text-2xl font-bold tracking-tight">Iniciar sesión</h1>
+        <p className="mt-1 text-sm leading-6 text-base-content/70">Accede para revisar grupos, boletos y resultados.</p>
 
         <form
           className="mt-5 flex flex-col gap-4"
@@ -74,7 +81,7 @@ export default function LoginPage() {
           }}
         >
           <div className="flex flex-col gap-2">
-            <label className="text-xs font-semibold uppercase tracking-wide text-base-content/70">
+            <label className="text-[11px] font-bold uppercase tracking-[0.14em] text-base-content/70">
               Usuario
             </label>
             <input
@@ -86,7 +93,7 @@ export default function LoginPage() {
           </div>
 
           <div className="flex flex-col gap-2">
-            <label className="text-xs font-semibold uppercase tracking-wide text-base-content/70">
+            <label className="text-[11px] font-bold uppercase tracking-[0.14em] text-base-content/70">
               Contraseña
             </label>
             <input
@@ -103,7 +110,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={saving || !name.trim() || !password}
-            className="btn btn-primary"
+            className="btn btn-primary w-full"
           >
             {saving ? "Entrando..." : "Entrar"}
           </button>

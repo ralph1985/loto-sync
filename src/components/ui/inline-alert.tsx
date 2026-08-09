@@ -17,7 +17,7 @@ const TONE_CLASS: Record<NonNullable<InlineAlertProps["tone"]>, string> = {
 
 export function InlineAlert({ children, tone = "info", className }: InlineAlertProps) {
   return (
-    <div className={cn("alert py-2 text-sm", TONE_CLASS[tone], className)} role="alert">
+    <div className={cn("alert rounded-xl py-2.5 text-sm leading-5", TONE_CLASS[tone], className)} role="alert">
       <span>{children}</span>
     </div>
   );
