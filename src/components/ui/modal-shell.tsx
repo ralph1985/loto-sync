@@ -3,6 +3,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 
 import { cn } from "@/components/ui/cn";
+import { shouldCloseModalOnEscape } from "@/components/ui/modal-behavior";
 
 type ModalShellProps = {
   children: ReactNode;
@@ -42,7 +43,7 @@ export function ModalShell({
     closeButtonRef.current?.focus();
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !closeDisabledRef.current) onCloseRef.current();
+      if (shouldCloseModalOnEscape(event.key, closeDisabledRef.current)) onCloseRef.current();
     };
 
     document.addEventListener("keydown", handleKeyDown);
