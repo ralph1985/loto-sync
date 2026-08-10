@@ -1,0 +1,8 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>Loto Sync</title>
+  <rect width="64" height="64" rx="18" fill="#26734D"/>
+  <path d="M18 25.5C18 22.4624 20.4624 20 23.5 20H40.5C43.5376 20 46 22.4624 46 25.5V38.5C46 41.5376 43.5376 44 40.5 44H23.5C20.4624 44 18 41.5376 18 38.5V25.5Z" stroke="#F5FFF8" stroke-width="3"/>
+  <path d="M27 20V44" stroke="#F5FFF8" stroke-width="3" stroke-dasharray="3 4"/>
+  <path d="M24 32H39" stroke="#9BE0B3" stroke-width="3" stroke-linecap="round"/>
+  <path d="M35.5 27.5L40 32L35.5 36.5" stroke="#9BE0B3" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

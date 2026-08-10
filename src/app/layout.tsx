@@ -6,6 +6,10 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Loto Sync",
   description: "Alta movil de boletos y resguardos para grupos de loteria.",
+  icons: {
+    icon: "/loto-sync-mark.svg",
+    apple: "/loto-sync-mark.svg",
+  },
 };
 
 export default function RootLayout({

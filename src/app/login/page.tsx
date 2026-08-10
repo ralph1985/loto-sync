@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import Image from "next/image";
 
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { PageShell } from "@/components/ui/page-shell";
@@ -37,7 +38,7 @@ export default function LoginPage() {
   return (
     <PageShell mainClassName="max-w-md px-4 py-10 sm:pt-16">
       <div className="mb-6 flex items-center gap-3 px-1">
-        <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary text-sm font-bold text-primary-content">LS</span>
+        <Image src="/loto-sync-mark.svg" alt="" width={40} height={40} className="h-10 w-10 rounded-xl" priority />
         <div>
           <p className="font-bold tracking-tight">Loto Sync</p>
           <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-base-content/50">Gestión de boletos</p>

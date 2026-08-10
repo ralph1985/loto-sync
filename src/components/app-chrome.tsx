@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 
@@ -49,7 +50,7 @@ export function AppChrome({ children }: { children: ReactNode }) {
       <header className="sticky top-0 z-40 border-b border-base-300 bg-base-100/90 backdrop-blur-xl">
         <div className="mx-auto flex h-[72px] w-full max-w-7xl items-center gap-8 px-4 sm:px-6 lg:px-10">
           <Link href="/review" className="group flex min-w-fit items-center gap-3" aria-label="Loto Sync, ir al panel">
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary text-sm font-bold text-primary-content shadow-sm">LS</span>
+            <Image src="/loto-sync-mark.svg" alt="" width={36} height={36} className="h-9 w-9 rounded-xl shadow-sm" priority />
             <span className="hidden sm:block">
               <span className="block text-sm font-bold tracking-tight text-base-content">Loto Sync</span>
               <span className="block text-[10px] font-medium uppercase tracking-[0.16em] text-base-content/50">Gestión de boletos</span>
