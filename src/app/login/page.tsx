@@ -38,11 +38,22 @@ export default function LoginPage() {
   return (
     <PageShell mainClassName="max-w-md px-4 py-10 sm:pt-16">
       <div className="mb-6 flex items-center gap-3 px-1">
-        <Image src="/loto-sync-mark.svg" alt="" width={40} height={40} className="h-10 w-10 rounded-xl" priority />
-        <div>
-          <p className="font-bold tracking-tight">Loto Sync</p>
-          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-base-content/50">Gestión de boletos</p>
-        </div>
+        <Image
+          src="/loto-sync-logo.svg"
+          alt="Loto Sync"
+          width={188}
+          height={48}
+          className="h-12 w-auto dark:hidden"
+          priority
+        />
+        <Image
+          src="/loto-sync-logo-dark.svg"
+          alt="Loto Sync"
+          width={188}
+          height={48}
+          className="hidden h-12 w-auto dark:block"
+          priority
+        />
       </div>
       <SurfaceCard className="rounded-2xl">
         <h1 className="text-2xl font-bold tracking-tight">Iniciar sesión</h1>
