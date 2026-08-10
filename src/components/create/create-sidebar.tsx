@@ -54,41 +54,35 @@ export function CreateSidebar({
 
   return (
     <aside className="animate-fade-up flex w-full flex-col gap-4 self-start lg:sticky lg:top-12 lg:max-w-md">
-      <div className="rounded-2xl border border-base-300 bg-base-100 p-4 shadow-sm sm:p-5">
+      <details className="rounded-2xl border border-base-300 bg-base-100 p-4 shadow-sm lg:hidden">
+        <summary className="cursor-pointer list-none text-sm font-semibold text-base-content">Resumen antes de guardar</summary>
+        <SummaryPanel
+          drawType={drawType}
+          selectedDraw={selectedDraw}
+          selectedGroup={selectedGroup}
+          groupId={groupId}
+          selectedGroupBalanceCents={selectedGroupBalanceCents}
+          priceInput={priceInput}
+          playsJoker={playsJoker}
+          jokerNumber={jokerNumber}
+          lines={lines}
+          validation={validation}
+        />
+      </details>
+      <div className="hidden rounded-2xl border border-base-300 bg-base-100 p-4 shadow-sm sm:p-5 lg:block">
         <h3 className="text-lg font-bold tracking-tight text-slate-900">Resumen antes de guardar</h3>
-        <p className="mt-1 text-sm text-slate-500">Vista rapida antes de guardar.</p>
-        <div className="mt-4 space-y-4 text-sm text-slate-600">
-          <SummaryItem label="Sorteo" value={selectedDraw?.label ?? (selectedDraw ? drawTypeLabel(selectedDraw.type) : "Sin definir")} />
-          <SummaryItem label="Grupo" value={selectedGroup?.name ?? "Sin definir"} />
-          <SummaryItem label="Bote grupo" value={groupId ? formatPrice(selectedGroupBalanceCents) : "Sin definir"} />
-          <SummaryItem label="Fecha" value={selectedDraw?.drawDate ? new Date(selectedDraw.drawDate).toLocaleDateString("es-ES") : "Sin definir"} />
-          <SummaryItem label="Precio" value={formatInputPrice(priceInput)} />
-          <SummaryItem label="Joker" value={drawType === "PRIMITIVA" ? (playsJoker ? jokerNumber || "Pendiente" : "No") : "No aplica"} />
-        </div>
-        <div className="mt-6 space-y-4">
-          {validation.lineResults.map((line, index) => (
-            <div key={index} className="rounded-xl bg-slate-900 px-4 py-3 text-white">
-              <p className="text-xs uppercase tracking-wide text-white/60">Linea {index + 1}</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {line.main.length ? line.main.map((value, valueIndex) => (
-                  <NumberBadge key={`${value}-${valueIndex}`} value={value} className="border-white/30 bg-white/20 text-white" />
-                )) : <span className="text-sm text-white/60">Numeros pendientes</span>}
-              </div>
-              {drawType === "EUROMILLONES" ? (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {line.stars.length ? line.stars.map((value, valueIndex) => (
-                    <NumberBadge key={`star-${value}-${valueIndex}`} value={value} tone="accent" />
-                  )) : <span className="text-sm text-white/60">Estrellas pendientes</span>}
-                </div>
-              ) : (
-                <div className="mt-3 flex gap-3 text-xs text-white/70">
-                  <span>Complementario: {lines[index]?.complement || "-"}</span>
-                  <span>Reintegro: {lines[index]?.reintegro || "-"}</span>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+        <SummaryPanel
+          drawType={drawType}
+          selectedDraw={selectedDraw}
+          selectedGroup={selectedGroup}
+          groupId={groupId}
+          selectedGroupBalanceCents={selectedGroupBalanceCents}
+          priceInput={priceInput}
+          playsJoker={playsJoker}
+          jokerNumber={jokerNumber}
+          lines={lines}
+          validation={validation}
+        />
       </div>
       <GroupBalances groups={groups} />
       <Checklist />
@@ -102,6 +96,66 @@ export function CreateSidebar({
       />
     </aside>
   );
+}
+
+function SummaryPanel({
+  drawType,
+  selectedDraw,
+  selectedGroup,
+  groupId,
+  selectedGroupBalanceCents,
+  priceInput,
+  playsJoker,
+  jokerNumber,
+  lines,
+  validation,
+}: {
+  drawType: DrawType;
+  selectedDraw: Draw | null;
+  selectedGroup?: Group;
+  groupId: string;
+  selectedGroupBalanceCents: number;
+  priceInput: string;
+  playsJoker: boolean;
+  jokerNumber: string;
+  lines: LineState[];
+  validation: CreateValidation;
+}) {
+  return <>
+    <p className="mt-1 text-sm text-slate-500">Vista rápida antes de guardar.</p>
+    <div className="mt-4 space-y-4 text-sm text-slate-600">
+      <SummaryItem label="Sorteo" value={selectedDraw?.label ?? (selectedDraw ? drawTypeLabel(selectedDraw.type) : "Sin definir")} />
+      <SummaryItem label="Grupo" value={selectedGroup?.name ?? "Sin definir"} />
+      <SummaryItem label="Bote grupo" value={groupId ? formatPrice(selectedGroupBalanceCents) : "Sin definir"} />
+      <SummaryItem label="Fecha" value={selectedDraw?.drawDate ? new Date(selectedDraw.drawDate).toLocaleDateString("es-ES") : "Sin definir"} />
+      <SummaryItem label="Precio" value={formatInputPrice(priceInput)} />
+      <SummaryItem label="Joker" value={drawType === "PRIMITIVA" ? (playsJoker ? jokerNumber || "Pendiente" : "No") : "No aplica"} />
+    </div>
+    <div className="mt-6 space-y-4">
+      {validation.lineResults.map((line, index) => (
+        <div key={index} className="rounded-xl bg-slate-900 px-4 py-3 text-white">
+          <p className="text-xs uppercase tracking-wide text-white/60">Linea {index + 1}</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {line.main.length ? line.main.map((value, valueIndex) => (
+              <NumberBadge key={`${value}-${valueIndex}`} value={value} className="border-white/30 bg-white/20 text-white" />
+            )) : <span className="text-sm text-white/60">Números pendientes</span>}
+          </div>
+          {drawType === "EUROMILLONES" ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {line.stars.length ? line.stars.map((value, valueIndex) => (
+                <NumberBadge key={`star-${value}-${valueIndex}`} value={value} tone="accent" />
+              )) : <span className="text-sm text-white/60">Estrellas pendientes</span>}
+            </div>
+          ) : (
+            <div className="mt-3 flex gap-3 text-xs text-white/70">
+              <span>Complementario: {lines[index]?.complement || "-"}</span>
+              <span>Reintegro: {lines[index]?.reintegro || "-"}</span>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  </>;
 }
 
 function SummaryItem({ label, value }: { label: string; value: string }) {

@@ -71,3 +71,32 @@ test("calcula la cobertura semanal L-J-S", () => {
     "2026-08-15",
   ]);
 });
+
+test("permite el alta rápida con una sola línea y extras opcionales", () => {
+  const result = validateTicketInput({
+    groupId: "group-1",
+    drawType: "PRIMITIVA",
+    drawDate: "2026-08-10",
+    priceInput: "2",
+    playsJoker: false,
+    jokerNumber: "",
+    lines: [{ mainInput: "1 2 3 4 5 6", starInput: "", complement: "", reintegro: "" }],
+  });
+
+  assert.equal(result.isValid, true);
+  const payload = buildTicketPayload({
+    groupId: "group-1",
+    drawType: "PRIMITIVA",
+    drawDate: "2026-08-10",
+    primitivaCoverageMode: "SINGLE",
+    priceInput: "2",
+    playsJoker: false,
+    jokerNumber: "",
+    notes: "",
+    lines: [{ mainInput: "1 2 3 4 5 6", starInput: "", complement: "", reintegro: "" }],
+  });
+
+  assert.equal(payload.priceCents, 200);
+  assert.equal(payload.lines[0]?.complement, undefined);
+  assert.equal(payload.lines[0]?.reintegro, undefined);
+});

@@ -26,6 +26,8 @@ export function useTicketCreation({ refreshInitialData }: UseTicketCreationOptio
   const [lines, setLines] = useState<LineState[]>([createEmptyLine()]);
   const [notes, setNotes] = useState("");
   const [receipt, setReceipt] = useState<File | null>(null);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [receiptRetry, setReceiptRetry] = useState<{ ticketId: string; file: File } | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -86,11 +88,22 @@ export function useTicketCreation({ refreshInitialData }: UseTicketCreationOptio
         const uploadResponse = await fetch("/api/receipts", { method: "POST", body: formData });
         if (!uploadResponse.ok) {
           const uploadPayload = await uploadResponse.json();
-          throw new Error(`${successMessage} ${uploadPayload?.error || "No se pudo subir el resguardo."}`);
+          setReceiptRetry({ ticketId: payload.data.id, file: receipt });
+          setLines([createEmptyLine()]);
+          setNotes("");
+          setPriceInput("");
+          setPlaysJoker(false);
+          setJokerNumber("");
+          setPrimitivaCoverageMode("SINGLE");
+          setReceipt(null);
+          setAdvancedOpen(false);
+          setSubmitted(false);
+          throw new Error(`Boleto guardado, pero no se pudo subir el resguardo. ${uploadPayload?.error || "Puedes reintentarlo sin duplicar el boleto."}`);
         }
         successMessage = "Boleto y resguardo guardados correctamente.";
       }
       setSaveSuccess(successMessage);
+      setReceiptRetry(null);
       setLines([createEmptyLine()]);
       setNotes("");
       setPriceInput("");
@@ -98,6 +111,7 @@ export function useTicketCreation({ refreshInitialData }: UseTicketCreationOptio
       setJokerNumber("");
       setPrimitivaCoverageMode("SINGLE");
       setReceipt(null);
+      setAdvancedOpen(false);
       setSubmitted(false);
       await refreshInitialData();
     } catch (error) {
@@ -106,6 +120,30 @@ export function useTicketCreation({ refreshInitialData }: UseTicketCreationOptio
       setSaving(false);
     }
   }, [drawDate, drawType, groupId, jokerNumber, lines, notes, playsJoker, priceInput, primitivaCoverageMode, receipt, refreshInitialData, saving, validation.isValid]);
+
+  const retryReceiptUpload = useCallback(async () => {
+    if (!receiptRetry || saving) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const formData = new FormData();
+      formData.append("ticketId", receiptRetry.ticketId);
+      formData.append("file", receiptRetry.file);
+      const response = await fetch("/api/receipts", { method: "POST", body: formData });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload?.error || "No se pudo subir el resguardo.");
+      }
+      setReceiptRetry(null);
+      setReceipt(null);
+      setSaveSuccess("Resguardo añadido correctamente.");
+      await refreshInitialData();
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "No se pudo subir el resguardo.");
+    } finally {
+      setSaving(false);
+    }
+  }, [receiptRetry, refreshInitialData, saving]);
 
   const selectedDraw: Draw | null = drawDate
     ? {
@@ -137,6 +175,9 @@ export function useTicketCreation({ refreshInitialData }: UseTicketCreationOptio
     setNotes,
     receipt,
     setReceipt,
+    advancedOpen,
+    setAdvancedOpen,
+    receiptRetry,
     submitted,
     saving,
     saveError,
@@ -145,6 +186,7 @@ export function useTicketCreation({ refreshInitialData }: UseTicketCreationOptio
     selectedDraw,
     handleLineChange,
     handleSubmit,
+    retryReceiptUpload,
     weeklyDrawDates: getPrimitivaWeeklyDrawDates,
     createEmptyLine,
   };

@@ -55,6 +55,9 @@ export default function Home() {
     setNotes,
     receipt,
     setReceipt,
+    advancedOpen,
+    setAdvancedOpen,
+    receiptRetry,
     submitted,
     saving,
     saveError,
@@ -63,6 +66,7 @@ export default function Home() {
     selectedDraw,
     handleLineChange,
     handleSubmit,
+    retryReceiptUpload,
     weeklyDrawDates,
     createEmptyLine,
   } = useTicketCreation({ refreshInitialData });
@@ -154,6 +158,8 @@ export default function Home() {
             onDrawDateChange={setDrawDate}
             coverageMode={primitivaCoverageMode}
             onCoverageModeChange={setPrimitivaCoverageMode}
+            advancedOpen={advancedOpen}
+            onAdvancedToggle={() => setAdvancedOpen((current) => !current)}
             weeklyDrawDates={weeklyDrawDates}
             priceInput={priceInput}
             onPriceChange={setPriceInput}
@@ -177,6 +183,8 @@ export default function Home() {
             submitted={submitted}
             saveSuccess={saveSuccess}
             saveError={saveError}
+            receiptRetry={receiptRetry}
+            onRetryReceipt={retryReceiptUpload}
             onSubmit={handleSubmit}
           />
         </section>
