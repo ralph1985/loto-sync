@@ -20,6 +20,7 @@ const DRAW_TYPE_OPTIONS: { value: "ALL" | DrawType; label: string }[] = [
 ];
 
 const ARCHIVED_PAGE_SIZE = 2;
+const REVIEW_GROUP_STORAGE_KEY = "loto-review-group";
 
 type UseReviewDataOptions = {
   setSelectedTicket: Dispatch<SetStateAction<Ticket | null>>;
@@ -77,12 +78,15 @@ export function useReviewData({ setSelectedTicket }: UseReviewDataOptions) {
     const status = searchParams.get("status");
     const group = searchParams.get("group");
     const drawType = searchParams.get("drawType");
+    const rememberedGroup = typeof window !== "undefined"
+      ? window.localStorage.getItem(REVIEW_GROUP_STORAGE_KEY)
+      : null;
     setStatusFilter(
       status && STATUS_OPTIONS.some((option) => option.value === status)
         ? (status as "ALL" | TicketStatus)
         : "ALL"
     );
-    setGroupFilter(group ?? "ALL");
+    setGroupFilter(group ?? rememberedGroup ?? "ALL");
     setDrawTypeFilter(
       drawType && DRAW_TYPE_OPTIONS.some((option) => option.value === drawType)
         ? (drawType as "ALL" | DrawType)
@@ -103,9 +107,12 @@ export function useReviewData({ setSelectedTicket }: UseReviewDataOptions) {
   }, [drawTypeFilter, filtersHydrated, groupFilter, pathname, router, searchParams, statusFilter]);
 
   useEffect(() => {
-    if (filtersHydrated && groups.length === 1 && groupFilter === "ALL") {
-      setGroupFilter(groups[0].id);
+    if (!filtersHydrated) return;
+    if (groupFilter !== "ALL" && !groups.some((group) => group.id === groupFilter)) {
+      setGroupFilter("ALL");
+      return;
     }
+    window.localStorage.setItem(REVIEW_GROUP_STORAGE_KEY, groupFilter);
   }, [filtersHydrated, groupFilter, groups]);
 
   const filteredTickets = useMemo(

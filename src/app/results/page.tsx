@@ -1,11 +1,19 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { ModalShell } from "@/components/ui/modal-shell";
 import { NumberBadge } from "@/components/ui/number-badge";
 import { PageShell } from "@/components/ui/page-shell";
 import { SurfaceCard } from "@/components/ui/surface-card";
+import {
+  buildDisplayedResults,
+  clearStoredResultsCache,
+  DRAW_WEEKDAYS,
+  loadStoredResults as fetchStoredResults,
+  type StoredResult,
+} from "@/features/results/data";
 
 const parseNumbers = (value: string) =>
   value
@@ -15,49 +23,11 @@ const parseNumbers = (value: string) =>
     .map((item) => Number.parseInt(item, 10))
     .filter((item) => !Number.isNaN(item));
 
-const DRAW_WEEKDAYS = new Set([1, 4, 6]); // lunes, jueves, sabado
-
-const toIsoDate = (value: Date) => {
-  const year = value.getUTCFullYear();
-  const month = String(value.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(value.getUTCDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
-
 const isValidPrimitivaDrawDate = (value: string) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const date = new Date(`${value}T00:00:00.000Z`);
   if (Number.isNaN(date.getTime())) return false;
   return DRAW_WEEKDAYS.has(date.getUTCDay());
-};
-
-type StoredResult = {
-  id: string;
-  game: "PRIMITIVA" | "EUROMILLONES";
-  drawDate: string | null;
-  numbers: number[];
-  stars?: number[];
-  complementario?: number | null;
-  reintegro?: number | null;
-  fetchedAt: string;
-};
-
-const STORED_RESULTS_CACHE_PREFIX = "results:stored:";
-const STORED_RESULTS_CACHE_TTL_MS = 60 * 60 * 1000;
-
-const getStoredResultsCacheKey = (gameFilter: "ALL" | "PRIMITIVA" | "EUROMILLONES") =>
-  `${STORED_RESULTS_CACHE_PREFIX}${gameFilter}`;
-
-const clearStoredResultsCache = () => {
-  if (typeof window === "undefined") return;
-  const keys: string[] = [];
-  for (let index = 0; index < window.localStorage.length; index += 1) {
-    const key = window.localStorage.key(index);
-    if (key && key.startsWith(STORED_RESULTS_CACHE_PREFIX)) {
-      keys.push(key);
-    }
-  }
-  keys.forEach((key) => window.localStorage.removeItem(key));
 };
 
 export default function ResultsPage() {
@@ -76,52 +46,18 @@ export default function ResultsPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  useEffect(() => {
+    const requestedGame = new URLSearchParams(window.location.search).get("game");
+    if (requestedGame === "PRIMITIVA" || requestedGame === "EUROMILLONES") {
+      setGameFilter(requestedGame);
+    }
+  }, []);
+
   const loadStoredResults = useCallback(async (forceRefresh = false) => {
     setLoadingResults(true);
     setResultsError(null);
     try {
-      const cacheKey = getStoredResultsCacheKey(gameFilter);
-      if (!forceRefresh && typeof window !== "undefined") {
-        const cachedRaw = window.localStorage.getItem(cacheKey);
-        if (cachedRaw) {
-          try {
-            const cached = JSON.parse(cachedRaw) as {
-              cachedAt?: number;
-              data?: StoredResult[];
-            };
-            const cachedAt = typeof cached.cachedAt === "number" ? cached.cachedAt : 0;
-            if (
-              Array.isArray(cached.data) &&
-              cachedAt > 0 &&
-              Date.now() - cachedAt < STORED_RESULTS_CACHE_TTL_MS
-            ) {
-              setStoredResults(cached.data);
-              return;
-            }
-          } catch {
-            window.localStorage.removeItem(cacheKey);
-          }
-        }
-      }
-
-      const query =
-        gameFilter === "ALL" ? "/api/results/stored" : `/api/results/stored?game=${gameFilter}`;
-      const response = await fetch(query);
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload?.error || "No se pudieron cargar resultados.");
-      }
-      const data = payload.data ?? [];
-      setStoredResults(data);
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(
-          cacheKey,
-          JSON.stringify({
-            cachedAt: Date.now(),
-            data,
-          })
-        );
-      }
+      setStoredResults(await fetchStoredResults(gameFilter, forceRefresh));
     } catch (loadError) {
       setResultsError(
         loadError instanceof Error
@@ -195,69 +131,10 @@ export default function ResultsPage() {
     };
   }, [complementarioInput, drawDate, numbersInput, reintegroInput]);
 
-  const displayedResults = useMemo(() => {
-    const rows = storedResults.map((item) => ({
-      ...item,
-      fetchedAt: item.fetchedAt,
-      isMissing: false,
-    }));
-
-    const shouldInjectPrimitivaGaps = gameFilter === "ALL" || gameFilter === "PRIMITIVA";
-    if (shouldInjectPrimitivaGaps) {
-      const primitivaDates = storedResults
-        .filter((item) => item.game === "PRIMITIVA" && item.drawDate)
-        .map((item) => item.drawDate as string)
-        .sort();
-
-      if (primitivaDates.length > 0) {
-        const firstDate = new Date(`${primitivaDates[0]}T00:00:00Z`);
-        const today = new Date();
-        const endDate = new Date(
-          Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())
-        );
-        const available = new Set(primitivaDates);
-
-        for (
-          let cursor = new Date(firstDate);
-          cursor <= endDate;
-          cursor = new Date(cursor.getTime() + 24 * 60 * 60 * 1000)
-        ) {
-          if (!DRAW_WEEKDAYS.has(cursor.getUTCDay())) {
-            continue;
-          }
-          const isoDate = toIsoDate(cursor);
-          if (!available.has(isoDate)) {
-            rows.push({
-              id: `missing-${isoDate}`,
-              game: "PRIMITIVA",
-              drawDate: isoDate,
-              numbers: [],
-              stars: [],
-              complementario: null,
-              reintegro: null,
-              fetchedAt: "",
-              isMissing: true,
-            });
-          }
-        }
-      }
-    }
-
-    return rows.sort((left, right) => {
-      const leftTime = left.drawDate ? Date.parse(`${left.drawDate}T00:00:00Z`) : 0;
-      const rightTime = right.drawDate ? Date.parse(`${right.drawDate}T00:00:00Z`) : 0;
-      if (rightTime !== leftTime) {
-        return rightTime - leftTime;
-      }
-      if (left.isMissing !== right.isMissing) {
-        return left.isMissing ? 1 : -1;
-      }
-      if (!left.fetchedAt || !right.fetchedAt) {
-        return 0;
-      }
-      return Date.parse(right.fetchedAt) - Date.parse(left.fetchedAt);
-    });
-  }, [gameFilter, storedResults]);
+  const displayedResults = useMemo(
+    () => buildDisplayedResults(storedResults, gameFilter),
+    [gameFilter, storedResults]
+  );
 
   const missingCount = useMemo(
     () => displayedResults.filter((item) => item.isMissing).length,
@@ -265,15 +142,17 @@ export default function ResultsPage() {
   );
 
   return (
-    <PageShell mainClassName="flex max-w-3xl flex-col gap-6">
+    <PageShell mainClassName="flex max-w-7xl flex-col gap-6">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold">Resultados guardados</h1>
-          <p className="text-sm text-base-content/70">Historico de sorteos cargados.</p>
+          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-primary">Histórico</p>
+          <h1 className="mt-1 text-3xl font-bold tracking-tight">Resultados guardados</h1>
+          <p className="mt-1 text-sm text-base-content/70">Consulta sorteos cargados y completa manualmente los que falten.</p>
         </div>
-        <button type="button" onClick={() => setShowCreateModal(true)} className="btn btn-outline btn-sm">
-          Alta manual
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link href="/" className="btn btn-ghost btn-sm">Volver al panel</Link>
+          <button type="button" onClick={() => setShowCreateModal(true)} className="btn btn-primary btn-sm">Alta manual</button>
+        </div>
       </header>
 
       <SurfaceCard>
