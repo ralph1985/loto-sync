@@ -15,6 +15,7 @@ export type LineValidation = {
 
 type TicketLinesEditorProps = {
   drawType: DrawType;
+  advancedOpen: boolean;
   lines: LineState[];
   validation: LineValidation[];
   onAddLine: () => void;
@@ -24,6 +25,7 @@ type TicketLinesEditorProps = {
 
 export function TicketLinesEditor({
   drawType,
+  advancedOpen,
   lines,
   validation,
   onAddLine,
@@ -95,7 +97,7 @@ export function TicketLinesEditor({
                       className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
                     />
                   </label>
-                ) : (
+                ) : advancedOpen ? (
                   <div className="grid gap-3 sm:grid-cols-2">
                     <label className="flex flex-col gap-2">
                       <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -120,7 +122,7 @@ export function TicketLinesEditor({
                       />
                     </label>
                   </div>
-                )}
+                ) : null}
               </div>
 
               {lineValidation?.issues.length ? (

@@ -36,6 +36,8 @@ type TicketCreateFormProps = {
   onDrawDateChange: (value: string) => void;
   coverageMode: PrimitivaCoverageMode;
   onCoverageModeChange: (value: PrimitivaCoverageMode) => void;
+  advancedOpen: boolean;
+  onAdvancedToggle: () => void;
   weeklyDrawDates: (value: string) => string[];
   priceInput: string;
   onPriceChange: (value: string) => void;
@@ -57,6 +59,8 @@ type TicketCreateFormProps = {
   submitted: boolean;
   saveSuccess: string | null;
   saveError: string | null;
+  receiptRetry: { ticketId: string; file: File } | null;
+  onRetryReceipt: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 };
 
@@ -74,6 +78,8 @@ export function TicketCreateForm({
   onDrawDateChange,
   coverageMode,
   onCoverageModeChange,
+  advancedOpen,
+  onAdvancedToggle,
   weeklyDrawDates,
   priceInput,
   onPriceChange,
@@ -95,6 +101,8 @@ export function TicketCreateForm({
   submitted,
   saveSuccess,
   saveError,
+  receiptRetry,
+  onRetryReceipt,
   onSubmit,
 }: TicketCreateFormProps) {
   return (
@@ -148,25 +156,6 @@ export function TicketCreateForm({
             />
           </label>
 
-          {drawType === "PRIMITIVA" ? (
-            <label className="flex flex-col gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Cobertura</span>
-              <select
-                value={coverageMode}
-                onChange={(event) => onCoverageModeChange(event.target.value as PrimitivaCoverageMode)}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
-              >
-                <option value="SINGLE">Solo este sorteo</option>
-                <option value="WEEKLY">Semana completa (L-J-S)</option>
-              </select>
-              {drawDate && coverageMode === "WEEKLY" ? (
-                <span className="text-xs text-slate-500">
-                  Se aplicará a: {weeklyDrawDates(drawDate).map((value) => new Date(`${value}T00:00:00.000Z`).toLocaleDateString("es-ES")).join(" · ")}
-                </span>
-              ) : null}
-            </label>
-          ) : null}
-
           <label className="flex flex-col gap-2">
             <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Precio (EUR)</span>
             <input
@@ -178,7 +167,7 @@ export function TicketCreateForm({
             />
           </label>
         </div>
-        {drawType === "PRIMITIVA" ? (
+        {drawType === "PRIMITIVA" && advancedOpen ? (
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
               <input type="checkbox" checked={playsJoker} onChange={(event) => onPlaysJokerChange(event.target.checked)} className="h-4 w-4 rounded border-slate-300" />
@@ -199,16 +188,51 @@ export function TicketCreateForm({
         ) : null}
       </section>
 
+      <button
+        type="button"
+        onClick={onAdvancedToggle}
+        aria-expanded={advancedOpen}
+        className="flex items-center justify-between rounded-2xl border border-base-300 bg-base-100 px-4 py-3 text-left text-sm font-semibold text-base-content shadow-sm transition hover:border-primary"
+      >
+        <span>{advancedOpen ? "Ocultar opciones avanzadas" : "Mostrar opciones avanzadas"}</span>
+        <span aria-hidden="true" className="text-lg leading-none">{advancedOpen ? "-" : "+"}</span>
+      </button>
+
+      {advancedOpen && drawType === "PRIMITIVA" ? (
+        <section className="rounded-2xl border border-primary/20 bg-primary/5 p-4 sm:p-5">
+          <label className="flex flex-col gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-base-content/70">Cobertura</span>
+            <select
+              value={coverageMode}
+              onChange={(event) => onCoverageModeChange(event.target.value as PrimitivaCoverageMode)}
+              className="select select-bordered w-full"
+            >
+              <option value="SINGLE">Solo este sorteo</option>
+              <option value="WEEKLY">Semana completa (L-J-S)</option>
+            </select>
+            {drawDate && coverageMode === "WEEKLY" ? (
+              <span className="text-xs text-base-content/70">
+                Se aplicará a: {weeklyDrawDates(drawDate).map((value) => new Date(`${value}T00:00:00.000Z`).toLocaleDateString("es-ES")).join(" · ")}
+              </span>
+            ) : null}
+          </label>
+        </section>
+      ) : null}
+
       <TicketLinesEditor
         drawType={drawType}
+        advancedOpen={advancedOpen}
         lines={lines}
         validation={validation.lineResults}
-        onAddLine={onAddLine}
+        onAddLine={() => {
+          onAddLine();
+          if (!advancedOpen) onAdvancedToggle();
+        }}
         onRemoveLine={onRemoveLine}
         onLineChange={onLineChange}
       />
 
-      <section className="animate-fade-up rounded-3xl border border-white/70 bg-white/90 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur sm:p-6">
+      {advancedOpen ? <section className="animate-fade-up rounded-3xl border border-white/70 bg-white/90 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur sm:p-6">
         <h2 className="text-lg font-semibold text-slate-900">Resguardo</h2>
         <p className="mt-1 text-sm text-slate-500">Opcional, pero recomendable para comprobaciones.</p>
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -220,22 +244,27 @@ export function TicketCreateForm({
           />
           {receipt ? <span className="text-xs text-slate-500">{receipt.name} ({Math.round(receipt.size / 1024)} KB)</span> : null}
         </div>
-      </section>
+      </section> : null}
 
-      <section className="animate-fade-up rounded-3xl border border-white/70 bg-white/90 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur sm:p-6">
+      {advancedOpen ? <section className="animate-fade-up rounded-3xl border border-white/70 bg-white/90 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur sm:p-6">
         <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Notas</label>
         <textarea value={notes} onChange={(event) => onNotesChange(event.target.value)} placeholder="Ej: Boleto compartido con Marta y Luis." rows={3} className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none" />
-      </section>
+      </section> : null}
 
-      <section className="animate-fade-up rounded-3xl border border-white/70 bg-white/90 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur sm:p-6">
+      <section className="sticky bottom-16 z-20 animate-fade-up rounded-3xl border border-white/70 bg-white/95 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur sm:p-6 lg:static">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm text-slate-500">{selectedDraw?.label ?? "Sorteo"} · {lines.length} linea(s)</div>
-          <button type="submit" disabled={!validation.isValid || saving} className={`rounded-full px-6 py-3 text-sm font-semibold uppercase tracking-wide transition ${validation.isValid && !saving ? "bg-slate-900 text-white hover:bg-slate-700" : "cursor-not-allowed bg-slate-200 text-slate-500"}`}>
-            {saving ? "Guardando..." : "Guardar boleto"}
+          <button type="submit" disabled={!validation.isValid || saving || !!receiptRetry} className={`rounded-full px-6 py-3 text-sm font-semibold uppercase tracking-wide transition ${validation.isValid && !saving && !receiptRetry ? "bg-slate-900 text-white hover:bg-slate-700" : "cursor-not-allowed bg-slate-200 text-slate-500"}`}>
+            {saving ? "Guardando..." : receiptRetry ? "Resguardo pendiente" : "Guardar boleto"}
           </button>
         </div>
         {saveSuccess ? <InlineAlert tone="success" className="mt-4">{saveSuccess}</InlineAlert> : null}
         {saveError ? <InlineAlert tone="error" className="mt-4">{saveError}</InlineAlert> : null}
+        {receiptRetry ? (
+          <button type="button" onClick={onRetryReceipt} disabled={saving} className="btn btn-outline btn-sm mt-4">
+            {saving ? "Subiendo resguardo..." : "Reintentar resguardo"}
+          </button>
+        ) : null}
         {submitted && !validation.isValid ? <InlineAlert tone="error" className="mt-4">Revisa las validaciones para continuar.</InlineAlert> : null}
       </section>
     </form>
