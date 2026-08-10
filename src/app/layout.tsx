@@ -26,7 +26,8 @@ export default function RootLayout({
               (function() {
                 try {
                   var stored = localStorage.getItem("loto-theme");
-                  var isDark = stored ? stored === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+                  var preference = stored === "light" || stored === "dark" || stored === "auto" ? stored : "auto";
+                  var isDark = preference === "dark" || (preference === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
                   document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light");
                 } catch (e) {
                   document.documentElement.setAttribute("data-theme", "light");

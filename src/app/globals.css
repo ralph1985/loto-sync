@@ -183,8 +183,8 @@ input::placeholder {
 
 .theme-toggle {
   display: inline-flex;
-  width: 40px;
-  height: 40px;
+  gap: 2px;
+  padding: 4px;
   align-items: center;
   justify-content: center;
   border: 1px solid var(--line);
@@ -193,14 +193,28 @@ input::placeholder {
   box-shadow: 0 8px 24px rgb(29 54 40 / 0.10) !important;
 }
 
-.theme-toggle .icon-sun,
-.theme-toggle .icon-moon {
-  line-height: 1;
+.theme-option {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-radius: 8px;
+  padding: 0 8px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
 }
 
-html[data-theme="light"] .theme-toggle .icon-moon,
-html[data-theme="dark"] .theme-toggle .icon-sun {
-  display: none;
+.theme-option:hover,
+.theme-option[aria-pressed="true"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.theme-option-icon {
+  font-size: 15px;
+  line-height: 1;
 }
 
 @keyframes fade-up {
