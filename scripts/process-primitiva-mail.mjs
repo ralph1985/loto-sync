@@ -66,7 +66,10 @@ try {
     const mailbox = process.env.RESULTS_IMAP_MAILBOX ?? 'INBOX';
     const lock = await client.getMailboxLock(mailbox);
     try {
-      const uids = await client.search({ seen: false }, { uid: true });
+      // No dependemos de que el mensaje siga sin leer: abrirlo en otro cliente
+      // puede marcarlo como visto antes de que el worker llegue a procesarlo.
+      // state.processed evita duplicar importaciones e informes ya enviados.
+      const uids = await client.search({ all: true }, { uid: true });
       for (const uid of uids.sort((left, right) => left - right)) {
         const message = await client.fetchOne(uid, { source: true, envelope: true }, { uid: true });
         if (!message?.source) continue;
