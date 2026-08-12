@@ -416,7 +416,7 @@ function buildTextReport(result, group, dateLabel, balance, summary) {
       `    Aciertos: ${line.hits.join(', ') || 'ninguno'}`,
       `    Fallados: ${line.missed.join(', ') || 'ninguno'}`,
       ...(result.game === 'EUROMILLONES' ? [`    Estrellas: ${line.stars.join(', ') || 'ninguna'}`, `    Aciertos estrellas: ${line.starHits.join(', ') || 'ninguno'}`] : []),
-      `    Complementario: ${line.complement ?? 'no indicado'} | Reintegro: ${line.reintegro ?? 'no indicado'}`
+      ...(result.game === 'PRIMITIVA' ? [`    Complementario: ${line.complement ?? 'no indicado'} | Reintegro: ${line.reintegro ?? 'no indicado'}`] : [])
     ].join('\n')).join('\n');
     const elMillion = result.game === 'EUROMILLONES'
       ? `\n  El Millón: ${ticket.elMillionCode ?? 'pendiente'} (${ticket.elMillionMatch === true ? 'acertado' : ticket.elMillionMatch === false ? 'no acertado' : 'sin comprobar'})`
@@ -452,7 +452,10 @@ function buildHtmlReport(result, group, dateLabel, balance, summary) {
       const euroDetails = result.game === 'EUROMILLONES'
         ? `<br><span style="color:#7c3aed;font-weight:700;">Estrellas acertadas:</span> ${escapeHtml(line.starHits.join(', ') || 'ninguna')}`
         : '';
-      return `<tr><td style="padding:12px 0;border-top:1px solid #e2e8f0;vertical-align:top;"><strong>Línea ${lineIndex + 1}</strong><div style="margin-top:8px;">${numberPills || '<span style="color:#64748b;">sin números</span>'}</div><div style="margin-top:8px;font-size:14px;"><span style="color:#166534;font-weight:700;">Aciertos:</span> ${hits}<br><span style="color:#991b1b;font-weight:700;">Fallados:</span> ${missed}${euroDetails}<br><span style="color:#475569;">Complementario: ${escapeHtml(line.complement ?? 'no indicado')} · Reintegro: ${escapeHtml(line.reintegro ?? 'no indicado')}</span></div></td></tr>`;
+      const primitivaDetails = result.game === 'PRIMITIVA'
+        ? `<br><span style="color:#475569;">Complementario: ${escapeHtml(line.complement ?? 'no indicado')} · Reintegro: ${escapeHtml(line.reintegro ?? 'no indicado')}</span>`
+        : '';
+      return `<tr><td style="padding:12px 0;border-top:1px solid #e2e8f0;vertical-align:top;"><strong>Línea ${lineIndex + 1}</strong><div style="margin-top:8px;">${numberPills || '<span style="color:#64748b;">sin números</span>'}</div><div style="margin-top:8px;font-size:14px;"><span style="color:#166534;font-weight:700;">Aciertos:</span> ${hits}<br><span style="color:#991b1b;font-weight:700;">Fallados:</span> ${missed}${euroDetails}${primitivaDetails}</div></td></tr>`;
     }).join('');
     const euroTicket = result.game === 'EUROMILLONES'
       ? `<p style="margin:8px 0;color:#475569;font-size:14px;"><strong>El Millón del boleto:</strong> ${escapeHtml(ticket.elMillionCode ?? 'pendiente')} · ${ticket.elMillionMatch === true ? 'acertado' : ticket.elMillionMatch === false ? 'no acertado' : 'sin comprobar'}</p>`
