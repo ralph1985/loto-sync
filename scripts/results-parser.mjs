@@ -61,8 +61,9 @@ function validateFilters(filters) {
 export function matchResultFilter(parsed, filters) {
   const from = (parsed.from?.value ?? []).flatMap((item) => [item.address, item.name]).filter(Boolean).map(normalize);
   const subject = normalize(parsed.subject ?? '');
+  const forwardedContent = normalize([parsed.text, parsed.html].filter(Boolean).join('\n'));
   const matches = filters.filter((filter) =>
-    filter.from.some((expected) => from.includes(expected)) &&
+    filter.from.some((expected) => from.includes(expected) || forwardedContent.includes(expected)) &&
     filter.subjectIncludes.some((expected) => subject.includes(expected))
   );
   if (matches.length > 1) throw new Error(`El correo coincide con varios filtros: ${matches.map((filter) => filter.id).join(', ')}.`);
