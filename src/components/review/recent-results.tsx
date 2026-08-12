@@ -36,6 +36,7 @@ export function RecentResults({ results, loading, error }: RecentResultsProps) {
                     {result.complementario !== null && result.complementario !== undefined ? <NumberBadge value={`C ${result.complementario}`} tone="neutral" /> : null}
                     {result.reintegro !== null && result.reintegro !== undefined ? <NumberBadge value={`R ${result.reintegro}`} tone="success" /> : null}
                   </div>
+                  {result.elMillionCode ? <p className="mt-2 text-xs text-base-content/70">El Millón: <span className="font-semibold text-base-content">{result.elMillionCode}</span></p> : null}
                 </div>
               ))}
             </div>

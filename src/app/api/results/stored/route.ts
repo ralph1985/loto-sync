@@ -41,7 +41,8 @@ const parsePayload = (payload: unknown) => {
       numbers: [] as number[],
       stars: [] as number[],
       complementario: null as number | null,
-      reintegro: null as number | null
+      reintegro: null as number | null,
+      elMillionCode: null as string | null
     }
   }
 
@@ -57,6 +58,7 @@ const parsePayload = (payload: unknown) => {
 
   const complementarioRaw = resultData?.complementario
   const reintegroRaw = resultData?.reintegro
+  const elMillionCodeRaw = resultData?.elMillionCode
 
   const complementario =
     typeof complementarioRaw === 'number'
@@ -88,7 +90,8 @@ const parsePayload = (payload: unknown) => {
       ])
     ],
     complementario: Number.isFinite(complementario as number) ? complementario : null,
-    reintegro: Number.isFinite(reintegro as number) ? reintegro : null
+    reintegro: Number.isFinite(reintegro as number) ? reintegro : null,
+    elMillionCode: typeof elMillionCodeRaw === 'string' ? elMillionCodeRaw : null
   }
 }
 
@@ -123,6 +126,7 @@ export async function GET(request: Request) {
         stars: parsed.stars,
         complementario: parsed.complementario,
         reintegro: parsed.reintegro,
+        elMillionCode: parsed.elMillionCode,
         fetchedAt: entry.fetchedAt.toISOString()
       }
     })

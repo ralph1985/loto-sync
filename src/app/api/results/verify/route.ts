@@ -52,6 +52,12 @@ export async function GET(request: Request) {
       )
     }
     await requireGroupAccess(user.id, ticket.groupId)
+    if (ticket.purchaseStatus !== 'CONFIRMED') {
+      return NextResponse.json(
+        { error: 'El boleto todavía no está confirmado como comprado.' },
+        { status: 409 }
+      )
+    }
 
     const ticketDrawDate = drawDateQuery
       ? toDateOnly(drawDateQuery)

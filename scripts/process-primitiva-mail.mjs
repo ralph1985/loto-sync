@@ -9,6 +9,7 @@ import { simpleParser } from 'mailparser';
 import nodemailer from 'nodemailer';
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { loadResultFilters, matchResultFilter, validateExtraction } from './results-parser.mjs';
 
 const execFileAsync = promisify(execFile);
 const root = resolve(process.cwd());
@@ -21,13 +22,13 @@ const localEmlPath = process.argv[2] === '--file' ? resolve(root, process.argv[3
 loadLocalEnvFiles(resolve(root, '.env.local'));
 loadLocalEnvFiles(resolve(root, '.env'));
 
+const resultFilters = loadResultFilters(process.env);
+
 const required = [
   'DATABASE_URL',
   'DB_SYNC_TOKEN',
   'REMOTE_SYNC_BASE_URL',
   ...(localEmlPath ? [] : ['RESULTS_IMAP_PASSWORD']),
-  'RESULTS_IMAP_FROM',
-  'RESULTS_IMAP_SUBJECT'
 ];
 if (!process.env.RESULTS_SMTP_PASSWORD && !process.env.RESULTS_IMAP_PASSWORD) {
   required.push('RESULTS_SMTP_PASSWORD or RESULTS_IMAP_PASSWORD');
@@ -89,10 +90,11 @@ try {
 console.log(`Results worker: ${processed} correo(s) procesado(s).`);
 
 async function processMessage({ source, parsed, uid }) {
-  const messageId = parsed.messageId?.trim() || (uid === null ? `local-${createHash('sha256').update(source).digest('hex')}` : `uid-${uid}`);
+  const messageId = parsed.messageId?.trim() || `content-${createHash('sha256').update(source).digest('hex')}`;
   if (state.processed[messageId]?.sentAt) return;
-  const game = detectGame(parsed);
-  if (uid !== null && !matchesFilter(parsed, game)) return;
+  const matchedFilter = matchResultFilter(parsed, resultFilters);
+  if (!matchedFilter) return;
+  const game = matchedFilter.game;
 
   const safeId = createHash('sha256').update(messageId).digest('hex').slice(0, 24);
   const emlPath = resolve(messageDir, `${safeId}.eml`);
@@ -109,6 +111,7 @@ async function processMessage({ source, parsed, uid }) {
     uid,
     drawDate: result.date,
     game: result.game,
+    filterId: matchedFilter.id,
     resultHash,
     emlPath,
     resultPath,
@@ -200,21 +203,6 @@ function isWithinWorkerDirectory(filePath) {
   return normalized.startsWith(`${workerDir}/`);
 }
 
-function detectGame(parsed) {
-  const subject = parsed.subject?.toLowerCase() ?? '';
-  return subject.includes('euromill') ? 'EUROMILLONES' : 'PRIMITIVA';
-}
-
-function matchesFilter(parsed, game) {
-  const expectedFrom = process.env.RESULTS_IMAP_FROM.toLowerCase();
-  const expectedSubject = (game === 'EUROMILLONES'
-    ? process.env.RESULTS_IMAP_SUBJECT_EUROMILLONES ?? process.env.RESULTS_IMAP_SUBJECT
-    : process.env.RESULTS_IMAP_SUBJECT_PRIMITIVA ?? process.env.RESULTS_IMAP_SUBJECT).toLowerCase();
-  const from = parsed.from?.value?.map((item) => item.address ?? item.name ?? '').join(' ').toLowerCase() ?? '';
-  const subject = parsed.subject?.toLowerCase() ?? '';
-  return from.includes(expectedFrom) && subject.includes(expectedSubject);
-}
-
 async function extractWithCodex(emlPath, game) {
   const codex = process.env.RESULTS_CODEX_BIN ?? '/home/rafa/.local/bin/codex';
   const prompt = [
@@ -252,31 +240,6 @@ async function extractWithCodex(emlPath, game) {
   });
 }
 
-function validateExtraction(value, game) {
-  if (!value || typeof value !== 'object' || value.error) throw new Error('Resultado no determinable por Codex.');
-  const date = typeof value.date === 'string' ? value.date : '';
-  const numbers = Array.isArray(value.numbers) ? value.numbers : [];
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('La fecha extraída no es válida.');
-  const parsedDate = new Date(`${date}T00:00:00.000Z`);
-  const validWeekdays = game === 'EUROMILLONES' ? [2, 5] : [1, 4, 6];
-  if (Number.isNaN(parsedDate.getTime()) || !validWeekdays.includes(parsedDate.getUTCDay())) throw new Error(`La fecha no corresponde a un sorteo de ${game}.`);
-  const expectedNumbers = game === 'EUROMILLONES' ? 5 : 6;
-  const maxNumber = game === 'EUROMILLONES' ? 50 : 49;
-  if (numbers.length !== expectedNumbers || new Set(numbers).size !== expectedNumbers || numbers.some((item) => !Number.isInteger(item) || item < 1 || item > maxNumber)) throw new Error('La combinación extraída no es válida.');
-  if (game === 'EUROMILLONES') {
-    const stars = Array.isArray(value.stars) ? value.stars : [];
-    if (stars.length !== 2 || new Set(stars).size !== 2 || stars.some((item) => !Number.isInteger(item) || item < 1 || item > 12)) throw new Error('Las estrellas extraídas no son válidas.');
-    const elMillionCode = typeof value.elMillionCode === 'string' ? value.elMillionCode.trim().toUpperCase() : '';
-    if (!/^[A-Z]{3}\d{5}$/.test(elMillionCode)) throw new Error('El código de El Millón no es válido.');
-    return { game, date, numbers, stars, elMillionCode };
-  }
-  const complementario = value.complementario === null ? null : Number(value.complementario);
-  const reintegro = value.reintegro === null ? null : Number(value.reintegro);
-  if (complementario !== null && (!Number.isInteger(complementario) || complementario < 1 || complementario > 49 || numbers.includes(complementario))) throw new Error('El complementario no es válido.');
-  if (reintegro !== null && (!Number.isInteger(reintegro) || reintegro < 0 || reintegro > 9)) throw new Error('El reintegro no es válido.');
-  return { game, date, numbers, stars: [], complementario, reintegro, elMillionCode: null };
-}
-
 async function runBackup(label) {
   await execFileAsync('npm', ['run', 'backup:db'], { cwd: root, env: process.env, maxBuffer: 2_000_000 });
   console.log(`Backup ${label} correcto.`);
@@ -287,6 +250,7 @@ async function importAndBuildReport(result) {
   const tickets = await prisma.ticket.findMany({
     where: {
       draw: { type: result.game },
+      purchaseStatus: 'CONFIRMED',
       OR: [{ checks: { some: { drawDate } } }, { draw: { drawDate } }]
     },
     include: {
@@ -300,7 +264,7 @@ async function importAndBuildReport(result) {
         }
       },
       lines: { include: { numbers: true }, orderBy: { lineIndex: 'asc' } },
-      checks: { where: { drawDate }, select: { prizeCents: true } }
+      checks: { where: { drawDate }, select: { prizeCents: true, elMillionMatch: true } }
     }
   });
   const groupIds = [...new Set(tickets.map((ticket) => ticket.groupId))];
@@ -362,6 +326,8 @@ async function importAndBuildReport(result) {
         group: ticket.group?.name ?? ticket.groupId,
         recipients: ticket.group?.emailRecipients.map((recipient) => recipient.email) ?? [],
         balanceCents: balanceByGroup.get(ticket.groupId) ?? 0,
+        elMillionCode: ticket.elMillionCode,
+        elMillionMatch,
         lines: lineReports
       });
     }
@@ -408,8 +374,17 @@ async function sendGroupReports(result, report, resultHash, stateEntry) {
 async function sendGroupReport(result, group, resultHash) {
   const from = process.env.RESULTS_REPORT_FROM ?? 'loto@conquense.dev';
   const dateLabel = new Intl.DateTimeFormat('es-ES', { dateStyle: 'long', timeZone: 'UTC' }).format(new Date(`${result.date}T00:00:00.000Z`));
-  const totalHits = group.tickets.reduce((total, ticket) => total + ticket.lines.reduce((lineTotal, line) => lineTotal + line.hits.length, 0), 0);
-  const summary = totalHits > 0 ? `${totalHits} acierto${totalHits === 1 ? '' : 's'}` : 'Sin aciertos';
+  const summaryData = group.tickets.reduce((summary, ticket) => {
+    summary.main += ticket.lines.reduce((total, line) => total + line.hits.length, 0);
+    summary.stars += ticket.lines.reduce((total, line) => total + line.starHits.length, 0);
+    summary.elMillion += ticket.elMillionMatch ? 1 : 0;
+    return summary;
+  }, { main: 0, stars: 0, elMillion: 0 });
+  const summaryParts = [];
+  if (summaryData.main > 0) summaryParts.push(`${summaryData.main} acierto${summaryData.main === 1 ? '' : 's'}`);
+  if (summaryData.stars > 0) summaryParts.push(`${summaryData.stars} estrella${summaryData.stars === 1 ? '' : 's'}`);
+  if (summaryData.elMillion > 0) summaryParts.push('El Millón acertado');
+  const summary = summaryParts.join(' · ') || 'Sin aciertos';
   const balance = (group.balanceCents / 100).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
   const text = buildTextReport(result, group, dateLabel, balance, summary);
   const html = buildHtmlReport(result, group, dateLabel, balance, summary);
@@ -430,7 +405,7 @@ async function sendGroupReport(result, group, resultHash) {
     subject: `${result.game === 'EUROMILLONES' ? 'Euromillones' : 'La Primitiva'} — ${group.group} — resultados ${result.date}`,
     text,
     html,
-    headers: { 'X-Loto-Result-Key': `primitiva/${result.date}/${group.groupId}/${resultHash}` }
+    headers: { 'X-Loto-Result-Key': `${result.game.toLowerCase()}/${result.date}/${group.groupId}/${resultHash}` }
   });
 }
 
@@ -443,7 +418,10 @@ function buildTextReport(result, group, dateLabel, balance, summary) {
       ...(result.game === 'EUROMILLONES' ? [`    Estrellas: ${line.stars.join(', ') || 'ninguna'}`, `    Aciertos estrellas: ${line.starHits.join(', ') || 'ninguno'}`] : []),
       `    Complementario: ${line.complement ?? 'no indicado'} | Reintegro: ${line.reintegro ?? 'no indicado'}`
     ].join('\n')).join('\n');
-    return `Boleto ${index + 1} (${ticket.ticketId}) — grupo: ${ticket.group}\n${lines}`;
+    const elMillion = result.game === 'EUROMILLONES'
+      ? `\n  El Millón: ${ticket.elMillionCode ?? 'pendiente'} (${ticket.elMillionMatch === true ? 'acertado' : ticket.elMillionMatch === false ? 'no acertado' : 'sin comprobar'})`
+      : '';
+    return `Boleto ${index + 1} (${ticket.ticketId}) — grupo: ${ticket.group}${elMillion}\n${lines}`;
   }).join('\n\n');
   return [
     `INFORME DE ${result.game === 'EUROMILLONES' ? 'EUROMILLONES' : 'LA PRIMITIVA'}`,
@@ -455,8 +433,7 @@ function buildTextReport(result, group, dateLabel, balance, summary) {
     '',
     `Combinación ganadora: ${result.numbers.join(', ')}`,
     ...(result.game === 'EUROMILLONES' ? [`Estrellas: ${result.stars.join(', ')}`, `Código ganador de El Millón: ${result.elMillionCode}`] : []),
-    `Complementario: ${result.complementario ?? 'no indicado'}`,
-    `Reintegro: ${result.reintegro ?? 'no indicado'}`,
+    ...(result.game === 'PRIMITIVA' ? [`Complementario: ${result.complementario ?? 'no indicado'}`, `Reintegro: ${result.reintegro ?? 'no indicado'}`] : []),
     '',
     tickets || 'No hay boletos correspondientes a este sorteo.',
     '',
@@ -472,9 +449,15 @@ function buildHtmlReport(result, group, dateLabel, balance, summary) {
       const numberPills = line.numbers.map((number) => `<span style="display:inline-block;margin:2px 4px 2px 0;padding:4px 8px;border-radius:999px;background:${line.hits.includes(number) ? '#dcfce7' : '#fee2e2'};color:${line.hits.includes(number) ? '#166534' : '#991b1b'};font-weight:700;">${escapeHtml(number)}</span>`).join('');
       const hits = line.hits.length > 0 ? line.hits.map((number) => `<span style="color:#166534;font-weight:700;">${escapeHtml(number)}</span>`).join(', ') : '<span style="color:#64748b;">ninguno</span>';
       const missed = line.missed.length > 0 ? line.missed.map((number) => `<span style="color:#991b1b;font-weight:700;">${escapeHtml(number)}</span>`).join(', ') : '<span style="color:#64748b;">ninguno</span>';
-      return `<tr><td style="padding:12px 0;border-top:1px solid #e2e8f0;vertical-align:top;"><strong>Línea ${lineIndex + 1}</strong><div style="margin-top:8px;">${numberPills || '<span style="color:#64748b;">sin números</span>'}</div><div style="margin-top:8px;font-size:14px;"><span style="color:#166534;font-weight:700;">Aciertos:</span> ${hits}<br><span style="color:#991b1b;font-weight:700;">Fallados:</span> ${missed}<br><span style="color:#475569;">Complementario: ${escapeHtml(line.complement ?? 'no indicado')} · Reintegro: ${escapeHtml(line.reintegro ?? 'no indicado')}</span></div></td></tr>`;
+      const euroDetails = result.game === 'EUROMILLONES'
+        ? `<br><span style="color:#7c3aed;font-weight:700;">Estrellas acertadas:</span> ${escapeHtml(line.starHits.join(', ') || 'ninguna')}`
+        : '';
+      return `<tr><td style="padding:12px 0;border-top:1px solid #e2e8f0;vertical-align:top;"><strong>Línea ${lineIndex + 1}</strong><div style="margin-top:8px;">${numberPills || '<span style="color:#64748b;">sin números</span>'}</div><div style="margin-top:8px;font-size:14px;"><span style="color:#166534;font-weight:700;">Aciertos:</span> ${hits}<br><span style="color:#991b1b;font-weight:700;">Fallados:</span> ${missed}${euroDetails}<br><span style="color:#475569;">Complementario: ${escapeHtml(line.complement ?? 'no indicado')} · Reintegro: ${escapeHtml(line.reintegro ?? 'no indicado')}</span></div></td></tr>`;
     }).join('');
-    return `<section style="margin:20px 0;padding:16px 18px;border:1px solid #e2e8f0;border-radius:12px;background:#ffffff;"><h3 style="margin:0;color:#0f172a;font-size:17px;">Boleto ${ticketIndex + 1}</h3><p style="margin:4px 0 8px;color:#64748b;font-size:12px;">${escapeHtml(ticket.ticketId)}</p><table role="presentation" style="width:100%;border-collapse:collapse;">${lines}</table></section>`;
+    const euroTicket = result.game === 'EUROMILLONES'
+      ? `<p style="margin:8px 0;color:#475569;font-size:14px;"><strong>El Millón del boleto:</strong> ${escapeHtml(ticket.elMillionCode ?? 'pendiente')} · ${ticket.elMillionMatch === true ? 'acertado' : ticket.elMillionMatch === false ? 'no acertado' : 'sin comprobar'}</p>`
+      : '';
+    return `<section style="margin:20px 0;padding:16px 18px;border:1px solid #e2e8f0;border-radius:12px;background:#ffffff;"><h3 style="margin:0;color:#0f172a;font-size:17px;">Boleto ${ticketIndex + 1}</h3><p style="margin:4px 0 8px;color:#64748b;font-size:12px;">${escapeHtml(ticket.ticketId)}</p>${euroTicket}<table role="presentation" style="width:100%;border-collapse:collapse;">${lines}</table></section>`;
   }).join('');
   const resultNumbers = result.numbers.map((number) => `<span style="display:inline-block;margin:2px 4px 2px 0;padding:5px 9px;border-radius:999px;background:#e0e7ff;color:#3730a3;font-weight:700;">${escapeHtml(number)}</span>`).join('');
   return `<!doctype html><html lang="es"><body style="margin:0;background:#f1f5f9;color:#0f172a;font-family:Arial,sans-serif;line-height:1.5;"><div style="max-width:680px;margin:0 auto;padding:24px 14px;"><div style="padding:24px;border-radius:16px 16px 0 0;background:#1e3a8a;color:#ffffff;"><p style="margin:0 0 6px;font-size:12px;letter-spacing:1px;text-transform:uppercase;opacity:.8;">Informe de ${gameLabel}</p><h1 style="margin:0;font-size:26px;">${escapeHtml(group.group)}</h1><p style="margin:6px 0 0;opacity:.9;">Sorteo del ${escapeHtml(dateLabel)}</p></div><div style="padding:20px;background:#ffffff;"><div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px;"><div style="flex:1;min-width:200px;padding:16px;border-radius:12px;background:${hasHits ? '#dcfce7' : '#f8fafc'};border:1px solid ${hasHits ? '#86efac' : '#e2e8f0'};"><div style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;">Resultado del grupo</div><strong style="display:block;margin-top:4px;font-size:22px;color:${hasHits ? '#166534' : '#334155'};">${escapeHtml(summary)}</strong></div><div style="flex:1;min-width:200px;padding:16px;border-radius:12px;background:#fef3c7;border:1px solid #fcd34d;"><div style="font-size:12px;color:#92400e;text-transform:uppercase;letter-spacing:.5px;">Bote restante</div><strong style="display:block;margin-top:4px;font-size:22px;color:#92400e;">${escapeHtml(balance)}</strong><span style="font-size:12px;color:#92400e;">Saldo actual del grupo</span></div></div><div style="padding:16px;border-radius:12px;background:#eef2ff;"><h2 style="margin:0 0 8px;font-size:16px;color:#3730a3;">Resultado del sorteo</h2><div>${resultNumbers}</div><p style="margin:10px 0 0;font-size:14px;color:#475569;"><strong>Estrellas:</strong> ${escapeHtml(result.stars.join(', ') || 'no indicadas')}${result.game === 'EUROMILLONES' ? ` · <strong>El Millón:</strong> ${escapeHtml(result.elMillionCode ?? 'no indicado')}` : ` · <strong>Complementario:</strong> ${escapeHtml(result.complementario ?? 'no indicado')} · <strong>Reintegro:</strong> ${escapeHtml(result.reintegro ?? 'no indicado')}`}</p></div>${ticketSections || '<p style="color:#64748b;">No hay boletos correspondientes a este sorteo.</p>'}<p style="margin:24px 0 0;padding-top:16px;border-top:1px solid #e2e8f0;color:#64748b;font-size:12px;">Informe generado automáticamente por <a href="https://conquense.dev" style="color:#1d4ed8;font-weight:700;">conquense.dev</a>. Consulta tus grupos y boletos en <a href="https://loterias.conquense.dev/" style="color:#1d4ed8;font-weight:700;">loterias.conquense.dev</a>, a partir del correo oficial de Loterías del Estado.</p></div></div></body></html>`;

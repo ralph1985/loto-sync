@@ -300,12 +300,12 @@ function TicketNumbersPanel({
           );
         })}
       </div>
-      <TicketChecksList checks={ticket.checks} />
+      <TicketChecksList checks={ticket.checks} elMillionCode={ticket.elMillionCode} />
     </div>
   );
 }
 
-function TicketChecksList({ checks }: { checks?: TicketCheck[] }) {
+function TicketChecksList({ checks, elMillionCode }: { checks?: TicketCheck[]; elMillionCode?: string | null }) {
   if (!checks?.length) return null;
 
   return (
@@ -321,6 +321,7 @@ function TicketChecksList({ checks }: { checks?: TicketCheck[] }) {
               <span>
                 {formatDate(check.drawDate)} · {check.status} · {check.matchesMain}
                 {check.matchesStars ? ` + ${check.matchesStars} estrellas` : ""}
+                {check.elMillionMatch === true ? " · El Millón acertado" : check.elMillionMatch === false ? " · El Millón no acertado" : elMillionCode ? " · El Millón pendiente" : ""}
               </span>
               <span>{formatPrice(check.prizeCents ?? null)}</span>
             </div>

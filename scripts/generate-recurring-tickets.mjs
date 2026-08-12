@@ -20,39 +20,41 @@ try {
   const recurring = await prisma.recurringTicket.findMany({ where: { active: true } });
   await execFileAsync('npm', ['run', 'backup:db'], { cwd: process.cwd(), env: process.env, maxBuffer: 2_000_000 });
   let created = 0;
-  for (const definition of recurring) {
-    const start = new Date(Math.max(definition.startDate.getTime(), today.getTime()));
-    const drawDate = nextDraw(start);
-    const draw = await prisma.draw.upsert({
-      where: { type_drawDate: { type: definition.drawType, drawDate } },
-      update: {},
-      create: { type: definition.drawType, drawDate }
-    });
-    const existing = await prisma.ticket.findUnique({
-      where: { recurringTicketId_drawId: { recurringTicketId: definition.id, drawId: draw.id } },
-      select: { id: true }
-    });
-    if (existing) continue;
-    const mainNumbers = Array.isArray(definition.mainNumbers) ? definition.mainNumbers.map(Number) : [];
-    const starNumbers = Array.isArray(definition.starNumbers) ? definition.starNumbers.map(Number) : [];
-    await prisma.ticket.create({
-      data: {
-        groupId: definition.groupId,
-        drawId: draw.id,
-        recurringTicketId: definition.id,
-        purchaseStatus: 'PENDING_CONFIRMATION',
-        status: 'PENDIENTE',
-        notes: 'Boleto generado por apuesta recurrente.',
-        lines: { create: { lineIndex: 1, numbers: { create: [
-          ...mainNumbers.map((value, position) => ({ kind: 'MAIN', position: position + 1, value })),
-          ...starNumbers.map((value, position) => ({ kind: 'STAR', position: position + 1, value }))
-        ] } } },
-        checks: { create: { drawDate, status: 'PENDIENTE', reason: 'Pendiente de confirmacion de compra.', winningNumbers: [], winningStars: [] } }
-      }
-    });
-    created += 1;
-  }
-  if (created > 0) await execFileAsync('npm', ['run', 'backup:db'], { cwd: process.cwd(), env: process.env, maxBuffer: 2_000_000 });
+  await prisma.$transaction(async (tx) => {
+    for (const definition of recurring) {
+      const start = new Date(Math.max(definition.startDate.getTime(), today.getTime()));
+      const drawDate = nextDraw(start);
+      const draw = await tx.draw.upsert({
+        where: { type_drawDate: { type: definition.drawType, drawDate } },
+        update: {},
+        create: { type: definition.drawType, drawDate }
+      });
+      const existing = await tx.ticket.findUnique({
+        where: { recurringTicketId_drawId: { recurringTicketId: definition.id, drawId: draw.id } },
+        select: { id: true }
+      });
+      if (existing) continue;
+      const mainNumbers = Array.isArray(definition.mainNumbers) ? definition.mainNumbers.map(Number) : [];
+      const starNumbers = Array.isArray(definition.starNumbers) ? definition.starNumbers.map(Number) : [];
+      await tx.ticket.create({
+        data: {
+          groupId: definition.groupId,
+          drawId: draw.id,
+          recurringTicketId: definition.id,
+          purchaseStatus: 'PENDING_CONFIRMATION',
+          status: 'PENDIENTE',
+          notes: 'Boleto generado por apuesta recurrente.',
+          lines: { create: { lineIndex: 1, numbers: { create: [
+            ...mainNumbers.map((value, position) => ({ kind: 'MAIN', position: position + 1, value })),
+            ...starNumbers.map((value, position) => ({ kind: 'STAR', position: position + 1, value }))
+          ] } } },
+          checks: { create: { drawDate, status: 'PENDIENTE', reason: 'Pendiente de confirmacion de compra.', winningNumbers: [], winningStars: [] } }
+        }
+      });
+      created += 1;
+    }
+  });
+  await execFileAsync('npm', ['run', 'backup:db'], { cwd: process.cwd(), env: process.env, maxBuffer: 2_000_000 });
   console.log(`Recurring tickets created: ${created}`);
 } finally {
   await prisma.$disconnect();

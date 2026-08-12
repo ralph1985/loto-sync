@@ -36,6 +36,8 @@ const isValidPrimitivaWeekday = (value: string) => {
   return weekday === 1 || weekday === 4 || weekday === 6
 }
 
+const isValidEuromillionsWeekday = (value: string) => new Date(`${value}T00:00:00.000Z`).getUTCDay() === 2 || new Date(`${value}T00:00:00.000Z`).getUTCDay() === 5
+
 const validateResults = (
   game: 'PRIMITIVA' | 'EUROMILLONES',
   items: ImportPayload['results']
@@ -54,9 +56,23 @@ const validateResults = (
       issues.push(`${prefix}.date debe caer en lunes, jueves o sabado.`)
       return
     }
+    if (game === 'EUROMILLONES' && !isValidEuromillionsWeekday(date)) {
+      issues.push(`${prefix}.date debe caer en martes o viernes.`)
+      return
+    }
 
-    if (!Array.isArray(item.numbers) || item.numbers.length === 0) {
-      issues.push(`${prefix}.numbers es obligatorio.`)
+    const expectedNumbers = game === 'EUROMILLONES' ? 5 : 6
+    const maxNumber = game === 'EUROMILLONES' ? 50 : 49
+    if (!Array.isArray(item.numbers) || item.numbers.length !== expectedNumbers || new Set(item.numbers).size !== expectedNumbers || item.numbers.some((value) => !Number.isInteger(value) || value < 1 || value > maxNumber)) {
+      issues.push(`${prefix}.numbers debe contener ${expectedNumbers} numeros distintos validos.`)
+      return
+    }
+    if (game === 'EUROMILLONES' && (!Array.isArray(item.stars) || item.stars.length !== 2 || new Set(item.stars).size !== 2 || item.stars.some((value) => !Number.isInteger(value) || value < 1 || value > 12))) {
+      issues.push(`${prefix}.stars debe contener 2 estrellas distintas entre 1 y 12.`)
+      return
+    }
+    if (game === 'EUROMILLONES' && (!item.elMillionCode || !/^[A-Z]{3}\d{5}$/i.test(item.elMillionCode.trim()))) {
+      issues.push(`${prefix}.elMillionCode debe tener formato AAA99999.`)
       return
     }
 
@@ -103,6 +119,7 @@ const syncChecksForImportedDate = async (
   const tickets = await prisma.ticket.findMany({
     where: {
       draw: { type: game },
+      purchaseStatus: 'CONFIRMED',
       OR: [
         { checks: { some: { drawDate: parsedDrawDate } } },
         { draw: { drawDate: parsedDrawDate } }

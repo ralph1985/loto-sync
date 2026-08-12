@@ -146,8 +146,8 @@ El worker local consulta por IMAP los mensajes nuevos del buzón configurado, co
 Configuración adicional en `.env.local`:
 
 - `RESULTS_IMAP_HOST`, `RESULTS_IMAP_PORT`, `RESULTS_IMAP_SECURE`, `RESULTS_IMAP_USER`, `RESULTS_IMAP_PASSWORD` y `RESULTS_IMAP_MAILBOX`.
-- `RESULTS_IMAP_FROM` y `RESULTS_IMAP_SUBJECT`, obligatorios para filtrar el correo real de Loterías del Estado.
-- `RESULTS_IMAP_SUBJECT_PRIMITIVA` y `RESULTS_IMAP_SUBJECT_EUROMILLONES` permiten usar asuntos separados; si faltan, se usa `RESULTS_IMAP_SUBJECT`.
+- `RESULTS_IMAP_FROM` y `RESULTS_IMAP_SUBJECT` mantienen la configuración simple existente.
+- `RESULTS_IMAP_FILTERS_JSON` permite configurar varios filtros de forma extensible. Cada filtro contiene `id`, `game`, `from`, `subjectIncludes` y `weekdays`. Si no se define, se crean filtros compatibles para Primitiva y Euromillón; el filtro de Euromillón usa por defecto `Resultados y escrutinio de Euromillones`.
 - `RESULTS_CODEX_BIN`, `RESULTS_SMTP_HOST`, `RESULTS_SMTP_PORT`, `RESULTS_SMTP_SECURE`, `RESULTS_SMTP_USER`, `RESULTS_SMTP_PASSWORD` (opcional si reutiliza `RESULTS_IMAP_PASSWORD`) y `RESULTS_REPORT_FROM`.
 - `RESULTS_RETENTION_DAYS` (por defecto, `90`).
 
@@ -159,8 +159,8 @@ Ejecución manual:
 
 ```bash
 npm run results:process
-# prueba completa sobre un correo descargado, sin tocar el buzón IMAP
-node scripts/process-primitiva-mail.mjs --file ./resultado.eml
+# inspección segura de un correo descargado: sin tocar DB, IMAP ni SMTP
+npm run results:inspect -- --file ./resultado.eml
 ```
 
 ## Apuestas recurrentes de Euromillón
@@ -173,7 +173,7 @@ La generación se activa automáticamente cada día a las 04:30 mediante cron, c
 npm run recurring-tickets:generate
 ```
 
-El comando es idempotente y ejecuta backup PRE/POST cuando crea boletos. El primer boleto real no se ha creado todavía porque falta la combinación de 5 números y 2 estrellas.
+El comando es idempotente y ejecuta backup PRE/POST cuando crea boletos. Los boletos se generan como pendientes y solo entran en la comprobación después de confirmar la compra y guardar el código de El Millón.
 
 Los comandos `db:sync:up` y `db:sync:down` quedan desactivados para evitar sobrescrituras de una base local.
 

@@ -9,6 +9,7 @@ export type StoredResult = {
   stars?: number[];
   complementario?: number | null;
   reintegro?: number | null;
+  elMillionCode?: string | null;
   fetchedAt: string;
 };
 

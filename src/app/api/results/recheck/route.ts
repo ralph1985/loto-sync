@@ -45,6 +45,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'ticketId no existe.' }, { status: 404 })
     }
     await requireGroupAccess(user.id, ticket.groupId)
+    if (ticket.purchaseStatus !== 'CONFIRMED') {
+      return NextResponse.json(
+        { error: 'El boleto todavía no está confirmado como comprado.' },
+        { status: 409 }
+      )
+    }
 
   const line = ticket.lines[0]
     const mainNumbers = line
