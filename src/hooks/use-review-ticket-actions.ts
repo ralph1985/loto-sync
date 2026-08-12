@@ -59,6 +59,9 @@ export function useReviewTicketActions({ selectedTicket, setSelectedTicket, load
   const [editTicketError, setEditTicketError] = useState<string | null>(null);
   const [editDrawDate, setEditDrawDate] = useState("");
   const [editPrimitivaCoverageMode, setEditPrimitivaCoverageMode] = useState<PrimitivaCoverageMode>("SINGLE");
+  const [confirmingPurchase, setConfirmingPurchase] = useState(false);
+  const [purchaseError, setPurchaseError] = useState<string | null>(null);
+  const [elMillionCodeInput, setElMillionCodeInput] = useState("");
 
   useEffect(() => {
     if (!selectedTicket) {
@@ -69,6 +72,8 @@ export function useReviewTicketActions({ selectedTicket, setSelectedTicket, load
     }
     setCheckDrawDate(toDateInput(selectedTicket.draw?.drawDate));
     setManualPrizeInput("");
+    setElMillionCodeInput(selectedTicket.elMillionCode ?? "");
+    setPurchaseError(null);
     setPrizeError(null);
     setEditDrawDate(toDateInput(selectedTicket.draw?.drawDate));
     setEditPrimitivaCoverageMode(inferPrimitivaCoverageMode(selectedTicket));
@@ -108,6 +113,27 @@ export function useReviewTicketActions({ selectedTicket, setSelectedTicket, load
       setEditingTicket(false);
     }
   }, [editDrawDate, editPrimitivaCoverageMode, loadData, selectedTicket, setSelectedTicket]);
+
+  const handleConfirmPurchase = useCallback(async () => {
+    if (!selectedTicket) return;
+    setConfirmingPurchase(true);
+    setPurchaseError(null);
+    try {
+      const response = await fetch(`/api/tickets/${selectedTicket.id}/confirm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ elMillionCode: elMillionCodeInput }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload?.error || "No se pudo confirmar la compra.");
+      setSelectedTicket(payload.data);
+      await loadData(true);
+    } catch (error) {
+      setPurchaseError(error instanceof Error ? error.message : "No se pudo confirmar la compra.");
+    } finally {
+      setConfirmingPurchase(false);
+    }
+  }, [elMillionCodeInput, loadData, selectedTicket, setSelectedTicket]);
 
   const handleVerifyTicket = useCallback(async () => {
     if (!selectedTicket) return;
@@ -197,6 +223,11 @@ export function useReviewTicketActions({ selectedTicket, setSelectedTicket, load
     weeklyDrawDates: getPrimitivaWeeklyDrawDates,
     winningMainNumbers,
     winningStars,
+    confirmingPurchase,
+    purchaseError,
+    elMillionCodeInput,
+    setElMillionCodeInput,
+    handleConfirmPurchase,
     handleSaveTicketDrawScope,
     handleVerifyTicket,
     handleRecheckTicket,

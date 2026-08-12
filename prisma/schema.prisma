@@ -23,6 +23,12 @@ enum TicketStatus {
   PREMIO
 }
 
+enum TicketPurchaseStatus {
+  PENDING_CONFIRMATION
+  CONFIRMED
+  CANCELLED
+}
+
 enum LineNumberKind {
   MAIN
   STAR
@@ -37,6 +43,7 @@ model Group {
   members     GroupMember[]
   invitations GroupInvitation[]
   emailRecipients GroupEmailRecipient[]
+  recurringTickets RecurringTicket[]
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 }
@@ -168,7 +175,11 @@ model Ticket {
   group      Group        @relation(fields: [groupId], references: [id])
   drawId     String
   draw       Draw         @relation(fields: [drawId], references: [id])
+  recurringTicketId String?
+  recurringTicket RecurringTicket? @relation(fields: [recurringTicketId], references: [id], onDelete: SetNull)
   status     TicketStatus @default(PENDIENTE)
+  purchaseStatus TicketPurchaseStatus @default(CONFIRMED)
+  elMillionCode String?
   priceCents Int?
   playsJoker Boolean      @default(false)
   jokerNumber String?
@@ -181,6 +192,24 @@ model Ticket {
 
   @@index([groupId, drawId])
   @@index([status])
+  @@index([purchaseStatus])
+  @@unique([recurringTicketId, drawId])
+}
+
+model RecurringTicket {
+  id          String   @id @default(cuid())
+  groupId     String
+  group       Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  drawType    DrawType @default(EUROMILLONES)
+  startDate   DateTime
+  active      Boolean  @default(true)
+  mainNumbers Json
+  starNumbers Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tickets     Ticket[]
+
+  @@index([groupId, active])
 }
 
 model TicketCheck {
@@ -196,6 +225,7 @@ model TicketCheck {
   matchesStars   Int          @default(0)
   prizeCents     Int?
   prizeSource    String?
+  elMillionMatch Boolean?
   checkedAt      DateTime     @default(now())
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt

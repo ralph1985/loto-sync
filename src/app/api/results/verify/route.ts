@@ -97,6 +97,9 @@ export async function GET(request: Request) {
       hasValidResult && result.stars
         ? starNumbers.filter((value: (typeof starNumbers)[number]) => result.stars?.includes(value)).length
         : 0
+    const elMillionMatch = ticket.draw.type === 'EUROMILLONES' && ticket.elMillionCode && result.elMillionCode
+      ? ticket.elMillionCode === result.elMillionCode
+      : null
 
     const reason = !line
       ? 'El boleto no tiene lineas.'
@@ -137,6 +140,7 @@ export async function GET(request: Request) {
           winningStars: result.stars ?? [],
           matchesMain: mainMatches,
           matchesStars: starsMatches,
+          elMillionMatch,
           checkedAt: new Date()
         },
         create: {
@@ -148,6 +152,7 @@ export async function GET(request: Request) {
           winningStars: result.stars ?? [],
           matchesMain: mainMatches,
           matchesStars: starsMatches,
+          elMillionMatch,
           checkedAt: new Date()
         }
       })

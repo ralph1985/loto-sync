@@ -139,14 +139,15 @@ Genera un fichero local `backups/vercel-postgres-YYYYMMDD-HHMMSS.json`. No reali
 
 En este PC se ejecuta los martes, viernes y domingos a las 04:30 con cron. La salida queda registrada en `backups/backup-cron.log`.
 
-## Automatización de resultados de Primitiva
+## Automatización de resultados de Primitiva y Euromillón
 
-El worker local consulta por IMAP los mensajes nuevos del buzón configurado, conserva el `.eml`, usa Codex en modo solo lectura para extraer un JSON validable, importa el resultado en `ResultCache`, recalcula los boletos afectados y envía un informe SMTP independiente por grupo. Cada informe incluye el saldo/bote calculado desde `GroupMovement`, los boletos del grupo y sus aciertos/fallos. En este PC se ejecuta cada 30 minutos durante las 12 horas posteriores a los sorteos de lunes, jueves y sábado (22:00–10:00 del día siguiente), y dos veces los días sin sorteo.
+El worker local consulta por IMAP los mensajes nuevos del buzón configurado, conserva el `.eml`, usa Codex en modo solo lectura para extraer un JSON validable, importa el resultado en `ResultCache`, recalcula los boletos afectados y envía un informe SMTP independiente por grupo. Admite La Primitiva (lunes, jueves y sábado) y Euromillón (martes y viernes). Para Euromillón también guarda y comprueba el código de El Millón de cada resguardo.
 
 Configuración adicional en `.env.local`:
 
 - `RESULTS_IMAP_HOST`, `RESULTS_IMAP_PORT`, `RESULTS_IMAP_SECURE`, `RESULTS_IMAP_USER`, `RESULTS_IMAP_PASSWORD` y `RESULTS_IMAP_MAILBOX`.
 - `RESULTS_IMAP_FROM` y `RESULTS_IMAP_SUBJECT`, obligatorios para filtrar el correo real de Loterías del Estado.
+- `RESULTS_IMAP_SUBJECT_PRIMITIVA` y `RESULTS_IMAP_SUBJECT_EUROMILLONES` permiten usar asuntos separados; si faltan, se usa `RESULTS_IMAP_SUBJECT`.
 - `RESULTS_CODEX_BIN`, `RESULTS_SMTP_HOST`, `RESULTS_SMTP_PORT`, `RESULTS_SMTP_SECURE`, `RESULTS_SMTP_USER`, `RESULTS_SMTP_PASSWORD` (opcional si reutiliza `RESULTS_IMAP_PASSWORD`) y `RESULTS_REPORT_FROM`.
 - `RESULTS_RETENTION_DAYS` (por defecto, `90`).
 
@@ -161,6 +162,18 @@ npm run results:process
 # prueba completa sobre un correo descargado, sin tocar el buzón IMAP
 node scripts/process-primitiva-mail.mjs --file ./resultado.eml
 ```
+
+## Apuestas recurrentes de Euromillón
+
+Desde el panel de revisión, un owner puede guardar una combinación fija para un grupo. La aplicación prepara un boleto pendiente para el próximo sorteo de martes o viernes. Tras comprarlo, el owner debe abrir el boleto, introducir el código de El Millón del resguardo y confirmar la compra. La aplicación no realiza compras en SELAE.
+
+La generación se activa automáticamente cada día a las 04:30 mediante cron, con `flock` para evitar ejecuciones simultáneas. La salida queda registrada en `backups/recurring-cron.log`. También puede ejecutarse manualmente:
+
+```bash
+npm run recurring-tickets:generate
+```
+
+El comando es idempotente y ejecuta backup PRE/POST cuando crea boletos. El primer boleto real no se ha creado todavía porque falta la combinación de 5 números y 2 estrellas.
 
 Los comandos `db:sync:up` y `db:sync:down` quedan desactivados para evitar sobrescrituras de una base local.
 

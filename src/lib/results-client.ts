@@ -5,6 +5,7 @@ export type NormalizedResult = {
   drawDate: string
   numbers: number[]
   stars?: number[]
+  elMillionCode?: string | null
   source: 'local-db'
 }
 
@@ -14,6 +15,7 @@ export type ImportResultInput = {
   stars?: number[]
   complementario?: number | null
   reintegro?: number | null
+  elMillionCode?: string | null
 }
 
 import { Prisma } from '@prisma/client'
@@ -59,6 +61,7 @@ type RawResultPayload = {
         resultData?: {
           estrellas?: unknown[]
           stars?: unknown[]
+          elMillionCode?: unknown
         }
         [key: string]: unknown
       }
@@ -72,6 +75,7 @@ type RawResultPayload = {
   resultData?: {
     estrellas?: unknown[]
     stars?: unknown[]
+    elMillionCode?: unknown
   }
   [key: string]: unknown
 }
@@ -133,12 +137,18 @@ const normalizeResult = (
     ...coerceNumberArray(resultData.estrellas)
   ]
   const uniqueStars = [...new Set(stars)]
+  const elMillionCode = typeof data?.elMillionCode === 'string'
+    ? data.elMillionCode
+    : typeof resultData.elMillionCode === 'string'
+      ? resultData.elMillionCode
+      : null
 
   return {
     game,
     drawDate,
     numbers: uniqueNumbers,
     stars: uniqueStars.length > 0 ? uniqueStars : undefined,
+    elMillionCode,
     source: 'local-db'
   }
 }
@@ -265,7 +275,8 @@ export const importResults = async (
         stars: item.stars ?? [],
         resultData: {
           complementario: item.complementario ?? null,
-          reintegro: item.reintegro ?? null
+          reintegro: item.reintegro ?? null,
+          elMillionCode: item.elMillionCode ?? null
         }
       },
       source: 'manual-json'

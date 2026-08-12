@@ -11,6 +11,7 @@ export type SyncDataset = {
   User: Array<Record<string, unknown>>
   Group: Array<Record<string, unknown>>
   Draw: Array<Record<string, unknown>>
+  RecurringTicket: Array<Record<string, unknown>>
   GroupMember: Array<Record<string, unknown>>
   GroupInvitation: Array<Record<string, unknown>>
   GroupEmailRecipient: Array<Record<string, unknown>>
@@ -34,6 +35,7 @@ const TABLES: SyncTableConfig[] = [
   { name: 'User', dateFields: ['createdAt', 'updatedAt'] },
   { name: 'Group', dateFields: ['createdAt', 'updatedAt'] },
   { name: 'Draw', dateFields: ['drawDate', 'createdAt', 'updatedAt'] },
+  { name: 'RecurringTicket', dateFields: ['startDate', 'createdAt', 'updatedAt'] },
   { name: 'GroupMember', dateFields: ['createdAt'] },
   { name: 'GroupInvitation', dateFields: ['createdAt', 'updatedAt'] },
   { name: 'GroupEmailRecipient', dateFields: ['createdAt', 'updatedAt'] },
@@ -86,11 +88,12 @@ export const shouldBlockOverwrite = (source: SyncSummary, target: SyncSummary) =
 }
 
 export const exportSyncDataset = async (): Promise<SyncDataset> => {
-  const [users, groups, draws, groupMembers, invitations, emailRecipients, tickets, lines, lineNumbers, receipts, checks, movements, cache, auditLogs] =
+  const [users, groups, draws, recurringTickets, groupMembers, invitations, emailRecipients, tickets, lines, lineNumbers, receipts, checks, movements, cache, auditLogs] =
     await Promise.all([
       prisma.user.findMany(),
       prisma.group.findMany(),
       prisma.draw.findMany(),
+      prisma.recurringTicket.findMany(),
       prisma.groupMember.findMany(),
       prisma.groupInvitation.findMany(),
       prisma.groupEmailRecipient.findMany(),
@@ -108,6 +111,7 @@ export const exportSyncDataset = async (): Promise<SyncDataset> => {
     User: users,
     Group: groups,
     Draw: draws,
+    RecurringTicket: recurringTickets,
     GroupMember: groupMembers,
     GroupInvitation: invitations,
     GroupEmailRecipient: emailRecipients,
@@ -265,6 +269,7 @@ export const replaceSyncDataset = async (dataset: SyncDataset) => {
           type: String(row.type),
           drawDate: toDate(row.drawDate),
           label: row.label ? String(row.label) : null,
+          elMillionCode: row.elMillionCode ? String(row.elMillionCode) : null,
           createdAt: toDate(row.createdAt),
           updatedAt: toDate(row.updatedAt)
         }))
@@ -283,6 +288,22 @@ export const replaceSyncDataset = async (dataset: SyncDataset) => {
       })
     }
 
+    if (normalized.RecurringTicket.length > 0) {
+      await tx.recurringTicket.createMany({
+        data: normalized.RecurringTicket.map((row) => ({
+          id: String(row.id),
+          groupId: String(row.groupId),
+          drawType: String(row.drawType),
+          startDate: toDate(row.startDate),
+          active: row.active !== false,
+          mainNumbers: toJson(row.mainNumbers, []),
+          starNumbers: toJson(row.starNumbers, []),
+          createdAt: toDate(row.createdAt),
+          updatedAt: toDate(row.updatedAt)
+        }))
+      })
+    }
+
     if (normalized.GroupInvitation.length > 0) {
       await tx.groupInvitation.createMany({
         data: normalized.GroupInvitation.map((row) => ({
@@ -292,6 +313,9 @@ export const replaceSyncDataset = async (dataset: SyncDataset) => {
           inviteeId: row.inviteeId ? String(row.inviteeId) : null,
           role: String(row.role),
           status: String(row.status),
+          purchaseStatus: row.purchaseStatus ? String(row.purchaseStatus) : 'CONFIRMED',
+          elMillionCode: row.elMillionCode ? String(row.elMillionCode) : null,
+          recurringTicketId: row.recurringTicketId ? String(row.recurringTicketId) : null,
           note: row.note ? String(row.note) : null,
           createdAt: toDate(row.createdAt),
           updatedAt: toDate(row.updatedAt)
@@ -406,6 +430,7 @@ export const replaceSyncDataset = async (dataset: SyncDataset) => {
                 ? null
                 : Number(row.prizeCents),
           prizeSource: row.prizeSource ? String(row.prizeSource) : null,
+          elMillionMatch: typeof row.elMillionMatch === 'boolean' ? row.elMillionMatch : null,
           checkedAt: toDate(row.checkedAt),
           createdAt: toDate(row.createdAt),
           updatedAt: toDate(row.updatedAt)

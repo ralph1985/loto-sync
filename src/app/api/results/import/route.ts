@@ -16,6 +16,7 @@ type ImportPayload = {
     stars?: number[]
     complementario?: number | null
     reintegro?: number | null
+    elMillionCode?: string | null
   }>
 }
 
@@ -64,7 +65,8 @@ const validateResults = (
       numbers: item.numbers,
       stars: item.stars ?? [],
       complementario: item.complementario ?? null,
-      reintegro: item.reintegro ?? null
+      reintegro: item.reintegro ?? null,
+      elMillionCode: item.elMillionCode ?? null
     })
   })
 
@@ -144,6 +146,9 @@ const syncChecksForImportedDate = async (
       hasValidResult && result.stars
         ? starNumbers.filter((value: (typeof starNumbers)[number]) => result.stars?.includes(value)).length
         : 0
+    const elMillionMatch = game === 'EUROMILLONES' && ticket.elMillionCode && result.elMillionCode
+      ? ticket.elMillionCode === result.elMillionCode
+      : null
 
     const existing = ticket.checks[0]
     const checkStatus = (existing?.prizeCents ?? 0) > 0 ? 'PREMIO' : hasValidResult ? 'COMPROBADO' : 'PENDIENTE'
@@ -167,6 +172,7 @@ const syncChecksForImportedDate = async (
         winningStars: result.stars ?? [],
         matchesMain,
         matchesStars,
+        elMillionMatch,
         checkedAt: new Date()
       },
       create: {
@@ -178,6 +184,7 @@ const syncChecksForImportedDate = async (
         winningStars: result.stars ?? [],
         matchesMain,
         matchesStars,
+        elMillionMatch,
         checkedAt: new Date()
       }
     })

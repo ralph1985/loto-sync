@@ -86,19 +86,20 @@ try {
   await prisma.$disconnect();
 }
 
-console.log(`Primitiva worker: ${processed} correo(s) procesado(s).`);
+console.log(`Results worker: ${processed} correo(s) procesado(s).`);
 
 async function processMessage({ source, parsed, uid }) {
   const messageId = parsed.messageId?.trim() || (uid === null ? `local-${createHash('sha256').update(source).digest('hex')}` : `uid-${uid}`);
   if (state.processed[messageId]?.sentAt) return;
-  if (uid !== null && !matchesFilter(parsed)) return;
+  const game = detectGame(parsed);
+  if (uid !== null && !matchesFilter(parsed, game)) return;
 
   const safeId = createHash('sha256').update(messageId).digest('hex').slice(0, 24);
   const emlPath = resolve(messageDir, `${safeId}.eml`);
   if (!existsSync(emlPath)) writeFileSync(emlPath, source);
 
-  const extraction = await extractWithCodex(emlPath);
-  const result = validateExtraction(extraction);
+  const extraction = await extractWithCodex(emlPath, game);
+  const result = validateExtraction(extraction, game);
   const resultPath = resolve(resultDir, `${result.date}-${safeId}.json`);
   writeFileSync(resultPath, `${JSON.stringify(result, null, 2)}\n`);
   const resultHash = createHash('sha256').update(JSON.stringify(result)).digest('hex');
@@ -107,6 +108,7 @@ async function processMessage({ source, parsed, uid }) {
     messageId,
     uid,
     drawDate: result.date,
+    game: result.game,
     resultHash,
     emlPath,
     resultPath,
@@ -198,23 +200,30 @@ function isWithinWorkerDirectory(filePath) {
   return normalized.startsWith(`${workerDir}/`);
 }
 
-function matchesFilter(parsed) {
+function detectGame(parsed) {
+  const subject = parsed.subject?.toLowerCase() ?? '';
+  return subject.includes('euromill') ? 'EUROMILLONES' : 'PRIMITIVA';
+}
+
+function matchesFilter(parsed, game) {
   const expectedFrom = process.env.RESULTS_IMAP_FROM.toLowerCase();
-  const expectedSubject = process.env.RESULTS_IMAP_SUBJECT.toLowerCase();
+  const expectedSubject = (game === 'EUROMILLONES'
+    ? process.env.RESULTS_IMAP_SUBJECT_EUROMILLONES ?? process.env.RESULTS_IMAP_SUBJECT
+    : process.env.RESULTS_IMAP_SUBJECT_PRIMITIVA ?? process.env.RESULTS_IMAP_SUBJECT).toLowerCase();
   const from = parsed.from?.value?.map((item) => item.address ?? item.name ?? '').join(' ').toLowerCase() ?? '';
   const subject = parsed.subject?.toLowerCase() ?? '';
   return from.includes(expectedFrom) && subject.includes(expectedSubject);
 }
 
-async function extractWithCodex(emlPath) {
+async function extractWithCodex(emlPath, game) {
   const codex = process.env.RESULTS_CODEX_BIN ?? '/home/rafa/.local/bin/codex';
   const prompt = [
-    'Lee únicamente el correo EML indicado y extrae el resultado del sorteo de La Primitiva.',
+    `Lee únicamente el correo EML indicado y extrae el resultado del sorteo de ${game === 'EUROMILLONES' ? 'Euromillón' : 'La Primitiva'}.`,
     `Fichero: ${emlPath}`,
-    'Devuelve exclusivamente un objeto JSON sin markdown con esta forma exacta:',
-    '{"date":"YYYY-MM-DD","numbers":[1,2,3,4,5,6],"complementario":0,"reintegro":0}',
-    'date es la fecha real del sorteo. numbers contiene exactamente los seis números principales.',
-    'complementario y reintegro deben ser números o null si no aparecen. No inventes valores.',
+    game === 'EUROMILLONES'
+      ? 'Devuelve exclusivamente JSON: {"date":"YYYY-MM-DD","numbers":[1,2,3,4,5],"stars":[1,2],"elMillionCode":"ABC12345"}. numbers son los cinco números y stars las dos estrellas.'
+      : 'Devuelve exclusivamente JSON: {"date":"YYYY-MM-DD","numbers":[1,2,3,4,5,6],"complementario":0,"reintegro":0}.',
+    'date es la fecha real del sorteo. No inventes valores.',
     'Si no puedes determinar con seguridad todos los campos, devuelve exactamente {"error":"resultado no determinable"}.'
   ].join('\n');
 
@@ -243,19 +252,29 @@ async function extractWithCodex(emlPath) {
   });
 }
 
-function validateExtraction(value) {
+function validateExtraction(value, game) {
   if (!value || typeof value !== 'object' || value.error) throw new Error('Resultado no determinable por Codex.');
   const date = typeof value.date === 'string' ? value.date : '';
   const numbers = Array.isArray(value.numbers) ? value.numbers : [];
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('La fecha extraída no es válida.');
   const parsedDate = new Date(`${date}T00:00:00.000Z`);
-  if (Number.isNaN(parsedDate.getTime()) || ![1, 4, 6].includes(parsedDate.getUTCDay())) throw new Error('La fecha no corresponde a un sorteo de Primitiva.');
-  if (numbers.length !== 6 || new Set(numbers).size !== 6 || numbers.some((item) => !Number.isInteger(item) || item < 1 || item > 49)) throw new Error('La combinación debe tener seis números únicos entre 1 y 49.');
+  const validWeekdays = game === 'EUROMILLONES' ? [2, 5] : [1, 4, 6];
+  if (Number.isNaN(parsedDate.getTime()) || !validWeekdays.includes(parsedDate.getUTCDay())) throw new Error(`La fecha no corresponde a un sorteo de ${game}.`);
+  const expectedNumbers = game === 'EUROMILLONES' ? 5 : 6;
+  const maxNumber = game === 'EUROMILLONES' ? 50 : 49;
+  if (numbers.length !== expectedNumbers || new Set(numbers).size !== expectedNumbers || numbers.some((item) => !Number.isInteger(item) || item < 1 || item > maxNumber)) throw new Error('La combinación extraída no es válida.');
+  if (game === 'EUROMILLONES') {
+    const stars = Array.isArray(value.stars) ? value.stars : [];
+    if (stars.length !== 2 || new Set(stars).size !== 2 || stars.some((item) => !Number.isInteger(item) || item < 1 || item > 12)) throw new Error('Las estrellas extraídas no son válidas.');
+    const elMillionCode = typeof value.elMillionCode === 'string' ? value.elMillionCode.trim().toUpperCase() : '';
+    if (!/^[A-Z]{3}\d{5}$/.test(elMillionCode)) throw new Error('El código de El Millón no es válido.');
+    return { game, date, numbers, stars, elMillionCode };
+  }
   const complementario = value.complementario === null ? null : Number(value.complementario);
   const reintegro = value.reintegro === null ? null : Number(value.reintegro);
   if (complementario !== null && (!Number.isInteger(complementario) || complementario < 1 || complementario > 49 || numbers.includes(complementario))) throw new Error('El complementario no es válido.');
   if (reintegro !== null && (!Number.isInteger(reintegro) || reintegro < 0 || reintegro > 9)) throw new Error('El reintegro no es válido.');
-  return { date, numbers, complementario, reintegro };
+  return { game, date, numbers, stars: [], complementario, reintegro, elMillionCode: null };
 }
 
 async function runBackup(label) {
@@ -267,7 +286,7 @@ async function importAndBuildReport(result) {
   const drawDate = new Date(`${result.date}T00:00:00.000Z`);
   const tickets = await prisma.ticket.findMany({
     where: {
-      draw: { type: 'PRIMITIVA' },
+      draw: { type: result.game },
       OR: [{ checks: { some: { drawDate } } }, { draw: { drawDate } }]
     },
     include: {
@@ -296,10 +315,11 @@ async function importAndBuildReport(result) {
 
   const reportRows = [];
   await prisma.$transaction(async (tx) => {
+    await tx.draw.update({ where: { type_drawDate: { type: result.game, drawDate } }, data: { elMillionCode: result.elMillionCode } }).catch(() => undefined);
     await tx.resultCache.upsert({
-      where: { game_drawDate: { game: 'PRIMITIVA', drawDate } },
+      where: { game_drawDate: { game: result.game, drawDate } },
       update: { payload: buildPayload(result), fetchedAt: new Date() },
-      create: { game: 'PRIMITIVA', drawDate, payload: buildPayload(result), fetchedAt: new Date() }
+      create: { game: result.game, drawDate, payload: buildPayload(result), fetchedAt: new Date() }
     });
 
     for (const ticket of tickets) {
@@ -307,10 +327,15 @@ async function importAndBuildReport(result) {
       const lineReports = lines.map((line) => {
         const main = line.numbers.filter((number) => number.kind === 'MAIN').map((number) => number.value);
         const hits = main.filter((number) => result.numbers.includes(number));
+        const stars = line.numbers.filter((number) => number.kind === 'STAR').map((number) => number.value);
+        const starHits = stars.filter((number) => result.stars.includes(number));
         return {
           numbers: main,
           hits,
           missed: main.filter((number) => !result.numbers.includes(number)),
+          stars,
+          starHits,
+          missedStars: stars.filter((number) => !result.stars.includes(number)),
           complement: line.complement,
           reintegro: line.reintegro
         };
@@ -318,11 +343,15 @@ async function importAndBuildReport(result) {
       const primary = lineReports[0];
       const existing = ticket.checks[0];
       const matchesMain = primary.hits.length;
+      const matchesStars = primary.starHits.length;
+      const elMillionMatch = result.game === 'EUROMILLONES' && ticket.elMillionCode
+        ? ticket.elMillionCode === result.elMillionCode
+        : null;
       const checkStatus = existing?.prizeCents > 0 ? 'PREMIO' : 'COMPROBADO';
       await tx.ticketCheck.upsert({
         where: { ticketId_drawDate: { ticketId: ticket.id, drawDate } },
-        update: { status: checkStatus, reason: null, winningNumbers: result.numbers, winningStars: [], matchesMain, matchesStars: 0, checkedAt: new Date() },
-        create: { ticketId: ticket.id, drawDate, status: checkStatus, reason: null, winningNumbers: result.numbers, winningStars: [], matchesMain, matchesStars: 0, checkedAt: new Date() }
+        update: { status: checkStatus, reason: null, winningNumbers: result.numbers, winningStars: result.stars, matchesMain, matchesStars, elMillionMatch, checkedAt: new Date() },
+        create: { ticketId: ticket.id, drawDate, status: checkStatus, reason: null, winningNumbers: result.numbers, winningStars: result.stars, matchesMain, matchesStars, elMillionMatch, checkedAt: new Date() }
       });
       const allChecks = await tx.ticketCheck.findMany({ where: { ticketId: ticket.id }, select: { status: true, prizeCents: true } });
       const nextStatus = allChecks.some((check) => check.status === 'PREMIO' || (check.prizeCents ?? 0) > 0) ? 'PREMIO' : 'COMPROBADO';
@@ -349,14 +378,15 @@ async function importAndBuildReport(result) {
 }
 
 function buildPayload(result) {
+  const isEuro = result.game === 'EUROMILLONES';
   return {
     success: true,
     data: {
-      game: { slug: 'primitiva', name: 'La Primitiva' },
+      game: { slug: isEuro ? 'euromillones' : 'primitiva', name: isEuro ? 'Euromillones' : 'La Primitiva' },
       drawDate: result.date,
       combination: result.numbers,
-      stars: [],
-      resultData: { complementario: result.complementario, reintegro: result.reintegro }
+      stars: result.stars,
+      resultData: { complementario: result.complementario ?? null, reintegro: result.reintegro ?? null, elMillionCode: result.elMillionCode ?? null }
     },
     source: 'email-codex'
   };
@@ -397,7 +427,7 @@ async function sendGroupReport(result, group, resultHash) {
     from,
     to: [from],
     bcc: group.recipients,
-    subject: `La Primitiva — ${group.group} — resultados ${result.date}`,
+    subject: `${result.game === 'EUROMILLONES' ? 'Euromillones' : 'La Primitiva'} — ${group.group} — resultados ${result.date}`,
     text,
     html,
     headers: { 'X-Loto-Result-Key': `primitiva/${result.date}/${group.groupId}/${resultHash}` }
@@ -410,12 +440,13 @@ function buildTextReport(result, group, dateLabel, balance, summary) {
       `  Línea ${lineIndex + 1}: ${line.numbers.join(', ') || 'sin números'}`,
       `    Aciertos: ${line.hits.join(', ') || 'ninguno'}`,
       `    Fallados: ${line.missed.join(', ') || 'ninguno'}`,
+      ...(result.game === 'EUROMILLONES' ? [`    Estrellas: ${line.stars.join(', ') || 'ninguna'}`, `    Aciertos estrellas: ${line.starHits.join(', ') || 'ninguno'}`] : []),
       `    Complementario: ${line.complement ?? 'no indicado'} | Reintegro: ${line.reintegro ?? 'no indicado'}`
     ].join('\n')).join('\n');
     return `Boleto ${index + 1} (${ticket.ticketId}) — grupo: ${ticket.group}\n${lines}`;
   }).join('\n\n');
   return [
-    'INFORME DE LA PRIMITIVA',
+    `INFORME DE ${result.game === 'EUROMILLONES' ? 'EUROMILLONES' : 'LA PRIMITIVA'}`,
     `Grupo: ${group.group}`,
     `Sorteo: ${dateLabel}`,
     '',
@@ -423,6 +454,7 @@ function buildTextReport(result, group, dateLabel, balance, summary) {
     `Bote restante: ${balance}`,
     '',
     `Combinación ganadora: ${result.numbers.join(', ')}`,
+    ...(result.game === 'EUROMILLONES' ? [`Estrellas: ${result.stars.join(', ')}`, `Código ganador de El Millón: ${result.elMillionCode}`] : []),
     `Complementario: ${result.complementario ?? 'no indicado'}`,
     `Reintegro: ${result.reintegro ?? 'no indicado'}`,
     '',
@@ -434,6 +466,7 @@ function buildTextReport(result, group, dateLabel, balance, summary) {
 
 function buildHtmlReport(result, group, dateLabel, balance, summary) {
   const hasHits = summary !== 'Sin aciertos';
+  const gameLabel = result.game === 'EUROMILLONES' ? 'Euromillones' : 'La Primitiva';
   const ticketSections = group.tickets.map((ticket, ticketIndex) => {
     const lines = ticket.lines.map((line, lineIndex) => {
       const numberPills = line.numbers.map((number) => `<span style="display:inline-block;margin:2px 4px 2px 0;padding:4px 8px;border-radius:999px;background:${line.hits.includes(number) ? '#dcfce7' : '#fee2e2'};color:${line.hits.includes(number) ? '#166534' : '#991b1b'};font-weight:700;">${escapeHtml(number)}</span>`).join('');
@@ -444,7 +477,7 @@ function buildHtmlReport(result, group, dateLabel, balance, summary) {
     return `<section style="margin:20px 0;padding:16px 18px;border:1px solid #e2e8f0;border-radius:12px;background:#ffffff;"><h3 style="margin:0;color:#0f172a;font-size:17px;">Boleto ${ticketIndex + 1}</h3><p style="margin:4px 0 8px;color:#64748b;font-size:12px;">${escapeHtml(ticket.ticketId)}</p><table role="presentation" style="width:100%;border-collapse:collapse;">${lines}</table></section>`;
   }).join('');
   const resultNumbers = result.numbers.map((number) => `<span style="display:inline-block;margin:2px 4px 2px 0;padding:5px 9px;border-radius:999px;background:#e0e7ff;color:#3730a3;font-weight:700;">${escapeHtml(number)}</span>`).join('');
-  return `<!doctype html><html lang="es"><body style="margin:0;background:#f1f5f9;color:#0f172a;font-family:Arial,sans-serif;line-height:1.5;"><div style="max-width:680px;margin:0 auto;padding:24px 14px;"><div style="padding:24px;border-radius:16px 16px 0 0;background:#1e3a8a;color:#ffffff;"><p style="margin:0 0 6px;font-size:12px;letter-spacing:1px;text-transform:uppercase;opacity:.8;">Informe de La Primitiva</p><h1 style="margin:0;font-size:26px;">${escapeHtml(group.group)}</h1><p style="margin:6px 0 0;opacity:.9;">Sorteo del ${escapeHtml(dateLabel)}</p></div><div style="padding:20px;background:#ffffff;"><div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px;"><div style="flex:1;min-width:200px;padding:16px;border-radius:12px;background:${hasHits ? '#dcfce7' : '#f8fafc'};border:1px solid ${hasHits ? '#86efac' : '#e2e8f0'};"><div style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;">Resultado del grupo</div><strong style="display:block;margin-top:4px;font-size:22px;color:${hasHits ? '#166534' : '#334155'};">${escapeHtml(summary)}</strong></div><div style="flex:1;min-width:200px;padding:16px;border-radius:12px;background:#fef3c7;border:1px solid #fcd34d;"><div style="font-size:12px;color:#92400e;text-transform:uppercase;letter-spacing:.5px;">Bote restante</div><strong style="display:block;margin-top:4px;font-size:22px;color:#92400e;">${escapeHtml(balance)}</strong><span style="font-size:12px;color:#92400e;">Saldo actual del grupo</span></div></div><div style="padding:16px;border-radius:12px;background:#eef2ff;"><h2 style="margin:0 0 8px;font-size:16px;color:#3730a3;">Resultado del sorteo</h2><div>${resultNumbers}</div><p style="margin:10px 0 0;font-size:14px;color:#475569;"><strong>Complementario:</strong> ${escapeHtml(result.complementario ?? 'no indicado')} · <strong>Reintegro:</strong> ${escapeHtml(result.reintegro ?? 'no indicado')}</p></div>${ticketSections || '<p style="color:#64748b;">No hay boletos correspondientes a este sorteo.</p>'}<p style="margin:24px 0 0;padding-top:16px;border-top:1px solid #e2e8f0;color:#64748b;font-size:12px;">Informe generado automáticamente por <a href="https://conquense.dev" style="color:#1d4ed8;font-weight:700;">conquense.dev</a>. Consulta tus grupos y boletos en <a href="https://loterias.conquense.dev/" style="color:#1d4ed8;font-weight:700;">loterias.conquense.dev</a>, a partir del correo oficial de Loterías del Estado.</p></div></div></body></html>`;
+  return `<!doctype html><html lang="es"><body style="margin:0;background:#f1f5f9;color:#0f172a;font-family:Arial,sans-serif;line-height:1.5;"><div style="max-width:680px;margin:0 auto;padding:24px 14px;"><div style="padding:24px;border-radius:16px 16px 0 0;background:#1e3a8a;color:#ffffff;"><p style="margin:0 0 6px;font-size:12px;letter-spacing:1px;text-transform:uppercase;opacity:.8;">Informe de ${gameLabel}</p><h1 style="margin:0;font-size:26px;">${escapeHtml(group.group)}</h1><p style="margin:6px 0 0;opacity:.9;">Sorteo del ${escapeHtml(dateLabel)}</p></div><div style="padding:20px;background:#ffffff;"><div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px;"><div style="flex:1;min-width:200px;padding:16px;border-radius:12px;background:${hasHits ? '#dcfce7' : '#f8fafc'};border:1px solid ${hasHits ? '#86efac' : '#e2e8f0'};"><div style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;">Resultado del grupo</div><strong style="display:block;margin-top:4px;font-size:22px;color:${hasHits ? '#166534' : '#334155'};">${escapeHtml(summary)}</strong></div><div style="flex:1;min-width:200px;padding:16px;border-radius:12px;background:#fef3c7;border:1px solid #fcd34d;"><div style="font-size:12px;color:#92400e;text-transform:uppercase;letter-spacing:.5px;">Bote restante</div><strong style="display:block;margin-top:4px;font-size:22px;color:#92400e;">${escapeHtml(balance)}</strong><span style="font-size:12px;color:#92400e;">Saldo actual del grupo</span></div></div><div style="padding:16px;border-radius:12px;background:#eef2ff;"><h2 style="margin:0 0 8px;font-size:16px;color:#3730a3;">Resultado del sorteo</h2><div>${resultNumbers}</div><p style="margin:10px 0 0;font-size:14px;color:#475569;"><strong>Estrellas:</strong> ${escapeHtml(result.stars.join(', ') || 'no indicadas')}${result.game === 'EUROMILLONES' ? ` · <strong>El Millón:</strong> ${escapeHtml(result.elMillionCode ?? 'no indicado')}` : ` · <strong>Complementario:</strong> ${escapeHtml(result.complementario ?? 'no indicado')} · <strong>Reintegro:</strong> ${escapeHtml(result.reintegro ?? 'no indicado')}`}</p></div>${ticketSections || '<p style="color:#64748b;">No hay boletos correspondientes a este sorteo.</p>'}<p style="margin:24px 0 0;padding-top:16px;border-top:1px solid #e2e8f0;color:#64748b;font-size:12px;">Informe generado automáticamente por <a href="https://conquense.dev" style="color:#1d4ed8;font-weight:700;">conquense.dev</a>. Consulta tus grupos y boletos en <a href="https://loterias.conquense.dev/" style="color:#1d4ed8;font-weight:700;">loterias.conquense.dev</a>, a partir del correo oficial de Loterías del Estado.</p></div></div></body></html>`;
 }
 
 function escapeHtml(value) {

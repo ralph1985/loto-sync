@@ -12,6 +12,7 @@ export type Group = {
   id: string;
   name: string;
   balanceCents?: number;
+  role?: "OWNER" | "MEMBER";
 };
 
 export type Draw = {
@@ -55,11 +56,14 @@ export type TicketCheck = {
   prizeCents?: number | null;
   prizeSource?: string | null;
   checkedAt: string;
+  elMillionMatch?: boolean | null;
 };
 
 export type Ticket = {
   id: string;
   status: TicketStatus;
+  purchaseStatus?: "PENDING_CONFIRMATION" | "CONFIRMED" | "CANCELLED";
+  elMillionCode?: string | null;
   createdAt: string;
   priceCents?: number | null;
   playsJoker?: boolean;

@@ -6,6 +6,7 @@ import { DashboardSection } from "@/components/review/dashboard-section";
 import { DashboardSummary } from "@/components/review/dashboard-summary";
 import { MovementsModal } from "@/components/review/movements-modal";
 import { RecentResults } from "@/components/review/recent-results";
+import { RecurringTicketsPanel } from "@/components/review/recurring-tickets-panel";
 import { ReviewFilters } from "@/components/review/review-filters";
 import { TicketReviewList } from "@/components/review/ticket-review-list";
 import { TicketReviewModal } from "@/components/review/ticket-review-modal";
@@ -117,6 +118,11 @@ function ReviewPageContent() {
     handleSaveManualPrize,
     winningMainNumbers,
     winningStars,
+    confirmingPurchase,
+    purchaseError,
+    elMillionCodeInput,
+    setElMillionCodeInput,
+    handleConfirmPurchase,
   } = useReviewTicketActions({ selectedTicket, setSelectedTicket, loadData });
 
   const [showMovementsModal, setShowMovementsModal] = useState(false);
@@ -227,6 +233,8 @@ function ReviewPageContent() {
           onOpenContribution={openContributionModal}
           onOpenMovements={() => setShowMovementsModal(true)}
         />
+
+        <RecurringTicketsPanel groups={groups} />
 
         <div className="flex flex-col gap-4">
           <DashboardSection
@@ -371,6 +379,11 @@ function ReviewPageContent() {
         prizeError={prizeError}
         winningMainNumbers={winningMainNumbers}
         winningStars={winningStars}
+        confirmingPurchase={confirmingPurchase}
+        purchaseError={purchaseError}
+        elMillionCodeInput={elMillionCodeInput}
+        onElMillionCodeChange={setElMillionCodeInput}
+        onConfirmPurchase={handleConfirmPurchase}
       />
     </div>
   );

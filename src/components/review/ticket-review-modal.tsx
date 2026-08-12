@@ -40,6 +40,11 @@ type TicketReviewModalProps = {
   prizeError: string | null;
   winningMainNumbers: Set<number>;
   winningStars: Set<number>;
+  confirmingPurchase: boolean;
+  purchaseError: string | null;
+  elMillionCodeInput: string;
+  onElMillionCodeChange: (value: string) => void;
+  onConfirmPurchase: () => void;
 };
 
 type TicketDrawScopeEditorProps = Pick<
@@ -380,6 +385,11 @@ export function TicketReviewModal({
   prizeError,
   winningMainNumbers,
   winningStars,
+  confirmingPurchase,
+  purchaseError,
+  elMillionCodeInput,
+  onElMillionCodeChange,
+  onConfirmPurchase,
 }: TicketReviewModalProps) {
   if (!ticket) return null;
 
@@ -390,6 +400,17 @@ export function TicketReviewModal({
       ariaLabel="Detalle del boleto"
       panelClassName="max-w-4xl border border-slate-200 bg-white p-6 shadow-[0_30px_80px_rgba(15,23,42,0.35)]"
     >
+      {ticket.purchaseStatus === "PENDING_CONFIRMATION" ? (
+        <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+          <p className="text-sm font-semibold text-amber-900">Compra pendiente de confirmar</p>
+          <p className="mt-1 text-xs text-amber-800">Introduce el código de El Millón del resguardo cuando hayas comprado este boleto.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <input className="input input-bordered input-sm" placeholder="ABC12345" value={elMillionCodeInput} onChange={(event) => onElMillionCodeChange(event.target.value.toUpperCase())} />
+            <button type="button" className="btn btn-sm btn-primary" disabled={confirmingPurchase} onClick={onConfirmPurchase}>{confirmingPurchase ? "Guardando…" : "Confirmar compra"}</button>
+          </div>
+          {purchaseError ? <p className="mt-2 text-xs text-error">{purchaseError}</p> : null}
+        </div>
+      ) : null}
       <div className="flex flex-col gap-3 pr-8 md:flex-row md:items-start md:justify-between">
         <div>
           <div className="text-xs uppercase tracking-wide text-slate-400">
