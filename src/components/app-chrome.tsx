@@ -13,6 +13,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/review", label: "Panel", description: "Boletos y grupos" },
   { href: "/create", label: "Nuevo boleto", description: "Guardar una apuesta" },
   { href: "/results", label: "Resultados", description: "Consultar sorteos" },
+  { href: "/recurring-tickets", label: "Recurrentes", description: "Apuestas automatizadas" },
 ];
 
 const isItemActive = (pathname: string, href: string) => {

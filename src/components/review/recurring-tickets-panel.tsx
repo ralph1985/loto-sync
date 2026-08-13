@@ -71,7 +71,10 @@ export function RecurringTicketsPanel({ groups }: { groups: Group[] }) {
 
   return <section className="rounded-2xl border border-base-300 bg-base-100 p-4 shadow-sm sm:p-6">
     <div className="mb-4"><h2 className="text-lg font-bold">Apuestas recurrentes</h2><p className="text-sm text-slate-600">Euromillón se prepara cada martes y viernes. Confirma después la compra y el código de El Millón.</p></div>
-    {rows.map((row) => <div key={row.id} className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-base-200 p-3 text-sm"><span><strong>{row.group.name}</strong> · {row.mainNumbers.join(", ")} + {row.starNumbers.join(", ")}</span><button type="button" onClick={() => toggle(row)} className="btn btn-sm">{row.active ? "Pausar" : "Activar"}</button></div>)}
+    {rows.map((row) => {
+      const canManage = groups.some((group) => group.id === row.groupId && group.role === "OWNER");
+      return <div key={row.id} className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-base-200 p-3 text-sm"><span><strong>{row.group.name}</strong> · {row.mainNumbers.join(", ")} + {row.starNumbers.join(", ")}</span>{canManage ? <button type="button" onClick={() => toggle(row)} className="btn btn-sm">{row.active ? "Pausar" : "Activar"}</button> : <span className={`rounded-full px-2 py-1 text-xs font-semibold ${row.active ? "bg-success/10 text-success" : "bg-base-300 text-base-content/60"}`}>{row.active ? "Activa" : "Pausada"}</span>}</div>;
+    })}
     {owners.length > 0 && <div className="grid gap-3 md:grid-cols-4">
       <select className="select select-bordered" value={groupId} onChange={(event) => setGroupId(event.target.value)}><option value="">Grupo</option>{owners.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select>
       <input className="input input-bordered" type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />

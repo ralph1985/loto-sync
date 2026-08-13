@@ -6,7 +6,6 @@ import { DashboardSection } from "@/components/review/dashboard-section";
 import { DashboardSummary } from "@/components/review/dashboard-summary";
 import { MovementsModal } from "@/components/review/movements-modal";
 import { RecentResults } from "@/components/review/recent-results";
-import { RecurringTicketsPanel } from "@/components/review/recurring-tickets-panel";
 import { ReviewFilters } from "@/components/review/review-filters";
 import { TicketReviewList } from "@/components/review/ticket-review-list";
 import { TicketReviewModal } from "@/components/review/ticket-review-modal";
@@ -314,10 +313,6 @@ function ReviewPageContent() {
           </DashboardSection> : null}
         </div>
 
-        <div className="border-t border-base-300 pt-5">
-          <p className="mb-3 text-xs font-semibold text-base-content/55">Automatizaciones</p>
-          <RecurringTicketsPanel groups={groups} />
-        </div>
       </main>
 
       {showContributionModal && groupFilter !== "ALL" && selectedGroup?.balanceTrackingEnabled !== false ? (
