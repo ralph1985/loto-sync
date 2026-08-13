@@ -209,19 +209,15 @@ function ReviewPageContent() {
 
   return (
     <div className="relative min-h-[100dvh] bg-transparent text-slate-900">
-      <main className="relative mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 pb-16 pt-8 md:px-10 md:pt-12">
-        <header className="flex flex-col gap-2 border-b border-base-300 pb-5 sm:pb-6">
-          <div className="space-y-2">
-            <span className="inline-flex w-fit items-center gap-2 rounded-lg bg-primary/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-primary">
-              Panel operativo
-            </span>
-            <h1 className="text-2xl font-bold leading-tight tracking-tight text-slate-900 sm:text-3xl md:text-4xl">
-              Boletos y resultados en un solo lugar
+      <main className="relative mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 pb-16 pt-7 md:px-10 md:pt-10">
+        <header className="flex items-end justify-between gap-4 border-b border-base-300 pb-5 sm:pb-6">
+          <div>
+            <p className="text-sm font-semibold text-base-content/60">Buenos días</p>
+            <h1 className="mt-1 text-2xl font-bold leading-tight tracking-[-0.03em] text-base-content sm:text-3xl md:text-4xl">
+              Centro de grupo
             </h1>
-            <p className="max-w-2xl text-sm leading-6 text-slate-600">
-              Detecta premios, pendientes y sorteos faltantes antes de entrar al detalle.
-            </p>
           </div>
+          <span className="hidden text-right text-xs leading-5 text-base-content/50 sm:block">Tu actividad, tus boletos<br />y tus próximos sorteos</span>
         </header>
 
         <DashboardSummary
@@ -234,8 +230,6 @@ function ReviewPageContent() {
           onOpenContribution={openContributionModal}
           onOpenMovements={() => setShowMovementsModal(true)}
         />
-
-        <RecurringTicketsPanel groups={groups} />
 
         <div className="flex flex-col gap-4">
           <DashboardSection
@@ -318,6 +312,11 @@ function ReviewPageContent() {
               </div>
             )}
           </DashboardSection> : null}
+        </div>
+
+        <div className="border-t border-base-300 pt-5">
+          <p className="mb-3 text-xs font-semibold text-base-content/55">Automatizaciones</p>
+          <RecurringTicketsPanel groups={groups} />
         </div>
       </main>
 

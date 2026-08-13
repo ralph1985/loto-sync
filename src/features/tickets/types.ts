@@ -16,6 +16,16 @@ export type Group = {
   role?: "OWNER" | "MEMBER";
 };
 
+export type GroupMember = {
+  id: string;
+  role: "OWNER" | "MEMBER";
+  createdAt?: string;
+  user: {
+    id: string;
+    name: string;
+  };
+};
+
 export type Draw = {
   id: string;
   type: DrawType;
