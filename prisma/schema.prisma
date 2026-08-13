@@ -38,6 +38,7 @@ model Group {
   id          String            @id @default(cuid())
   name        String
   kind        GroupKind?
+  balanceTrackingEnabled Boolean @default(true)
   tickets     Ticket[]
   movements   GroupMovement[]
   members     GroupMember[]

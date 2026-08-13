@@ -30,9 +30,10 @@ export function DashboardSummary({
   ).length;
   const pendingCount = scopedTickets.filter((ticket) => ticket.status === "PENDIENTE").length;
   const balanceCents = groupFilter === "ALL"
-    ? groups.reduce((total, group) => total + (group.balanceCents ?? 0), 0)
-    : groups.find((group) => group.id === groupFilter)?.balanceCents ?? 0;
+    ? groups.reduce((total, group) => total + (group.balanceTrackingEnabled !== false ? group.balanceCents ?? 0 : 0), 0)
+    : groups.find((group) => group.id === groupFilter)?.balanceCents ?? null;
   const selectedGroup = groups.find((group) => group.id === groupFilter);
+  const showBalance = groupFilter === "ALL" || selectedGroup?.balanceTrackingEnabled !== false;
 
   return (
     <section className="space-y-4" aria-labelledby="dashboard-summary-title">
@@ -63,12 +64,12 @@ export function DashboardSummary({
         <SummaryMetric label="Premios" value={String(prizeCount)} tone={prizeCount > 0 ? "success" : "neutral"} detail={prizeCount > 0 ? "Revisar ahora" : "Sin premios detectados"} />
         <SummaryMetric label="Pendientes" value={String(pendingCount)} tone={pendingCount > 0 ? "warning" : "neutral"} detail={pendingCount > 0 ? "Boletos sin comprobar" : "Todo comprobado"} />
         <SummaryMetric label="Sorteos faltantes" value={String(missingResultsCount)} tone={missingResultsCount > 0 ? "warning" : "neutral"} detail={missingResultsCount > 0 ? "Primitiva por cargar" : "Histórico al día"} />
-        <SummaryMetric label="Saldo" value={formatPrice(balanceCents)} tone="accent" detail={groupFilter === "ALL" ? "Total de grupos" : "Bote del grupo"} />
+        {showBalance ? <SummaryMetric label="Saldo" value={formatPrice(balanceCents)} tone="accent" detail={groupFilter === "ALL" ? "Total de grupos" : "Bote del grupo"} /> : null}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={onRefresh} className="btn btn-sm btn-outline">Actualizar panel</button>
-        {groupFilter !== "ALL" ? (
+        {groupFilter !== "ALL" && selectedGroup?.balanceTrackingEnabled !== false ? (
           <>
             <button type="button" onClick={onOpenContribution} className="btn btn-sm btn-outline">Recargar bote</button>
             <button type="button" onClick={onOpenMovements} className="btn btn-sm btn-ghost">Ver movimientos</button>
@@ -88,7 +89,7 @@ export function DashboardSummary({
                   <span className="block text-sm font-semibold text-base-content">{group.name}</span>
                   <span className="mt-1 block text-xs text-base-content/60">{groupPrizes} premios · {groupPending} pendientes</span>
                 </span>
-                <span className="text-sm font-bold text-primary">{formatPrice(group.balanceCents ?? 0)}</span>
+                {group.balanceTrackingEnabled !== false ? <span className="text-sm font-bold text-primary">{formatPrice(group.balanceCents ?? 0)}</span> : null}
               </button>
             );
           })}

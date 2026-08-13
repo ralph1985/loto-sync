@@ -87,6 +87,7 @@ function ReviewPageContent() {
     ],
     [storedResults]
   );
+  const selectedGroup = groups.find((group) => group.id === groupFilter);
   const missingResultsCount = useMemo(
     () => buildDisplayedResults(storedResults, "ALL").filter((result) => result.isMissing).length,
     [storedResults]
@@ -133,11 +134,11 @@ function ReviewPageContent() {
   const [contributionError, setContributionError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (groupFilter === "ALL") {
+    if (groupFilter === "ALL" || selectedGroup?.balanceTrackingEnabled === false) {
       setShowMovementsModal(false);
       setShowContributionModal(false);
     }
-  }, [groupFilter]);
+  }, [groupFilter, selectedGroup]);
   const openContributionModal = useCallback(() => {
     setContributionAmountInput("");
     setContributionNoteInput("");
@@ -291,7 +292,7 @@ function ReviewPageContent() {
             <RecentResults results={recentResults} loading={loadingResults} error={resultsError} />
           </DashboardSection>
 
-          <DashboardSection
+          {groupFilter !== "ALL" && selectedGroup?.balanceTrackingEnabled !== false ? <DashboardSection
             id="dashboard-accounting"
             title="Saldo y movimientos"
             description="Consulta la actividad económica del grupo seleccionado."
@@ -316,11 +317,11 @@ function ReviewPageContent() {
                 ))}
               </div>
             )}
-          </DashboardSection>
+          </DashboardSection> : null}
         </div>
       </main>
 
-      {showContributionModal && groupFilter !== "ALL" ? (
+      {showContributionModal && groupFilter !== "ALL" && selectedGroup?.balanceTrackingEnabled !== false ? (
         <ContributionModal
           open
           groupName={groups.find((group) => group.id === groupFilter)?.name ?? "Grupo"}
@@ -339,7 +340,7 @@ function ReviewPageContent() {
         />
       ) : null}
 
-      {showMovementsModal && groupFilter !== "ALL" ? (
+      {showMovementsModal && groupFilter !== "ALL" && selectedGroup?.balanceTrackingEnabled !== false ? (
         <MovementsModal
           open
           groupName={groups.find((group) => group.id === groupFilter)?.name ?? "Grupo"}

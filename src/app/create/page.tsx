@@ -89,7 +89,7 @@ export default function Home() {
 
   const latestTickets = tickets.slice(0, 5);
   const selectedGroupBalanceCents =
-    groups.find((group) => group.id === groupId)?.balanceCents ?? 0;
+    groups.find((group) => group.id === groupId)?.balanceCents ?? null;
 
   const handleCopy = async (ticket: Ticket) => {
     const firstLine = ticket.lines?.[0];

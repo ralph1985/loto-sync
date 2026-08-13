@@ -11,7 +11,8 @@ export type MovementType =
 export type Group = {
   id: string;
   name: string;
-  balanceCents?: number;
+  balanceTrackingEnabled: boolean;
+  balanceCents?: number | null;
   role?: "OWNER" | "MEMBER";
 };
 

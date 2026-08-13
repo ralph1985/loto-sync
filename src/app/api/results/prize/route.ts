@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 
 import { ApiAuthError, requireGroupAccess, requireSessionUser } from '@/lib/auth'
 import { writeAuditLog } from '@/lib/audit'
+import { isBalanceTracked } from '@/lib/group-balance'
 import { prisma } from '@/lib/prisma'
 
 const toDayStart = (value: string) => new Date(`${value}T00:00:00.000Z`)
@@ -47,7 +48,8 @@ export async function POST(request: Request) {
     const ticket = await prisma.ticket.findUnique({
       where: { id: ticketId },
       include: {
-        draw: true
+        draw: true,
+        group: true
       }
     })
 
@@ -96,8 +98,8 @@ export async function POST(request: Request) {
       }
     })
 
-    if (prizeCents > 0) {
-      await db.groupMovement.upsert({
+      if (prizeCents > 0 && isBalanceTracked(ticket.group)) {
+        await db.groupMovement.upsert({
         where: {
           relatedCheckId_type: {
             relatedCheckId: check.id,
@@ -119,7 +121,7 @@ export async function POST(request: Request) {
           relatedCheckId: check.id
         }
       })
-    } else {
+    } else if (isBalanceTracked(ticket.group)) {
       await db.groupMovement.deleteMany({
         where: {
           relatedCheckId: check.id,

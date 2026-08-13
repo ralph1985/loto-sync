@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { ApiAuthError, requireGroupAccess, requireSessionUser } from '@/lib/auth'
+import { isBalanceTracked } from '@/lib/group-balance'
 import { prisma } from '@/lib/prisma'
 
 export async function POST(request: Request, context: { params: Promise<{ ticketId: string }> }) {
@@ -8,7 +9,7 @@ export async function POST(request: Request, context: { params: Promise<{ ticket
     const user = await requireSessionUser()
     const { ticketId } = await context.params
     const payload = await request.json() as { elMillionCode?: string; priceCents?: number }
-    const ticket = await prisma.ticket.findUnique({ where: { id: ticketId }, include: { draw: true } })
+    const ticket = await prisma.ticket.findUnique({ where: { id: ticketId }, include: { draw: true, group: true } })
     if (!ticket) return NextResponse.json({ error: 'Boleto no encontrado.' }, { status: 404 })
     await requireGroupAccess(user.id, ticket.groupId, { ownerOnly: true })
     if (ticket.draw.type !== 'EUROMILLONES') {
@@ -32,7 +33,7 @@ export async function POST(request: Request, context: { params: Promise<{ ticket
         include: { draw: true, group: true, lines: { include: { numbers: true } }, checks: true }
       })
       const priceCents = payload.priceCents ?? ticket.priceCents ?? 0
-      if (priceCents > 0) {
+      if (priceCents > 0 && isBalanceTracked(ticket.group)) {
         const movement = await tx.groupMovement.findFirst({ where: { relatedTicketId: ticketId, type: 'TICKET_EXPENSE' } })
         if (!movement) {
           await tx.groupMovement.create({

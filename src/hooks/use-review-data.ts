@@ -143,7 +143,7 @@ export function useReviewData({ setSelectedTicket }: UseReviewDataOptions) {
     [primaryActiveTicket, secondaryVisibleTickets]
   );
   const selectedGroupBalanceCents = useMemo(
-    () => (groupFilter === "ALL" ? null : groups.find((group) => group.id === groupFilter)?.balanceCents ?? 0),
+    () => (groupFilter === "ALL" ? null : groups.find((group) => group.id === groupFilter)?.balanceCents ?? null),
     [groupFilter, groups]
   );
   const hasMoreSecondaryTickets = archivedVisibleCount < secondaryTickets.length;

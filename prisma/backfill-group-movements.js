@@ -15,6 +15,11 @@ async function main() {
       }
     },
     include: {
+      group: {
+        select: {
+          balanceTrackingEnabled: true
+        }
+      },
       draw: {
         select: {
           type: true,
@@ -27,6 +32,7 @@ async function main() {
   let created = 0
 
   for (const ticket of tickets) {
+    if (ticket.group?.balanceTrackingEnabled === false) continue
     const exists = await prisma.groupMovement.findFirst({
       where: {
         type: 'TICKET_EXPENSE',

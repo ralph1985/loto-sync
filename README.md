@@ -106,6 +106,7 @@ Notas de saldo (bote):
 - Al crear un ticket con `priceCents > 0`, se registra un movimiento `TICKET_EXPENSE`.
 - El saldo de cada grupo se calcula sumando movimientos (`OPENING`, `CONTRIBUTION`, `PRIZE`, etc.).
 - Al registrar premio manual (`/api/results/prize`), se crea/actualiza movimiento `PRIZE`.
+- Los grupos con `balanceTrackingEnabled = false` quedan fuera de este control. Actualmente Bego está configurado así: sus boletos y premios no generan movimientos de saldo, y el saldo no aparece en la interfaz ni en los informes. Los movimientos históricos se conservan.
 
 Ejemplo de importación de resultados locales:
 

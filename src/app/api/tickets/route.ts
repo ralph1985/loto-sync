@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 
 import { ApiAuthError, requireGroupAccess, requireSessionUser } from '@/lib/auth'
 import { writeAuditLog } from '@/lib/audit'
+import { isBalanceTracked } from '@/lib/group-balance'
 import { prisma } from '@/lib/prisma'
 
 type TicketLineInput = {
@@ -481,7 +482,7 @@ export async function POST(request: Request) {
       }
 
       const priceCents = payload.priceCents ?? 0
-      if (priceCents > 0) {
+      if (priceCents > 0 && isBalanceTracked(groupExists)) {
         await db.groupMovement.create({
           data: {
             groupId: payload.groupId,

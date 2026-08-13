@@ -52,7 +52,7 @@ export async function GET() {
     const groupsWithBalance = groups.map((group: (typeof groups)[number]) => ({
       ...group,
       role: roleByGroup.get(group.id) ?? 'MEMBER',
-      balanceCents: balanceByGroup.get(group.id) ?? 0
+      balanceCents: group.balanceTrackingEnabled ? balanceByGroup.get(group.id) ?? 0 : null
     }))
 
     return NextResponse.json({ data: groupsWithBalance })

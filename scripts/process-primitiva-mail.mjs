@@ -268,10 +268,13 @@ async function importAndBuildReport(result) {
     }
   });
   const groupIds = [...new Set(tickets.map((ticket) => ticket.groupId))];
+  const trackedGroupIds = tickets
+    .filter((ticket) => ticket.group?.balanceTrackingEnabled !== false)
+    .map((ticket) => ticket.groupId);
   const balances = groupIds.length
     ? await prisma.groupMovement.groupBy({
         by: ['groupId'],
-        where: { groupId: { in: groupIds } },
+        where: { groupId: { in: trackedGroupIds } },
         _sum: { amountCents: true }
       })
     : [];
@@ -325,7 +328,9 @@ async function importAndBuildReport(result) {
         groupId: ticket.groupId,
         group: ticket.group?.name ?? ticket.groupId,
         recipients: ticket.group?.emailRecipients.map((recipient) => recipient.email) ?? [],
-        balanceCents: balanceByGroup.get(ticket.groupId) ?? 0,
+        balanceCents: ticket.group?.balanceTrackingEnabled === false
+          ? null
+          : balanceByGroup.get(ticket.groupId) ?? 0,
         elMillionCode: ticket.elMillionCode,
         elMillionMatch,
         lines: lineReports
@@ -385,7 +390,9 @@ async function sendGroupReport(result, group, resultHash) {
   if (summaryData.stars > 0) summaryParts.push(`${summaryData.stars} estrella${summaryData.stars === 1 ? '' : 's'}`);
   if (summaryData.elMillion > 0) summaryParts.push('El Millón acertado');
   const summary = summaryParts.join(' · ') || 'Sin aciertos';
-  const balance = (group.balanceCents / 100).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
+  const balance = group.balanceCents === null
+    ? null
+    : (group.balanceCents / 100).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
   const text = buildTextReport(result, group, dateLabel, balance, summary);
   const html = buildHtmlReport(result, group, dateLabel, balance, summary);
   const transporter = nodemailer.createTransport({
@@ -429,7 +436,7 @@ function buildTextReport(result, group, dateLabel, balance, summary) {
     `Sorteo: ${dateLabel}`,
     '',
     `Resultado del grupo: ${summary}`,
-    `Bote restante: ${balance}`,
+    ...(balance === null ? [] : [`Bote restante: ${balance}`]),
     '',
     `Combinación ganadora: ${result.numbers.join(', ')}`,
     ...(result.game === 'EUROMILLONES' ? [`Estrellas: ${result.stars.join(', ')}`, `Código ganador de El Millón: ${result.elMillionCode}`] : []),
@@ -463,7 +470,8 @@ function buildHtmlReport(result, group, dateLabel, balance, summary) {
     return `<section style="margin:20px 0;padding:16px 18px;border:1px solid #e2e8f0;border-radius:12px;background:#ffffff;"><h3 style="margin:0;color:#0f172a;font-size:17px;">Boleto ${ticketIndex + 1}</h3><p style="margin:4px 0 8px;color:#64748b;font-size:12px;">${escapeHtml(ticket.ticketId)}</p>${euroTicket}<table role="presentation" style="width:100%;border-collapse:collapse;">${lines}</table></section>`;
   }).join('');
   const resultNumbers = result.numbers.map((number) => `<span style="display:inline-block;margin:2px 4px 2px 0;padding:5px 9px;border-radius:999px;background:#e0e7ff;color:#3730a3;font-weight:700;">${escapeHtml(number)}</span>`).join('');
-  return `<!doctype html><html lang="es"><body style="margin:0;background:#f1f5f9;color:#0f172a;font-family:Arial,sans-serif;line-height:1.5;"><div style="max-width:680px;margin:0 auto;padding:24px 14px;"><div style="padding:24px;border-radius:16px 16px 0 0;background:#1e3a8a;color:#ffffff;"><p style="margin:0 0 6px;font-size:12px;letter-spacing:1px;text-transform:uppercase;opacity:.8;">Informe de ${gameLabel}</p><h1 style="margin:0;font-size:26px;">${escapeHtml(group.group)}</h1><p style="margin:6px 0 0;opacity:.9;">Sorteo del ${escapeHtml(dateLabel)}</p></div><div style="padding:20px;background:#ffffff;"><div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px;"><div style="flex:1;min-width:200px;padding:16px;border-radius:12px;background:${hasHits ? '#dcfce7' : '#f8fafc'};border:1px solid ${hasHits ? '#86efac' : '#e2e8f0'};"><div style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;">Resultado del grupo</div><strong style="display:block;margin-top:4px;font-size:22px;color:${hasHits ? '#166534' : '#334155'};">${escapeHtml(summary)}</strong></div><div style="flex:1;min-width:200px;padding:16px;border-radius:12px;background:#fef3c7;border:1px solid #fcd34d;"><div style="font-size:12px;color:#92400e;text-transform:uppercase;letter-spacing:.5px;">Bote restante</div><strong style="display:block;margin-top:4px;font-size:22px;color:#92400e;">${escapeHtml(balance)}</strong><span style="font-size:12px;color:#92400e;">Saldo actual del grupo</span></div></div><div style="padding:16px;border-radius:12px;background:#eef2ff;"><h2 style="margin:0 0 8px;font-size:16px;color:#3730a3;">Resultado del sorteo</h2><div>${resultNumbers}</div><p style="margin:10px 0 0;font-size:14px;color:#475569;"><strong>Estrellas:</strong> ${escapeHtml(result.stars.join(', ') || 'no indicadas')}${result.game === 'EUROMILLONES' ? ` · <strong>El Millón:</strong> ${escapeHtml(result.elMillionCode ?? 'no indicado')}` : ` · <strong>Complementario:</strong> ${escapeHtml(result.complementario ?? 'no indicado')} · <strong>Reintegro:</strong> ${escapeHtml(result.reintegro ?? 'no indicado')}`}</p></div>${ticketSections || '<p style="color:#64748b;">No hay boletos correspondientes a este sorteo.</p>'}<p style="margin:24px 0 0;padding-top:16px;border-top:1px solid #e2e8f0;color:#64748b;font-size:12px;">Informe generado automáticamente por <a href="https://conquense.dev" style="color:#1d4ed8;font-weight:700;">conquense.dev</a>. Consulta tus grupos y boletos en <a href="https://loterias.conquense.dev/" style="color:#1d4ed8;font-weight:700;">loterias.conquense.dev</a>, a partir del correo oficial de Loterías del Estado.</p></div></div></body></html>`;
+  const balanceSection = balance === null ? '' : `<div style="flex:1;min-width:200px;padding:16px;border-radius:12px;background:#fef3c7;border:1px solid #fcd34d;"><div style="font-size:12px;color:#92400e;text-transform:uppercase;letter-spacing:.5px;">Bote restante</div><strong style="display:block;margin-top:4px;font-size:22px;color:#92400e;">${escapeHtml(balance)}</strong><span style="font-size:12px;color:#92400e;">Saldo actual del grupo</span></div>`;
+  return `<!doctype html><html lang="es"><body style="margin:0;background:#f1f5f9;color:#0f172a;font-family:Arial,sans-serif;line-height:1.5;"><div style="max-width:680px;margin:0 auto;padding:24px 14px;"><div style="padding:24px;border-radius:16px 16px 0 0;background:#1e3a8a;color:#ffffff;"><p style="margin:0 0 6px;font-size:12px;letter-spacing:1px;text-transform:uppercase;opacity:.8;">Informe de ${gameLabel}</p><h1 style="margin:0;font-size:26px;">${escapeHtml(group.group)}</h1><p style="margin:6px 0 0;opacity:.9;">Sorteo del ${escapeHtml(dateLabel)}</p></div><div style="padding:20px;background:#ffffff;"><div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px;"><div style="flex:1;min-width:200px;padding:16px;border-radius:12px;background:${hasHits ? '#dcfce7' : '#f8fafc'};border:1px solid ${hasHits ? '#86efac' : '#e2e8f0'};"><div style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;">Resultado del grupo</div><strong style="display:block;margin-top:4px;font-size:22px;color:${hasHits ? '#166534' : '#334155'};">${escapeHtml(summary)}</strong></div>${balanceSection}</div><div style="padding:16px;border-radius:12px;background:#eef2ff;"><h2 style="margin:0 0 8px;font-size:16px;color:#3730a3;">Resultado del sorteo</h2><div>${resultNumbers}</div><p style="margin:10px 0 0;font-size:14px;color:#475569;"><strong>Estrellas:</strong> ${escapeHtml(result.stars.join(', ') || 'no indicadas')}${result.game === 'EUROMILLONES' ? ` · <strong>El Millón:</strong> ${escapeHtml(result.elMillionCode ?? 'no indicado')}` : ` · <strong>Complementario:</strong> ${escapeHtml(result.complementario ?? 'no indicado')} · <strong>Reintegro:</strong> ${escapeHtml(result.reintegro ?? 'no indicado')}`}</p></div>${ticketSections || '<p style="color:#64748b;">No hay boletos correspondientes a este sorteo.</p>'}<p style="margin:24px 0 0;padding-top:16px;border-top:1px solid #e2e8f0;color:#64748b;font-size:12px;">Informe generado automáticamente por <a href="https://conquense.dev" style="color:#1d4ed8;font-weight:700;">conquense.dev</a>. Consulta tus grupos y boletos en <a href="https://loterias.conquense.dev/" style="color:#1d4ed8;font-weight:700;">loterias.conquense.dev</a>, a partir del correo oficial de Loterías del Estado.</p></div></div></body></html>`;
 }
 
 function escapeHtml(value) {

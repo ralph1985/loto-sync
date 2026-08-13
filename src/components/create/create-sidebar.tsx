@@ -11,7 +11,7 @@ type CreateSidebarProps = {
   selectedDraw: Draw | null;
   groupId: string;
   groups: Group[];
-  selectedGroupBalanceCents: number;
+  selectedGroupBalanceCents: number | null;
   priceInput: string;
   playsJoker: boolean;
   jokerNumber: string;
@@ -114,7 +114,7 @@ function SummaryPanel({
   selectedDraw: Draw | null;
   selectedGroup?: Group;
   groupId: string;
-  selectedGroupBalanceCents: number;
+  selectedGroupBalanceCents: number | null;
   priceInput: string;
   playsJoker: boolean;
   jokerNumber: string;
@@ -126,7 +126,9 @@ function SummaryPanel({
     <div className="mt-4 space-y-4 text-sm text-slate-600">
       <SummaryItem label="Sorteo" value={selectedDraw?.label ?? (selectedDraw ? drawTypeLabel(selectedDraw.type) : "Sin definir")} />
       <SummaryItem label="Grupo" value={selectedGroup?.name ?? "Sin definir"} />
-      <SummaryItem label="Bote grupo" value={groupId ? formatPrice(selectedGroupBalanceCents) : "Sin definir"} />
+      {selectedGroup?.balanceTrackingEnabled !== false ? (
+        <SummaryItem label="Bote grupo" value={groupId && selectedGroupBalanceCents !== null ? formatPrice(selectedGroupBalanceCents) : "Sin definir"} />
+      ) : null}
       <SummaryItem label="Fecha" value={selectedDraw?.drawDate ? new Date(selectedDraw.drawDate).toLocaleDateString("es-ES") : "Sin definir"} />
       <SummaryItem label="Precio" value={formatInputPrice(priceInput)} />
       <SummaryItem label="Joker" value={drawType === "PRIMITIVA" ? (playsJoker ? jokerNumber || "Pendiente" : "No") : "No aplica"} />
@@ -177,7 +179,7 @@ function GroupBalances({ groups }: { groups: Group[] }) {
 
 function BalanceList({ groups, mobile = false }: { groups: Group[]; mobile?: boolean }) {
   return <div className="mt-3 space-y-2">
-    {groups.length > 0 ? groups.map((group) => (
+    {groups.filter((group) => group.balanceTrackingEnabled !== false).length > 0 ? groups.filter((group) => group.balanceTrackingEnabled !== false).map((group) => (
       <div key={`${mobile ? "mobile-" : ""}${group.id}`} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2">
         <span>{group.name}</span><span className="font-semibold">{formatPrice(group.balanceCents ?? 0)}</span>
       </div>

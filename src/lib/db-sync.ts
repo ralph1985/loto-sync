@@ -256,6 +256,8 @@ export const replaceSyncDataset = async (dataset: SyncDataset) => {
           id: String(row.id),
           name: String(row.name),
           kind: row.kind ? String(row.kind) : null,
+          balanceTrackingEnabled:
+            row.balanceTrackingEnabled !== false && String(row.name).trim().toLowerCase() !== 'bego',
           createdAt: toDate(row.createdAt),
           updatedAt: toDate(row.updatedAt)
         }))

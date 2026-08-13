@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { ApiAuthError, requireGroupAccess, requireSessionUser } from '@/lib/auth'
+import { isBalanceTracked } from '@/lib/group-balance'
 import { prisma } from '@/lib/prisma'
 
 const ALLOWED_TYPES = ['OPENING', 'ADJUSTMENT', 'CONTRIBUTION', 'TICKET_EXPENSE', 'PRIZE'] as const
@@ -14,6 +15,8 @@ export async function GET(
     const actor = await requireSessionUser()
     const { groupId } = await context.params
     await requireGroupAccess(actor.id, groupId)
+    const group = await prisma.group.findUnique({ where: { id: groupId }, select: { balanceTrackingEnabled: true } })
+    if (!isBalanceTracked(group)) return NextResponse.json({ data: [] })
 
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type')
@@ -58,6 +61,10 @@ export async function POST(
     const actor = await requireSessionUser()
     const { groupId } = await context.params
     await requireGroupAccess(actor.id, groupId)
+    const group = await prisma.group.findUnique({ where: { id: groupId }, select: { balanceTrackingEnabled: true } })
+    if (!isBalanceTracked(group)) {
+      return NextResponse.json({ error: 'Este grupo no utiliza el control de saldo.' }, { status: 409 })
+    }
 
     const payload = await request.json().catch(() => null) as {
       amountCents?: unknown
