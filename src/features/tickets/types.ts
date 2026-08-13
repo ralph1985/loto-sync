@@ -36,6 +36,14 @@ export type TicketLine = {
   complement?: number | null;
   reintegro?: number | null;
   numbers: TicketLineNumber[];
+  elMillionCode?: string | null;
+};
+
+export type TicketLineResult = {
+  lineIndex: number;
+  matchesMain: number;
+  matchesStars: number;
+  elMillionMatch?: boolean | null;
 };
 
 export type Receipt = {
@@ -58,6 +66,7 @@ export type TicketCheck = {
   prizeSource?: string | null;
   checkedAt: string;
   elMillionMatch?: boolean | null;
+  lineResults?: TicketLineResult[] | null;
 };
 
 export type Ticket = {

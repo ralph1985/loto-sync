@@ -8,16 +8,18 @@ export async function POST(request: Request, context: { params: Promise<{ ticket
   try {
     const user = await requireSessionUser()
     const { ticketId } = await context.params
-    const payload = await request.json() as { elMillionCode?: string; priceCents?: number }
-    const ticket = await prisma.ticket.findUnique({ where: { id: ticketId }, include: { draw: true, group: true } })
+    const payload = await request.json() as { elMillionCode?: string; elMillionCodes?: string[]; priceCents?: number }
+    const ticket = await prisma.ticket.findUnique({ where: { id: ticketId }, include: { draw: true, group: true, lines: true } })
     if (!ticket) return NextResponse.json({ error: 'Boleto no encontrado.' }, { status: 404 })
     await requireGroupAccess(user.id, ticket.groupId, { ownerOnly: true })
     if (ticket.draw.type !== 'EUROMILLONES') {
       return NextResponse.json({ error: 'El codigo de El Millon solo aplica a Euromillones.' }, { status: 400 })
     }
-    const code = payload.elMillionCode?.trim().toUpperCase()
-    if (!code || !/^[A-Z]{3}\d{5}$/.test(code)) {
-      return NextResponse.json({ error: 'El codigo de El Millon debe tener 3 letras y 5 cifras.' }, { status: 400 })
+    const codes = Array.isArray(payload.elMillionCodes)
+      ? payload.elMillionCodes.map((value) => value.trim().toUpperCase())
+      : payload.elMillionCode ? [payload.elMillionCode.trim().toUpperCase()] : []
+    if (codes.length !== ticket.lines.length || codes.some((code) => !/^[A-Z]{3}\d{5}$/.test(code))) {
+      return NextResponse.json({ error: `Debes indicar un código válido de El Millón para cada una de las ${ticket.lines.length} líneas.` }, { status: 400 })
     }
     if (payload.priceCents !== undefined && (!Number.isInteger(payload.priceCents) || payload.priceCents < 0)) {
       return NextResponse.json({ error: 'priceCents no es valido.' }, { status: 400 })
@@ -27,7 +29,13 @@ export async function POST(request: Request, context: { params: Promise<{ ticket
         where: { id: ticketId },
         data: {
           purchaseStatus: 'CONFIRMED',
-          elMillionCode: code,
+          elMillionCode: codes[0] ?? null,
+          lines: {
+            update: ticket.lines.map((line, index) => ({
+              where: { id: line.id },
+              data: { elMillionCode: codes[index] }
+            }))
+          },
           priceCents: payload.priceCents ?? ticket.priceCents
         },
         include: { draw: true, group: true, lines: { include: { numbers: true } }, checks: true }

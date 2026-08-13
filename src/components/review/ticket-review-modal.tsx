@@ -42,8 +42,8 @@ type TicketReviewModalProps = {
   winningStars: Set<number>;
   confirmingPurchase: boolean;
   purchaseError: string | null;
-  elMillionCodeInput: string;
-  onElMillionCodeChange: (value: string) => void;
+  elMillionCodeInputs: string[];
+  onElMillionCodeChange: (index: number, value: string) => void;
   onConfirmPurchase: () => void;
 };
 
@@ -296,6 +296,7 @@ function TicketNumbersPanel({
                   Complementario: {line.complement ?? "-"} · Reintegro: {line.reintegro ?? "-"}
                 </div>
               )}
+              {line.elMillionCode ? <div className="mt-2 text-xs font-semibold text-indigo-700">El Millón: {line.elMillionCode}</div> : null}
             </div>
           );
         })}
@@ -388,7 +389,7 @@ export function TicketReviewModal({
   winningStars,
   confirmingPurchase,
   purchaseError,
-  elMillionCodeInput,
+  elMillionCodeInputs,
   onElMillionCodeChange,
   onConfirmPurchase,
 }: TicketReviewModalProps) {
@@ -405,8 +406,8 @@ export function TicketReviewModal({
         <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
           <p className="text-sm font-semibold text-amber-900">Compra pendiente de confirmar</p>
           <p className="mt-1 text-xs text-amber-800">Introduce el código de El Millón del resguardo cuando hayas comprado este boleto.</p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <input className="input input-bordered input-sm" placeholder="ABC12345" value={elMillionCodeInput} onChange={(event) => onElMillionCodeChange(event.target.value.toUpperCase())} />
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {(ticket.lines ?? []).map((line, index) => <input key={line.id} className="input input-bordered input-sm" placeholder={`Línea ${index + 1}: ABC12345`} value={elMillionCodeInputs[index] ?? ""} onChange={(event) => onElMillionCodeChange(index, event.target.value.toUpperCase())} />)}
             <button type="button" className="btn btn-sm btn-primary" disabled={confirmingPurchase} onClick={onConfirmPurchase}>{confirmingPurchase ? "Guardando…" : "Confirmar compra"}</button>
           </div>
           {purchaseError ? <p className="mt-2 text-xs text-error">{purchaseError}</p> : null}

@@ -84,6 +84,7 @@ export function TicketDetailModal({ ticket, onClose }: TicketDetailModalProps) {
                       Complementario: {line.complement ?? "-"} · Reintegro: {line.reintegro ?? "-"}
                     </div>
                   )}
+                  {line.elMillionCode ? <div className="mt-2 text-xs font-semibold text-indigo-700">El Millón: {line.elMillionCode}</div> : null}
                 </div>
               );
             })}

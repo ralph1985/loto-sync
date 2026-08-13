@@ -5,6 +5,7 @@ export type CreateLineInput = {
   starInput: string;
   complement: string;
   reintegro: string;
+  elMillionCode?: string;
 };
 
 export type LineValidation = {
@@ -24,6 +25,7 @@ export type CreateTicketInput = {
   drawType: DrawType;
   drawDate: string;
   primitivaCoverageMode: "SINGLE" | "WEEKLY";
+  euromillionsCoverageMode?: "SINGLE" | "WEEKLY";
   priceInput: string;
   playsJoker: boolean;
   jokerNumber: string;
@@ -36,6 +38,7 @@ export const createEmptyLine = (): CreateLineInput => ({
   starInput: "",
   complement: "",
   reintegro: "",
+  elMillionCode: "",
 });
 
 export const getPrimitivaWeeklyDrawDates = (drawDate: string) => {
@@ -50,6 +53,18 @@ export const getPrimitivaWeeklyDrawDates = (drawDate: string) => {
     value.setUTCDate(monday.getUTCDate() + offset);
     return value.toISOString().slice(0, 10);
   });
+};
+
+export const getEuromillionsWeeklyDrawDates = (drawDate: string) => {
+  const source = new Date(`${drawDate}T00:00:00.000Z`);
+  if (Number.isNaN(source.getTime())) return [];
+  const weekday = source.getUTCDay();
+  if (weekday !== 2 && weekday !== 5) return [drawDate];
+  const first = new Date(source);
+  if (weekday === 5) first.setUTCDate(first.getUTCDate() - 3);
+  const second = new Date(first);
+  second.setUTCDate(second.getUTCDate() + 3);
+  return [first, second].map((value) => value.toISOString().slice(0, 10));
 };
 
 export const toIntArray = (input: string) =>
@@ -110,6 +125,11 @@ export const validateTicketInput = (
       const star = validateNumberSet(line.starInput, 2, 1, 12);
       stars = star.values;
       lineIssues.push(...star.errors.map((error) => `Estrellas: ${error}`));
+      if (line.elMillionCode?.trim() && !/^[A-Z]{3}\d{5}$/i.test(line.elMillionCode.trim())) {
+        lineIssues.push("El Millón debe tener 3 letras y 5 cifras.");
+      }
+    } else if (line.elMillionCode?.trim()) {
+      lineIssues.push("El código de El Millón solo aplica a Euromillones.");
     }
     if (isPrimitiva && line.complement.trim()) {
       const value = Number.parseInt(line.complement, 10);
@@ -147,6 +167,8 @@ export const buildTicketPayload = (input: CreateTicketInput) => {
     drawDates:
       input.drawType === "PRIMITIVA" && input.primitivaCoverageMode === "WEEKLY"
         ? getPrimitivaWeeklyDrawDates(input.drawDate)
+        : input.drawType === "EUROMILLONES" && input.euromillionsCoverageMode === "WEEKLY"
+          ? getEuromillionsWeeklyDrawDates(input.drawDate)
         : undefined,
     priceCents,
     playsJoker: input.drawType === "PRIMITIVA" ? input.playsJoker : undefined,
@@ -157,6 +179,9 @@ export const buildTicketPayload = (input: CreateTicketInput) => {
       starNumbers: input.drawType === "EUROMILLONES" ? toIntArray(line.starInput) : undefined,
       complement: line.complement ? Number.parseInt(line.complement, 10) : undefined,
       reintegro: line.reintegro ? Number.parseInt(line.reintegro, 10) : undefined,
+      elMillionCode: input.drawType === "EUROMILLONES" && line.elMillionCode?.trim()
+        ? line.elMillionCode.trim().toUpperCase()
+        : undefined,
     })),
   };
 };

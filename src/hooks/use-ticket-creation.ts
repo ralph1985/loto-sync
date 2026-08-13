@@ -8,6 +8,7 @@ import {
   buildTicketPayload,
   createEmptyLine,
   getPrimitivaWeeklyDrawDates,
+  getEuromillionsWeeklyDrawDates,
   validateTicketInput,
 } from "@/features/tickets/create-logic";
 
@@ -18,6 +19,7 @@ type UseTicketCreationOptions = {
 export function useTicketCreation({ refreshInitialData }: UseTicketCreationOptions) {
   const [drawType, setDrawType] = useState<DrawType>("PRIMITIVA");
   const [primitivaCoverageMode, setPrimitivaCoverageMode] = useState<PrimitivaCoverageMode>("SINGLE");
+  const [euromillionsCoverageMode, setEuromillionsCoverageMode] = useState<"SINGLE" | "WEEKLY">("SINGLE");
   const [drawDate, setDrawDate] = useState("");
   const [groupId, setGroupId] = useState("");
   const [priceInput, setPriceInput] = useState("");
@@ -68,6 +70,7 @@ export function useTicketCreation({ refreshInitialData }: UseTicketCreationOptio
           drawType,
           drawDate,
           primitivaCoverageMode,
+          euromillionsCoverageMode,
           priceInput,
           playsJoker,
           jokerNumber,
@@ -119,7 +122,7 @@ export function useTicketCreation({ refreshInitialData }: UseTicketCreationOptio
     } finally {
       setSaving(false);
     }
-  }, [drawDate, drawType, groupId, jokerNumber, lines, notes, playsJoker, priceInput, primitivaCoverageMode, receipt, refreshInitialData, saving, validation.isValid]);
+  }, [drawDate, drawType, euromillionsCoverageMode, groupId, jokerNumber, lines, notes, playsJoker, priceInput, primitivaCoverageMode, receipt, refreshInitialData, saving, validation.isValid]);
 
   const retryReceiptUpload = useCallback(async () => {
     if (!receiptRetry || saving) return;
@@ -159,6 +162,8 @@ export function useTicketCreation({ refreshInitialData }: UseTicketCreationOptio
     setDrawType,
     primitivaCoverageMode,
     setPrimitivaCoverageMode,
+    euromillionsCoverageMode,
+    setEuromillionsCoverageMode,
     drawDate,
     setDrawDate,
     groupId,
@@ -188,6 +193,7 @@ export function useTicketCreation({ refreshInitialData }: UseTicketCreationOptio
     handleSubmit,
     retryReceiptUpload,
     weeklyDrawDates: getPrimitivaWeeklyDrawDates,
+    euromillionsWeeklyDrawDates: getEuromillionsWeeklyDrawDates,
     createEmptyLine,
   };
 }

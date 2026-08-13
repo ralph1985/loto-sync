@@ -227,6 +227,7 @@ model TicketCheck {
   prizeCents     Int?
   prizeSource    String?
   elMillionMatch Boolean?
+  lineResults   Json?
   checkedAt      DateTime     @default(now())
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
@@ -243,6 +244,7 @@ model TicketLine {
   reintegro  Int?
   numbers    TicketLineNumber[]
   lineIndex  Int      @default(1)
+  elMillionCode String?
   createdAt  DateTime @default(now())
 
   @@index([ticketId, lineIndex])

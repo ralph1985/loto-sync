@@ -7,6 +7,7 @@ import {
   importResults,
   type ImportResultInput
 } from '@/lib/results-client'
+import { computeLineResults, hasAnyElMillionMatch } from '@/features/results/line-results'
 
 type ImportPayload = {
   game?: string
@@ -144,32 +145,22 @@ const syncChecksForImportedDate = async (
 
   let updated = 0
   for (const ticket of tickets) {
-    const line = ticket.lines[0]
-    const mainNumbers = line
-      ? line.numbers
-          .filter((number: (typeof line.numbers)[number]) => number.kind === 'MAIN')
-          .map((number: (typeof line.numbers)[number]) => number.value)
+    const lineResults = hasValidResult
+      ? computeLineResults(ticket.lines.map((line) => ({
+          lineIndex: line.lineIndex,
+          mainNumbers: line.numbers.filter((number) => number.kind === 'MAIN').map((number) => number.value),
+          starNumbers: line.numbers.filter((number) => number.kind === 'STAR').map((number) => number.value),
+          elMillionCode: line.elMillionCode
+        })), result.numbers, result.stars ?? [], result.elMillionCode, ticket.elMillionCode)
       : []
-    const starNumbers = line
-      ? line.numbers
-          .filter((number: (typeof line.numbers)[number]) => number.kind === 'STAR')
-          .map((number: (typeof line.numbers)[number]) => number.value)
-      : []
-
-    const matchesMain = hasValidResult
-      ? mainNumbers.filter((value: (typeof mainNumbers)[number]) => result.numbers.includes(value)).length
-      : 0
-    const matchesStars =
-      hasValidResult && result.stars
-        ? starNumbers.filter((value: (typeof starNumbers)[number]) => result.stars?.includes(value)).length
-        : 0
-    const elMillionMatch = game === 'EUROMILLONES' && ticket.elMillionCode && result.elMillionCode
-      ? ticket.elMillionCode === result.elMillionCode
-      : null
+    const primaryResult = lineResults[0]
+    const matchesMain = primaryResult?.matchesMain ?? 0
+    const matchesStars = primaryResult?.matchesStars ?? 0
+    const elMillionMatch = hasAnyElMillionMatch(lineResults)
 
     const existing = ticket.checks[0]
     const checkStatus = (existing?.prizeCents ?? 0) > 0 ? 'PREMIO' : hasValidResult ? 'COMPROBADO' : 'PENDIENTE'
-    const reason = !line
+    const reason = ticket.lines.length === 0
       ? 'El boleto no tiene lineas.'
       : hasValidResult
         ? null
@@ -190,6 +181,7 @@ const syncChecksForImportedDate = async (
         matchesMain,
         matchesStars,
         elMillionMatch,
+        lineResults,
         checkedAt: new Date()
       },
       create: {
@@ -202,6 +194,7 @@ const syncChecksForImportedDate = async (
         matchesMain,
         matchesStars,
         elMillionMatch,
+        lineResults,
         checkedAt: new Date()
       }
     })

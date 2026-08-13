@@ -5,6 +5,7 @@ export type LineState = {
   starInput: string;
   complement: string;
   reintegro: string;
+  elMillionCode?: string;
 };
 
 export type LineValidation = {
@@ -124,6 +125,21 @@ export function TicketLinesEditor({
                   </label>
                 )}
               </div>
+
+              {drawType === "EUROMILLONES" ? (
+                <label className="mt-3 flex flex-col gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Código de El Millón (opcional)
+                  </span>
+                  <input
+                    value={line.elMillionCode ?? ""}
+                    onChange={(event) => onLineChange(index, { elMillionCode: event.target.value.toUpperCase() })}
+                    placeholder="Ej: FCP68298"
+                    maxLength={8}
+                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm uppercase text-slate-700 focus:border-slate-400 focus:outline-none"
+                  />
+                </label>
+              ) : null}
 
               {lineValidation?.issues.length ? (
                 <div className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700">

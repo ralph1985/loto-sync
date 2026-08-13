@@ -36,6 +36,9 @@ type TicketCreateFormProps = {
   onDrawDateChange: (value: string) => void;
   coverageMode: PrimitivaCoverageMode;
   onCoverageModeChange: (value: PrimitivaCoverageMode) => void;
+  euromillionsCoverageMode: "SINGLE" | "WEEKLY";
+  onEuromillionsCoverageModeChange: (value: "SINGLE" | "WEEKLY") => void;
+  euromillionsWeeklyDrawDates: (value: string) => string[];
   advancedOpen: boolean;
   onAdvancedToggle: () => void;
   weeklyDrawDates: (value: string) => string[];
@@ -78,6 +81,9 @@ export function TicketCreateForm({
   onDrawDateChange,
   coverageMode,
   onCoverageModeChange,
+  euromillionsCoverageMode,
+  onEuromillionsCoverageModeChange,
+  euromillionsWeeklyDrawDates,
   advancedOpen,
   onAdvancedToggle,
   weeklyDrawDates,
@@ -215,6 +221,18 @@ export function TicketCreateForm({
                 Se aplicará a: {weeklyDrawDates(drawDate).map((value) => new Date(`${value}T00:00:00.000Z`).toLocaleDateString("es-ES")).join(" · ")}
               </span>
             ) : null}
+          </label>
+        </section>
+      ) : null}
+      {advancedOpen && drawType === "EUROMILLONES" ? (
+        <section className="rounded-2xl border border-primary/20 bg-primary/5 p-4 sm:p-5">
+          <label className="flex flex-col gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-base-content/70">Cobertura Euromillones</span>
+            <select value={euromillionsCoverageMode} onChange={(event) => onEuromillionsCoverageModeChange(event.target.value as "SINGLE" | "WEEKLY")} className="select select-bordered w-full">
+              <option value="SINGLE">Solo este sorteo</option>
+              <option value="WEEKLY">Martes y viernes</option>
+            </select>
+            {drawDate && euromillionsCoverageMode === "WEEKLY" ? <span className="text-xs text-base-content/70">Se aplicará a: {euromillionsWeeklyDrawDates(drawDate).map((value) => new Date(`${value}T00:00:00.000Z`).toLocaleDateString("es-ES")).join(" · ")}</span> : null}
           </label>
         </section>
       ) : null}

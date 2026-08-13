@@ -166,6 +166,8 @@ npm run results:inspect -- --file ./resultado.eml
 
 ## Apuestas recurrentes de Euromillón
 
+Los boletos de Euromillones pueden contener varias líneas y un código de El Millón por línea. La cobertura semanal opcional conserva las mismas líneas y códigos para los sorteos del martes y viernes; los códigos antiguos guardados directamente en el boleto siguen siendo compatibles.
+
 Desde el panel de revisión, un owner puede guardar una combinación fija para un grupo. La aplicación prepara un boleto pendiente para el próximo sorteo de martes o viernes. Tras comprarlo, el owner debe abrir el boleto, introducir el código de El Millón del resguardo y confirmar la compra. La aplicación no realiza compras en SELAE.
 
 La generación se activa automáticamente cada día a las 04:30 mediante cron, con `flock` para evitar ejecuciones simultáneas. La salida queda registrada en `backups/recurring-cron.log`. También puede ejecutarse manualmente:

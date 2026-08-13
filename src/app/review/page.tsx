@@ -121,8 +121,8 @@ function ReviewPageContent() {
     winningStars,
     confirmingPurchase,
     purchaseError,
-    elMillionCodeInput,
-    setElMillionCodeInput,
+    elMillionCodeInputs,
+    setElMillionCodeInputs,
     handleConfirmPurchase,
   } = useReviewTicketActions({ selectedTicket, setSelectedTicket, loadData });
 
@@ -382,8 +382,8 @@ function ReviewPageContent() {
         winningStars={winningStars}
         confirmingPurchase={confirmingPurchase}
         purchaseError={purchaseError}
-        elMillionCodeInput={elMillionCodeInput}
-        onElMillionCodeChange={setElMillionCodeInput}
+        elMillionCodeInputs={elMillionCodeInputs}
+        onElMillionCodeChange={(index, value) => setElMillionCodeInputs((current) => current.map((code, codeIndex) => codeIndex === index ? value : code))}
         onConfirmPurchase={handleConfirmPurchase}
       />
     </div>

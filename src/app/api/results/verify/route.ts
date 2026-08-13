@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { ApiAuthError, requireGroupAccess, requireSessionUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { fetchResultForDrawDate } from '@/lib/results-client'
+import { computeLineResults, hasAnyElMillionMatch } from '@/features/results/line-results'
 
 const toDateOnly = (value: string) => new Date(value).toISOString().slice(0, 10)
 const toDayStart = (value: string) => new Date(`${value}T00:00:00.000Z`)
@@ -84,30 +85,20 @@ export async function GET(request: Request) {
       Array.isArray(result.numbers) &&
       result.numbers.length > 0
 
-    const line = ticket.lines[0]
-    const mainNumbers = line
-      ? line.numbers
-          .filter((number: (typeof line.numbers)[number]) => number.kind === 'MAIN')
-          .map((number: (typeof line.numbers)[number]) => number.value)
+    const lineResults = hasValidResult
+      ? computeLineResults(ticket.lines.map((line) => ({
+          lineIndex: line.lineIndex,
+          mainNumbers: line.numbers.filter((number) => number.kind === 'MAIN').map((number) => number.value),
+          starNumbers: line.numbers.filter((number) => number.kind === 'STAR').map((number) => number.value),
+          elMillionCode: line.elMillionCode
+        })), result.numbers, result.stars ?? [], result.elMillionCode, ticket.elMillionCode)
       : []
-    const starNumbers = line
-      ? line.numbers
-          .filter((number: (typeof line.numbers)[number]) => number.kind === 'STAR')
-          .map((number: (typeof line.numbers)[number]) => number.value)
-      : []
+    const primaryResult = lineResults[0]
+    const mainMatches = primaryResult?.matchesMain ?? 0
+    const starsMatches = primaryResult?.matchesStars ?? 0
+    const elMillionMatch = hasAnyElMillionMatch(lineResults)
 
-    const mainMatches = hasValidResult
-      ? mainNumbers.filter((value: (typeof mainNumbers)[number]) => result.numbers.includes(value)).length
-      : 0
-    const starsMatches =
-      hasValidResult && result.stars
-        ? starNumbers.filter((value: (typeof starNumbers)[number]) => result.stars?.includes(value)).length
-        : 0
-    const elMillionMatch = ticket.draw.type === 'EUROMILLONES' && ticket.elMillionCode && result.elMillionCode
-      ? ticket.elMillionCode === result.elMillionCode
-      : null
-
-    const reason = !line
+    const reason = ticket.lines.length === 0
       ? 'El boleto no tiene lineas.'
       : !hasValidResult
         ? resultDrawDate && ticketDrawDate !== resultDrawDate
@@ -147,6 +138,7 @@ export async function GET(request: Request) {
           matchesMain: mainMatches,
           matchesStars: starsMatches,
           elMillionMatch,
+          lineResults,
           checkedAt: new Date()
         },
         create: {
@@ -159,6 +151,7 @@ export async function GET(request: Request) {
           matchesMain: mainMatches,
           matchesStars: starsMatches,
           elMillionMatch,
+          lineResults,
           checkedAt: new Date()
         }
       })

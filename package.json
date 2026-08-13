@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev --webpack",
     "build": "prisma generate && next build",
-    "test:unit": "node --experimental-strip-types --test src/features/tickets/create-logic.test.ts src/components/ui/modal-behavior.test.ts src/features/results/data.test.ts src/lib/group-balance.test.ts scripts/results-parser.test.mjs",
+    "test:unit": "node --experimental-strip-types --test src/features/tickets/create-logic.test.ts src/components/ui/modal-behavior.test.ts src/features/results/data.test.ts src/features/results/line-results.test.ts src/lib/group-balance.test.ts scripts/results-parser.test.mjs",
     "start": "next start",
     "lint": "eslint",
     "postinstall": "prisma generate",

@@ -297,6 +297,7 @@ async function importAndBuildReport(result) {
         const stars = line.numbers.filter((number) => number.kind === 'STAR').map((number) => number.value);
         const starHits = stars.filter((number) => result.stars.includes(number));
         return {
+          lineIndex: line.lineIndex ?? 1,
           numbers: main,
           hits,
           missed: main.filter((number) => !result.numbers.includes(number)),
@@ -304,21 +305,34 @@ async function importAndBuildReport(result) {
           starHits,
           missedStars: stars.filter((number) => !result.stars.includes(number)),
           complement: line.complement,
-          reintegro: line.reintegro
+          reintegro: line.reintegro,
+          elMillionCode: line.elMillionCode ?? null,
+          elMillionMatch: result.game === 'EUROMILLONES' && line.elMillionCode && result.elMillionCode
+            ? line.elMillionCode === result.elMillionCode
+            : null
         };
       });
       const primary = lineReports[0];
       const existing = ticket.checks[0];
       const matchesMain = primary.hits.length;
       const matchesStars = primary.starHits.length;
-      const elMillionMatch = result.game === 'EUROMILLONES' && ticket.elMillionCode
-        ? ticket.elMillionCode === result.elMillionCode
-        : null;
+      const elMillionMatchValues = lineReports.map((line) => line.elMillionMatch).filter((value) => value !== null);
+      const elMillionMatch = elMillionMatchValues.length > 0
+        ? elMillionMatchValues.some(Boolean)
+        : result.game === 'EUROMILLONES' && ticket.elMillionCode
+          ? ticket.elMillionCode === result.elMillionCode
+          : null;
       const checkStatus = existing?.prizeCents > 0 ? 'PREMIO' : 'COMPROBADO';
+      const lineResults = lineReports.map(({ lineIndex, hits: lineHits, starHits, elMillionMatch: lineMillion }) => ({
+        lineIndex,
+        matchesMain: lineHits.length,
+        matchesStars: starHits.length,
+        elMillionMatch: lineMillion
+      }));
       await tx.ticketCheck.upsert({
         where: { ticketId_drawDate: { ticketId: ticket.id, drawDate } },
-        update: { status: checkStatus, reason: null, winningNumbers: result.numbers, winningStars: result.stars, matchesMain, matchesStars, elMillionMatch, checkedAt: new Date() },
-        create: { ticketId: ticket.id, drawDate, status: checkStatus, reason: null, winningNumbers: result.numbers, winningStars: result.stars, matchesMain, matchesStars, elMillionMatch, checkedAt: new Date() }
+        update: { status: checkStatus, reason: null, winningNumbers: result.numbers, winningStars: result.stars, matchesMain, matchesStars, elMillionMatch, lineResults, checkedAt: new Date() },
+        create: { ticketId: ticket.id, drawDate, status: checkStatus, reason: null, winningNumbers: result.numbers, winningStars: result.stars, matchesMain, matchesStars, elMillionMatch, lineResults, checkedAt: new Date() }
       });
       const allChecks = await tx.ticketCheck.findMany({ where: { ticketId: ticket.id }, select: { status: true, prizeCents: true } });
       const nextStatus = allChecks.some((check) => check.status === 'PREMIO' || (check.prizeCents ?? 0) > 0) ? 'PREMIO' : 'COMPROBADO';
@@ -423,10 +437,11 @@ function buildTextReport(result, group, dateLabel, balance, summary) {
       `    Aciertos: ${line.hits.join(', ') || 'ninguno'}`,
       `    Fallados: ${line.missed.join(', ') || 'ninguno'}`,
       ...(result.game === 'EUROMILLONES' ? [`    Estrellas: ${line.stars.join(', ') || 'ninguna'}`, `    Aciertos estrellas: ${line.starHits.join(', ') || 'ninguno'}`] : []),
+      ...(result.game === 'EUROMILLONES' ? [`    El Millón: ${line.elMillionCode ?? 'pendiente'} (${line.elMillionMatch === true ? 'acertado' : line.elMillionMatch === false ? 'no acertado' : 'sin comprobar'})`] : []),
       ...(result.game === 'PRIMITIVA' ? [`    Complementario: ${line.complement ?? 'no indicado'} | Reintegro: ${line.reintegro ?? 'no indicado'}`] : [])
     ].join('\n')).join('\n');
     const elMillion = result.game === 'EUROMILLONES'
-      ? `\n  El Millón: ${ticket.elMillionCode ?? 'pendiente'} (${ticket.elMillionMatch === true ? 'acertado' : ticket.elMillionMatch === false ? 'no acertado' : 'sin comprobar'})`
+      ? `\n  El Millón (resumen): ${ticket.elMillionCode ?? 'pendiente'} (${ticket.elMillionMatch === true ? 'acertado' : ticket.elMillionMatch === false ? 'no acertado' : 'sin comprobar'})`
       : '';
     return `Boleto ${index + 1} (${ticket.ticketId}) — grupo: ${ticket.group}${elMillion}\n${lines}`;
   }).join('\n\n');

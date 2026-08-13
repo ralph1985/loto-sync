@@ -375,6 +375,7 @@ export const replaceSyncDataset = async (dataset: SyncDataset) => {
                 ? null
                 : Number(row.reintegro),
           lineIndex: typeof row.lineIndex === 'number' ? row.lineIndex : Number(row.lineIndex),
+          elMillionCode: row.elMillionCode ? String(row.elMillionCode) : null,
           createdAt: toDate(row.createdAt)
         }))
       })
@@ -433,6 +434,7 @@ export const replaceSyncDataset = async (dataset: SyncDataset) => {
                 : Number(row.prizeCents),
           prizeSource: row.prizeSource ? String(row.prizeSource) : null,
           elMillionMatch: typeof row.elMillionMatch === 'boolean' ? row.elMillionMatch : null,
+          lineResults: toJson(row.lineResults, null),
           checkedAt: toDate(row.checkedAt),
           createdAt: toDate(row.createdAt),
           updatedAt: toDate(row.updatedAt)

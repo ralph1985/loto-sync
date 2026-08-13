@@ -10,6 +10,7 @@ type TicketLineInput = {
   starNumbers?: number[]
   complement?: number
   reintegro?: number
+  elMillionCode?: string
 }
 
 type TicketInput = {
@@ -96,6 +97,14 @@ const validateTicket = (input: TicketInput, drawType: 'PRIMITIVA' | 'EUROMILLONE
   if (drawType === 'PRIMITIVA' && !input.playsJoker && jokerNumber) {
     issues.push('No puedes enviar jokerNumber si playsJoker es false.')
   }
+
+  const lineCodes = input.lines.map((line) => line.elMillionCode?.trim().toUpperCase()).filter(Boolean)
+  if (drawType === 'PRIMITIVA' && lineCodes.length > 0) {
+    issues.push('elMillionCode solo aplica a Euromillones.')
+  }
+  lineCodes.forEach((code, index) => {
+    if (!/^[A-Z]{3}\d{5}$/.test(code ?? '')) issues.push(`Linea ${index + 1}: elMillionCode no es valido.`)
+  })
 
   input.lines.forEach((line, index) => {
     const linePrefix = `Linea ${index + 1}: `
@@ -429,6 +438,7 @@ export async function POST(request: Request) {
               lineIndex: index + 1,
               complement: line.complement ?? null,
               reintegro: line.reintegro ?? null,
+              elMillionCode: line.elMillionCode?.trim().toUpperCase() || null,
               numbers: {
                 create: [
                   ...line.mainNumbers.map((value, position) => ({

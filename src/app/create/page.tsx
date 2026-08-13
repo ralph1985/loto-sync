@@ -39,6 +39,8 @@ export default function Home() {
     setDrawType,
     primitivaCoverageMode,
     setPrimitivaCoverageMode,
+    euromillionsCoverageMode,
+    setEuromillionsCoverageMode,
     drawDate,
     setDrawDate,
     groupId,
@@ -68,6 +70,7 @@ export default function Home() {
     handleSubmit,
     retryReceiptUpload,
     weeklyDrawDates,
+    euromillionsWeeklyDrawDates,
     createEmptyLine,
   } = useTicketCreation({ refreshInitialData });
   const [copiedTicketId, setCopiedTicketId] = useState<string | null>(null);
@@ -158,6 +161,9 @@ export default function Home() {
             onDrawDateChange={setDrawDate}
             coverageMode={primitivaCoverageMode}
             onCoverageModeChange={setPrimitivaCoverageMode}
+            euromillionsCoverageMode={euromillionsCoverageMode}
+            onEuromillionsCoverageModeChange={setEuromillionsCoverageMode}
+            euromillionsWeeklyDrawDates={euromillionsWeeklyDrawDates}
             advancedOpen={advancedOpen}
             onAdvancedToggle={() => setAdvancedOpen((current) => !current)}
             weeklyDrawDates={weeklyDrawDates}

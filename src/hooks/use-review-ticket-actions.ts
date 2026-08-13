@@ -61,7 +61,7 @@ export function useReviewTicketActions({ selectedTicket, setSelectedTicket, load
   const [editPrimitivaCoverageMode, setEditPrimitivaCoverageMode] = useState<PrimitivaCoverageMode>("SINGLE");
   const [confirmingPurchase, setConfirmingPurchase] = useState(false);
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
-  const [elMillionCodeInput, setElMillionCodeInput] = useState("");
+  const [elMillionCodeInputs, setElMillionCodeInputs] = useState<string[]>([]);
 
   useEffect(() => {
     if (!selectedTicket) {
@@ -72,7 +72,7 @@ export function useReviewTicketActions({ selectedTicket, setSelectedTicket, load
     }
     setCheckDrawDate(toDateInput(selectedTicket.draw?.drawDate));
     setManualPrizeInput("");
-    setElMillionCodeInput(selectedTicket.elMillionCode ?? "");
+    setElMillionCodeInputs(selectedTicket.lines?.map((line) => line.elMillionCode ?? "") ?? [selectedTicket.elMillionCode ?? ""]);
     setPurchaseError(null);
     setPrizeError(null);
     setEditDrawDate(toDateInput(selectedTicket.draw?.drawDate));
@@ -122,7 +122,7 @@ export function useReviewTicketActions({ selectedTicket, setSelectedTicket, load
       const response = await fetch(`/api/tickets/${selectedTicket.id}/confirm`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ elMillionCode: elMillionCodeInput }),
+        body: JSON.stringify({ elMillionCodes: elMillionCodeInputs }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload?.error || "No se pudo confirmar la compra.");
@@ -133,7 +133,7 @@ export function useReviewTicketActions({ selectedTicket, setSelectedTicket, load
     } finally {
       setConfirmingPurchase(false);
     }
-  }, [elMillionCodeInput, loadData, selectedTicket, setSelectedTicket]);
+  }, [elMillionCodeInputs, loadData, selectedTicket, setSelectedTicket]);
 
   const handleVerifyTicket = useCallback(async () => {
     if (!selectedTicket) return;
@@ -225,8 +225,8 @@ export function useReviewTicketActions({ selectedTicket, setSelectedTicket, load
     winningStars,
     confirmingPurchase,
     purchaseError,
-    elMillionCodeInput,
-    setElMillionCodeInput,
+    elMillionCodeInputs,
+    setElMillionCodeInputs,
     handleConfirmPurchase,
     handleSaveTicketDrawScope,
     handleVerifyTicket,
