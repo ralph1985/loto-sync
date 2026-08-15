@@ -14,7 +14,7 @@
     "db:push": "prisma db push",
     "db:seed": "node prisma/seed.js",
     "backup:db": "node scripts/backup-db.mjs",
-    "results:process": "node scripts/process-primitiva-mail.mjs",
+    "results:process": "node scripts/process-results-mail.mjs",
     "results:inspect": "node scripts/inspect-result-email.mjs",
     "recurring-tickets:generate": "node scripts/generate-recurring-tickets.mjs",
     "db:sync:up": "node scripts/sync-db-mirror.mjs up",
