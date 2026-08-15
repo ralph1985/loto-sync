@@ -13,7 +13,7 @@ import { loadResultFilters, matchResultFilter, validateExtraction } from './resu
 
 const execFileAsync = promisify(execFile);
 const root = resolve(process.cwd());
-const workerDir = resolve(root, 'var/primitiva-worker');
+const workerDir = resolve(root, 'var/results-worker');
 const messageDir = resolve(workerDir, 'messages');
 const resultDir = resolve(workerDir, 'results');
 const statePath = resolve(workerDir, 'state.json');

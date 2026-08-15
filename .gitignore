@@ -42,7 +42,7 @@ yarn-error.log*
 
 # local backups
 /backups
-/var/primitiva-worker
+/var/results-worker
 *.eml
 
 # vercel
