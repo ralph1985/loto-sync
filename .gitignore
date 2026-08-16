@@ -42,6 +42,7 @@ yarn-error.log*
 
 # local backups
 /backups
+/var/
 /var/results-worker
 *.eml
 
