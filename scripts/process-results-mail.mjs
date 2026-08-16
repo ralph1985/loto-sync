@@ -306,6 +306,10 @@ async function importAndBuildReport(result) {
           missedStars: stars.filter((number) => !result.stars.includes(number)),
           complement: line.complement,
           reintegro: line.reintegro,
+          reintegroHit: result.game === 'PRIMITIVA' &&
+            line.reintegro !== null && line.reintegro !== undefined &&
+            result.reintegro !== null && result.reintegro !== undefined &&
+            line.reintegro === result.reintegro,
           elMillionCode: line.elMillionCode ?? null,
           elMillionMatch: result.game === 'EUROMILLONES' && line.elMillionCode && result.elMillionCode
             ? line.elMillionCode === result.elMillionCode
@@ -323,10 +327,11 @@ async function importAndBuildReport(result) {
           ? ticket.elMillionCode === result.elMillionCode
           : null;
       const checkStatus = existing?.prizeCents > 0 ? 'PREMIO' : 'COMPROBADO';
-      const lineResults = lineReports.map(({ lineIndex, hits: lineHits, starHits, elMillionMatch: lineMillion }) => ({
+      const lineResults = lineReports.map(({ lineIndex, hits: lineHits, starHits, elMillionMatch: lineMillion, reintegroHit }) => ({
         lineIndex,
         matchesMain: lineHits.length,
         matchesStars: starHits.length,
+        reintegroMatch: reintegroHit,
         elMillionMatch: lineMillion
       }));
       await tx.ticketCheck.upsert({
@@ -397,10 +402,12 @@ async function sendGroupReport(result, group, resultHash) {
     summary.main += ticket.lines.reduce((total, line) => total + line.hits.length, 0);
     summary.stars += ticket.lines.reduce((total, line) => total + line.starHits.length, 0);
     summary.elMillion += ticket.elMillionMatch ? 1 : 0;
+    summary.reintegros += ticket.lines.reduce((total, line) => total + (line.reintegroHit ? 1 : 0), 0);
     return summary;
-  }, { main: 0, stars: 0, elMillion: 0 });
+  }, { main: 0, stars: 0, reintegros: 0, elMillion: 0 });
   const summaryParts = [];
   if (summaryData.main > 0) summaryParts.push(`${summaryData.main} acierto${summaryData.main === 1 ? '' : 's'}`);
+  if (summaryData.reintegros > 0) summaryParts.push(`${summaryData.reintegros} reintegro${summaryData.reintegros === 1 ? '' : 's'}`);
   if (summaryData.stars > 0) summaryParts.push(`${summaryData.stars} estrella${summaryData.stars === 1 ? '' : 's'}`);
   if (summaryData.elMillion > 0) summaryParts.push('El Millón acertado');
   const summary = summaryParts.join(' · ') || 'Sin aciertos';
@@ -438,7 +445,7 @@ function buildTextReport(result, group, dateLabel, balance, summary) {
       `    Fallados: ${line.missed.join(', ') || 'ninguno'}`,
       ...(result.game === 'EUROMILLONES' ? [`    Estrellas: ${line.stars.join(', ') || 'ninguna'}`, `    Aciertos estrellas: ${line.starHits.join(', ') || 'ninguno'}`] : []),
       ...(result.game === 'EUROMILLONES' ? [`    El Millón: ${line.elMillionCode ?? 'pendiente'} (${line.elMillionMatch === true ? 'acertado' : line.elMillionMatch === false ? 'no acertado' : 'sin comprobar'})`] : []),
-      ...(result.game === 'PRIMITIVA' ? [`    Complementario: ${line.complement ?? 'no indicado'} | Reintegro: ${line.reintegro ?? 'no indicado'}`] : [])
+      ...(result.game === 'PRIMITIVA' ? [`    Complementario: ${line.complement ?? 'no indicado'} | Reintegro: ${line.reintegro ?? 'no indicado'} (${line.reintegroHit ? 'acertado' : 'no acertado'})`] : [])
     ].join('\n')).join('\n');
     const elMillion = result.game === 'EUROMILLONES'
       ? `\n  El Millón (resumen): ${ticket.elMillionCode ?? 'pendiente'} (${ticket.elMillionMatch === true ? 'acertado' : ticket.elMillionMatch === false ? 'no acertado' : 'sin comprobar'})`
@@ -475,7 +482,7 @@ function buildHtmlReport(result, group, dateLabel, balance, summary) {
         ? `<br><span style="color:#7c3aed;font-weight:700;">Estrellas acertadas:</span> ${escapeHtml(line.starHits.join(', ') || 'ninguna')}`
         : '';
       const primitivaDetails = result.game === 'PRIMITIVA'
-        ? `<br><span style="color:#475569;">Complementario: ${escapeHtml(line.complement ?? 'no indicado')} · Reintegro: ${escapeHtml(line.reintegro ?? 'no indicado')}</span>`
+        ? `<br><span style="color:#475569;">Complementario: ${escapeHtml(line.complement ?? 'no indicado')} · Reintegro: ${escapeHtml(line.reintegro ?? 'no indicado')} (${line.reintegroHit ? 'acertado' : 'no acertado'})</span>`
         : '';
       return `<tr><td style="padding:12px 0;border-top:1px solid #e2e8f0;vertical-align:top;"><strong>Línea ${lineIndex + 1}</strong><div style="margin-top:8px;">${numberPills || '<span style="color:#64748b;">sin números</span>'}</div><div style="margin-top:8px;font-size:14px;"><span style="color:#166534;font-weight:700;">Aciertos:</span> ${hits}<br><span style="color:#991b1b;font-weight:700;">Fallados:</span> ${missed}${euroDetails}${primitivaDetails}</div></td></tr>`;
     }).join('');
