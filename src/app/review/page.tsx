@@ -27,6 +27,11 @@ const parseEuroAmountToCents = (value: string) => {
 function ReviewPageContent() {
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
 
+  useEffect(() => {
+    document.documentElement.classList.add("review-scroll-stable");
+    return () => document.documentElement.classList.remove("review-scroll-stable");
+  }, []);
+
   const {
     tickets,
     groups,
@@ -214,7 +219,7 @@ function ReviewPageContent() {
   }, [handleRefreshData, loadDashboardResults]);
 
   return (
-    <div className="relative min-h-[100dvh] bg-transparent text-slate-900">
+    <div className="relative min-h-[100dvh] min-w-0 max-w-full overflow-x-clip bg-transparent text-slate-900">
       <GroupTabs groups={groups} activeGroupId={groupFilter} onChange={handleGroupChange} />
 
       <main
@@ -222,7 +227,7 @@ function ReviewPageContent() {
         role="tabpanel"
         aria-labelledby={selectedGroup ? `group-tab-${selectedGroup.id}` : undefined}
         aria-label={selectedGroup ? undefined : "Panel de grupos"}
-        className="relative mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 pb-16 pt-7 md:px-10 md:pt-10"
+        className="relative mx-auto flex w-full min-w-0 max-w-7xl flex-col gap-8 px-4 pb-16 pt-7 md:px-10 md:pt-10"
       >
         {!loading && error && groups.length === 0 ? (
           <section className="rounded-2xl border border-error/30 bg-error/5 p-6" aria-labelledby="groups-error-title">
@@ -248,7 +253,7 @@ function ReviewPageContent() {
               onOpenMovements={() => setShowMovementsModal(true)}
             />
 
-            <section aria-labelledby="dashboard-tickets-title">
+            <section aria-labelledby="dashboard-tickets-title" className="min-w-0 max-w-full">
               <div className="mb-5">
                 <h2 id="dashboard-tickets-title" className="text-2xl font-bold tracking-tight text-base-content">Boletos</h2>
                 <p className="mt-1 text-sm text-base-content/60">Filtra, compara y revisa las apuestas de {selectedGroup.name}.</p>
@@ -259,7 +264,7 @@ function ReviewPageContent() {
                 onStatusChange={setStatusFilter}
                 onDrawTypeChange={setDrawTypeFilter}
               />
-              <div className="mt-5">
+              <div className="mt-5 min-w-0 max-w-full">
                 <TicketReviewList
                   error={error}
                   loading={loading}
@@ -289,8 +294,8 @@ function ReviewPageContent() {
               </div>
             </section>
 
-            <div className={`grid gap-6 ${selectedGroup.balanceTrackingEnabled !== false ? "xl:grid-cols-[minmax(0,1.7fr)_minmax(18rem,0.8fr)]" : ""}`}>
-              <section aria-labelledby="dashboard-results-title" className="rounded-2xl border border-base-300 bg-base-100 p-4 sm:p-5">
+            <div className={`grid min-w-0 max-w-full gap-6 ${selectedGroup.balanceTrackingEnabled !== false ? "xl:grid-cols-[minmax(0,1.7fr)_minmax(18rem,0.8fr)]" : ""}`}>
+              <section aria-labelledby="dashboard-results-title" className="min-w-0 rounded-2xl border border-base-300 bg-base-100 p-4 sm:p-5">
                 <div className="mb-5">
                   <h2 id="dashboard-results-title" className="text-xl font-bold text-base-content">Resultados recientes</h2>
                   <p className="mt-1 text-sm text-base-content/60">Los tres últimos sorteos de cada juego.</p>
@@ -405,7 +410,7 @@ function MovementsPreview({
   onOpenAll: () => void;
 }) {
   return (
-    <section aria-labelledby="dashboard-accounting-title" className="rounded-2xl border border-base-300 bg-base-100 p-4 sm:p-5">
+    <section aria-labelledby="dashboard-accounting-title" className="min-w-0 rounded-2xl border border-base-300 bg-base-100 p-4 sm:p-5">
       <div className="mb-5 flex items-start justify-between gap-4">
         <div>
           <h2 id="dashboard-accounting-title" className="text-xl font-bold text-base-content">Últimos movimientos</h2>

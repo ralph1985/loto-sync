@@ -27,14 +27,14 @@ export function ReviewFilters({
   onDrawTypeChange,
 }: ReviewFiltersProps) {
   return (
-    <div className="border-y border-base-300 py-4">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="flex flex-col gap-2">
+    <div className="min-w-0 max-w-full border-y border-base-300 py-4">
+      <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+        <label className="flex min-w-0 flex-col gap-2">
           <span className="text-xs font-semibold text-base-content/60">Estado</span>
           <select
             value={statusFilter}
             onChange={(event) => onStatusChange(event.target.value as "ALL" | TicketStatus)}
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
+            className="w-full min-w-0 max-w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
           >
             {STATUS_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
@@ -44,12 +44,12 @@ export function ReviewFilters({
           </select>
         </label>
 
-        <label className="flex flex-col gap-2">
+        <label className="flex min-w-0 flex-col gap-2">
           <span className="text-xs font-semibold text-base-content/60">Sorteo</span>
           <select
             value={drawTypeFilter}
             onChange={(event) => onDrawTypeChange(event.target.value as "ALL" | DrawType)}
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
+            className="w-full min-w-0 max-w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
           >
             {DRAW_TYPE_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>

@@ -22,16 +22,16 @@ export function TicketReviewComparisons({
   onToggle,
 }: TicketReviewComparisonsProps) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-2.5 sm:p-3">
+    <div className="min-w-0 max-w-full rounded-2xl border border-slate-200 bg-slate-50 p-2.5 sm:p-3">
       <button
         type="button"
         onClick={onToggle}
-        className="mb-2 flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-left transition hover:border-slate-300 hover:bg-slate-50"
+        className="mb-2 flex w-full min-w-0 items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-left transition hover:border-slate-300 hover:bg-slate-50"
       >
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+        <span className="min-w-0 break-words text-[11px] font-semibold uppercase tracking-wide text-slate-600">
           Comparativas semanales ({checks.length})
         </span>
-        <span className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500">
+        <span className="inline-flex shrink-0 items-center gap-2 text-xs font-semibold text-slate-500">
           {expanded ? "Plegar" : "Desplegar"}
           <span
             className={`inline-block transition-transform ${expanded ? "rotate-180" : ""}`}
@@ -130,11 +130,11 @@ function ComparisonNumbers({
   const isBet = label === "Apostado";
 
   return (
-    <div className="grid grid-cols-[72px_minmax(0,1fr)] items-start gap-x-2">
+    <div className="grid min-w-0 grid-cols-1 items-start gap-1 sm:grid-cols-[72px_minmax(0,1fr)] sm:gap-x-2">
       <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
         {label}
       </span>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
         {mainNumbers.length > 0 ? (
           mainNumbers.map((value, index) => {
             const hit = winningMain.includes(value);

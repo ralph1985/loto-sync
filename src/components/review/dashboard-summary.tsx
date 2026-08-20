@@ -76,11 +76,11 @@ export function DashboardSummary({
       : "Todo al día";
 
   return (
-    <section aria-labelledby="dashboard-summary-title" className="border-b border-base-300 pb-7">
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
-        <div>
+    <section aria-labelledby="dashboard-summary-title" className="min-w-0 max-w-full border-b border-base-300 pb-7">
+      <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+        <div className="min-w-0">
           <p className="text-sm font-semibold text-primary">Centro de grupo</p>
-          <h1 id="dashboard-summary-title" className="mt-1 text-3xl font-bold leading-tight tracking-[-0.04em] text-base-content sm:text-4xl">
+          <h1 id="dashboard-summary-title" className="mt-1 break-words text-3xl font-bold leading-tight tracking-[-0.04em] text-base-content sm:text-4xl">
             {group.name}
           </h1>
           <div className="mt-4">
@@ -88,14 +88,14 @@ export function DashboardSummary({
           </div>
         </div>
 
-        <div className="flex flex-col gap-4 lg:items-end">
+        <div className="min-w-0 max-w-full flex flex-col gap-4 lg:items-end">
           {balanceEnabled ? (
             <div className="lg:text-right">
               <p className="text-sm text-base-content/60">Saldo disponible</p>
               <p className="mt-1 text-3xl font-bold tracking-[-0.04em] text-base-content">{formatPrice(group.balanceCents ?? null)}</p>
             </div>
           ) : null}
-          <div className="flex flex-wrap gap-2 lg:justify-end">
+          <div className="flex max-w-full flex-wrap gap-2 lg:justify-end">
             <button type="button" onClick={onRefresh} className="btn btn-primary btn-sm whitespace-nowrap">Actualizar</button>
             {balanceEnabled ? (
               <>
@@ -107,7 +107,7 @@ export function DashboardSummary({
         </div>
       </div>
 
-      <dl className="mt-7 grid overflow-hidden rounded-2xl border border-base-300 bg-base-100 sm:grid-cols-3 sm:divide-x sm:divide-base-300">
+      <dl className="mt-7 grid min-w-0 max-w-full overflow-hidden rounded-2xl border border-base-300 bg-base-100 sm:grid-cols-3 sm:divide-x sm:divide-base-300">
         <SummaryMetric label="Estado del grupo" value={statusLabel} detail={`${scopedTickets.length} boleto${scopedTickets.length === 1 ? "" : "s"} en total`} />
         <SummaryMetric
           label="Próximo boleto"
@@ -126,10 +126,10 @@ export function DashboardSummary({
 
 function SummaryMetric({ label, value, detail }: { label: string; value: string; detail: string }) {
   return (
-    <div className="border-b border-base-300 p-4 last:border-b-0 sm:border-b-0 sm:p-5">
+    <div className="min-w-0 border-b border-base-300 p-4 last:border-b-0 sm:border-b-0 sm:p-5">
       <dt className="text-xs font-semibold text-base-content/60">{label}</dt>
-      <dd className="mt-2 text-lg font-bold text-base-content">{value}</dd>
-      <dd className="mt-1 text-xs text-base-content/55">{detail}</dd>
+      <dd className="mt-2 break-words text-lg font-bold text-base-content">{value}</dd>
+      <dd className="mt-1 break-words text-xs text-base-content/55">{detail}</dd>
     </div>
   );
 }

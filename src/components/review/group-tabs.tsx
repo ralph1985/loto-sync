@@ -33,12 +33,12 @@ export function GroupTabs({ groups, activeGroupId, onChange }: GroupTabsProps) {
   };
 
   return (
-    <div className="sticky top-[72px] z-30 border-b border-base-300 bg-base-100/95 backdrop-blur-xl">
-      <div className="mx-auto w-full max-w-7xl px-4 md:px-10">
+    <div className="sticky top-[72px] z-30 max-w-full overflow-x-hidden border-b border-base-300 bg-base-100/95 backdrop-blur-xl">
+      <div className="mx-auto w-full min-w-0 max-w-7xl overflow-hidden px-4 md:px-10">
         <div
           role="tablist"
           aria-label="Grupos"
-          className="flex min-h-14 items-end gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="flex min-h-14 w-full max-w-full items-end gap-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {groups.map((group, index) => {
             const active = group.id === activeGroupId;

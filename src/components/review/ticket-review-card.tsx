@@ -31,12 +31,12 @@ export function TicketReviewCard({
 
   return (
     <article
-      className={`overflow-hidden rounded-2xl border bg-base-100 ${
+      className={`min-w-0 max-w-full overflow-hidden rounded-2xl border bg-base-100 ${
         active ? "border-primary" : "border-base-300"
       }`}
     >
-      <div className="grid gap-4 p-4 sm:p-5 lg:grid-cols-[1fr_auto] lg:items-start">
-        <div className="space-y-3">
+      <div className="grid min-w-0 gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+        <div className="min-w-0 space-y-3">
           <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
             {active ? (
                 <span className="rounded-lg bg-primary/10 px-2.5 py-1 text-primary">
@@ -65,8 +65,8 @@ export function TicketReviewCard({
             )}
           </div>
 
-          <div>
-            <h3 className="text-lg font-bold tracking-tight text-slate-900 sm:text-xl">
+          <div className="min-w-0">
+            <h3 className="break-words text-lg font-bold tracking-tight text-slate-900 sm:text-xl">
               {buildDrawLabel(ticket.draw)}
             </h3>
             <p className="text-sm text-slate-500">Alta: {formatDateTime(ticket.createdAt)}</p>
@@ -77,7 +77,7 @@ export function TicketReviewCard({
             <TicketMetric label="Premio acumulado" value={formatPrice(totalPrizeCents)} />
           </div>
 
-            <div className="rounded-xl border border-slate-200 bg-white p-3 sm:p-4">
+          <div className="min-w-0 rounded-xl border border-slate-200 bg-white p-3 sm:p-4">
             <p className="text-xs font-semibold text-slate-500">
               Números apostados
             </p>

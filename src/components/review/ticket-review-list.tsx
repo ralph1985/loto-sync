@@ -30,7 +30,7 @@ export function TicketReviewList({
   onShowMore,
 }: TicketReviewListProps) {
   return (
-    <section className="flex flex-col gap-4" aria-busy={loading}>
+    <section className="flex min-w-0 max-w-full flex-col gap-4" aria-busy={loading}>
       {error ? (
         <div className="rounded-xl border border-error/30 bg-error/5 px-4 py-3 text-sm text-error">
           {error}

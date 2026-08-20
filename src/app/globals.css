@@ -54,6 +54,12 @@ html {
   background: var(--background);
 }
 
+@media (min-width: 768px) {
+  html.review-scroll-stable {
+    scrollbar-gutter: stable;
+  }
+}
+
 body {
   min-width: 320px;
   background:
