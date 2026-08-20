@@ -2,8 +2,8 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 
 import { ContributionModal } from "@/components/review/contribution-modal";
-import { DashboardSection } from "@/components/review/dashboard-section";
 import { DashboardSummary } from "@/components/review/dashboard-summary";
+import { GroupTabs } from "@/components/review/group-tabs";
 import { MovementsModal } from "@/components/review/movements-modal";
 import { RecentResults } from "@/components/review/recent-results";
 import { ReviewFilters } from "@/components/review/review-filters";
@@ -11,7 +11,7 @@ import { TicketReviewList } from "@/components/review/ticket-review-list";
 import { TicketReviewModal } from "@/components/review/ticket-review-modal";
 import { formatPrice } from "@/features/tickets/formatters";
 import { buildDisplayedResults, getRecentResults, loadStoredResults, type StoredResult } from "@/features/results/data";
-import type { Ticket } from "@/features/tickets/types";
+import type { GroupMovement, Ticket } from "@/features/tickets/types";
 import { useReviewData } from "@/hooks/use-review-data";
 import { useReviewTicketActions } from "@/hooks/use-review-ticket-actions";
 
@@ -58,7 +58,6 @@ function ReviewPageContent() {
     archivedPageSize,
   } = useReviewData({ setSelectedTicket });
 
-  const [openSection, setOpenSection] = useState<"tickets" | "results" | "accounting">("tickets");
   const [storedResults, setStoredResults] = useState<StoredResult[]>([]);
   const [loadingResults, setLoadingResults] = useState(true);
   const [resultsError, setResultsError] = useState<string | null>(null);
@@ -132,8 +131,15 @@ function ReviewPageContent() {
   const [savingContribution, setSavingContribution] = useState(false);
   const [contributionError, setContributionError] = useState<string | null>(null);
 
+  const handleGroupChange = useCallback((nextGroupId: string) => {
+    setSelectedTicket(null);
+    setShowMovementsModal(false);
+    setShowContributionModal(false);
+    setGroupFilter(nextGroupId);
+  }, [setGroupFilter]);
+
   useEffect(() => {
-    if (groupFilter === "ALL" || selectedGroup?.balanceTrackingEnabled === false) {
+    if (!selectedGroup || selectedGroup.balanceTrackingEnabled === false) {
       setShowMovementsModal(false);
       setShowContributionModal(false);
     }
@@ -154,7 +160,7 @@ function ReviewPageContent() {
   }, [savingContribution]);
 
   const handleSaveContribution = useCallback(async () => {
-    if (groupFilter === "ALL") return;
+    if (!selectedGroup) return;
     const amountCents = parseEuroAmountToCents(contributionAmountInput);
     if (!amountCents) {
       setContributionError("Introduce un importe positivo con maximo 2 decimales.");
@@ -197,6 +203,7 @@ function ReviewPageContent() {
     contributionAmountInput,
     contributionNoteInput,
     groupFilter,
+    selectedGroup,
     loadData,
     loadMovements,
     setMovementTypeFilter,
@@ -208,114 +215,103 @@ function ReviewPageContent() {
 
   return (
     <div className="relative min-h-[100dvh] bg-transparent text-slate-900">
-      <main className="relative mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 pb-16 pt-7 md:px-10 md:pt-10">
-        <header className="flex items-end justify-between gap-4 border-b border-base-300 pb-5 sm:pb-6">
-          <div>
-            <p className="text-sm font-semibold text-base-content/60">Buenos días</p>
-            <h1 className="mt-1 text-2xl font-bold leading-tight tracking-[-0.03em] text-base-content sm:text-3xl md:text-4xl">
-              Centro de grupo
-            </h1>
-          </div>
-          <span className="hidden text-right text-xs leading-5 text-base-content/50 sm:block">Tu actividad, tus boletos<br />y tus próximos sorteos</span>
-        </header>
+      <GroupTabs groups={groups} activeGroupId={groupFilter} onChange={handleGroupChange} />
 
-        <DashboardSummary
-          groups={groups}
-          tickets={tickets}
-          groupFilter={groupFilter}
-          missingResultsCount={missingResultsCount}
-          onGroupChange={setGroupFilter}
-          onRefresh={handleRefreshDashboard}
-          onOpenContribution={openContributionModal}
-          onOpenMovements={() => setShowMovementsModal(true)}
-        />
-
-        <div className="flex flex-col gap-4">
-          <DashboardSection
-            id="dashboard-tickets"
-            title="Boletos"
-            description="Filtra, compara y revisa cada apuesta."
-            open={openSection === "tickets"}
-            onToggle={() => setOpenSection("tickets")}
-          >
-            <ReviewFilters
-              statusFilter={statusFilter}
-              drawTypeFilter={drawTypeFilter}
-              onStatusChange={setStatusFilter}
-              onDrawTypeChange={setDrawTypeFilter}
+      <main
+        id="group-panel"
+        role="tabpanel"
+        aria-labelledby={selectedGroup ? `group-tab-${selectedGroup.id}` : undefined}
+        aria-label={selectedGroup ? undefined : "Panel de grupos"}
+        className="relative mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 pb-16 pt-7 md:px-10 md:pt-10"
+      >
+        {!loading && error && groups.length === 0 ? (
+          <section className="rounded-2xl border border-error/30 bg-error/5 p-6" aria-labelledby="groups-error-title">
+            <h1 id="groups-error-title" className="text-2xl font-bold text-base-content">No pudimos cargar tus grupos</h1>
+            <p className="mt-2 text-sm text-base-content/65">{error}</p>
+            <button type="button" onClick={handleRefreshDashboard} className="btn btn-primary btn-sm mt-5">Reintentar</button>
+          </section>
+        ) : !loading && groups.length === 0 ? (
+          <section className="rounded-2xl border border-base-300 bg-base-100 p-6" aria-labelledby="empty-groups-title">
+            <h1 id="empty-groups-title" className="text-2xl font-bold text-base-content">No hay grupos disponibles</h1>
+            <p className="mt-2 text-sm text-base-content/65">Tu cuenta todavía no pertenece a ningún grupo.</p>
+          </section>
+        ) : !selectedGroup ? (
+          <PanelSkeleton />
+        ) : (
+          <>
+            <DashboardSummary
+              group={selectedGroup}
+              tickets={tickets}
+              missingResultsCount={missingResultsCount}
               onRefresh={handleRefreshDashboard}
+              onOpenContribution={openContributionModal}
+              onOpenMovements={() => setShowMovementsModal(true)}
             />
-            <div className="mt-4">
-              <TicketReviewList
-                error={error}
-                loading={loading}
-                filteredTickets={filteredTickets}
-                visibleTickets={visibleTickets}
-                secondaryTickets={secondaryTickets}
-                activeTicketId={activeTicketId}
-                expandedTickets={expandedTickets}
-                hasMoreSecondaryTickets={hasMoreSecondaryTickets}
-                onToggleComparisons={(ticketId) => {
-                  setExpandedTickets((current) => ({
-                    ...current,
-                    [ticketId]: !(current[ticketId] ?? false),
-                  }));
-                }}
-                onSelectTicket={(ticket) => {
-                  setSelectedTicket(ticket);
-                  setVerifyResult(null);
-                  setVerifyError(null);
-                }}
-                onShowMore={() =>
-                  setArchivedVisibleCount((current) =>
-                    Math.min(current + archivedPageSize, secondaryTickets.length)
-                  )
-                }
-              />
-            </div>
-          </DashboardSection>
 
-          <DashboardSection
-            id="dashboard-results"
-            title="Resultados recientes"
-            description="Los tres últimos sorteos de cada juego."
-            open={openSection === "results"}
-            onToggle={() => setOpenSection("results")}
-          >
-            <RecentResults results={recentResults} loading={loadingResults} error={resultsError} />
-          </DashboardSection>
-
-          {groupFilter !== "ALL" && selectedGroup?.balanceTrackingEnabled !== false ? <DashboardSection
-            id="dashboard-accounting"
-            title="Saldo y movimientos"
-            description="Consulta la actividad económica del grupo seleccionado."
-            open={openSection === "accounting"}
-            onToggle={() => setOpenSection("accounting")}
-          >
-            {groupFilter === "ALL" ? (
-              <p className="text-sm text-base-content/70">Selecciona un grupo arriba para consultar sus movimientos.</p>
-            ) : loadingMovements ? (
-              <p className="text-sm text-base-content/70">Cargando movimientos...</p>
-            ) : movementsError ? (
-              <p className="rounded-2xl border border-error/30 bg-error/5 px-4 py-3 text-sm text-error">{movementsError}</p>
-            ) : groupMovements.length === 0 ? (
-              <p className="text-sm text-base-content/70">Todavía no hay movimientos para este grupo.</p>
-            ) : (
-              <div className="space-y-2">
-                {groupMovements.slice(0, 5).map((movement) => (
-                  <div key={movement.id} className="flex items-center justify-between gap-3 rounded-2xl border border-base-300 px-3 py-3 text-sm">
-                    <span><span className="block font-semibold text-base-content">{movement.note || movement.type}</span><span className="block text-xs text-base-content/60">{new Date(movement.occurredAt).toLocaleDateString("es-ES")}</span></span>
-                    <span className={movement.amountCents >= 0 ? "font-bold text-success" : "font-bold text-error"}>{formatPrice(movement.amountCents)}</span>
-                  </div>
-                ))}
+            <section aria-labelledby="dashboard-tickets-title">
+              <div className="mb-5">
+                <h2 id="dashboard-tickets-title" className="text-2xl font-bold tracking-tight text-base-content">Boletos</h2>
+                <p className="mt-1 text-sm text-base-content/60">Filtra, compara y revisa las apuestas de {selectedGroup.name}.</p>
               </div>
-            )}
-          </DashboardSection> : null}
-        </div>
+              <ReviewFilters
+                statusFilter={statusFilter}
+                drawTypeFilter={drawTypeFilter}
+                onStatusChange={setStatusFilter}
+                onDrawTypeChange={setDrawTypeFilter}
+              />
+              <div className="mt-5">
+                <TicketReviewList
+                  error={error}
+                  loading={loading}
+                  filteredTickets={filteredTickets}
+                  visibleTickets={visibleTickets}
+                  secondaryTickets={secondaryTickets}
+                  activeTicketId={activeTicketId}
+                  expandedTickets={expandedTickets}
+                  hasMoreSecondaryTickets={hasMoreSecondaryTickets}
+                  onToggleComparisons={(ticketId) => {
+                    setExpandedTickets((current) => ({
+                      ...current,
+                      [ticketId]: !(current[ticketId] ?? false),
+                    }));
+                  }}
+                  onSelectTicket={(ticket) => {
+                    setSelectedTicket(ticket);
+                    setVerifyResult(null);
+                    setVerifyError(null);
+                  }}
+                  onShowMore={() =>
+                    setArchivedVisibleCount((current) =>
+                      Math.min(current + archivedPageSize, secondaryTickets.length)
+                    )
+                  }
+                />
+              </div>
+            </section>
 
+            <div className={`grid gap-6 ${selectedGroup.balanceTrackingEnabled !== false ? "xl:grid-cols-[minmax(0,1.7fr)_minmax(18rem,0.8fr)]" : ""}`}>
+              <section aria-labelledby="dashboard-results-title" className="rounded-2xl border border-base-300 bg-base-100 p-4 sm:p-5">
+                <div className="mb-5">
+                  <h2 id="dashboard-results-title" className="text-xl font-bold text-base-content">Resultados recientes</h2>
+                  <p className="mt-1 text-sm text-base-content/60">Los tres últimos sorteos de cada juego.</p>
+                </div>
+                <RecentResults results={recentResults} loading={loadingResults} error={resultsError} />
+              </section>
+
+              {selectedGroup.balanceTrackingEnabled !== false ? (
+                <MovementsPreview
+                  movements={groupMovements}
+                  loading={loadingMovements}
+                  error={movementsError}
+                  onOpenAll={() => setShowMovementsModal(true)}
+                />
+              ) : null}
+            </div>
+          </>
+        )}
       </main>
 
-      {showContributionModal && groupFilter !== "ALL" && selectedGroup?.balanceTrackingEnabled !== false ? (
+      {showContributionModal && selectedGroup && selectedGroup.balanceTrackingEnabled !== false ? (
         <ContributionModal
           open
           groupName={groups.find((group) => group.id === groupFilter)?.name ?? "Grupo"}
@@ -334,7 +330,7 @@ function ReviewPageContent() {
         />
       ) : null}
 
-      {showMovementsModal && groupFilter !== "ALL" && selectedGroup?.balanceTrackingEnabled !== false ? (
+      {showMovementsModal && selectedGroup && selectedGroup.balanceTrackingEnabled !== false ? (
         <MovementsModal
           open
           groupName={groups.find((group) => group.id === groupFilter)?.name ?? "Grupo"}
@@ -381,6 +377,64 @@ function ReviewPageContent() {
         onConfirmPurchase={handleConfirmPurchase}
       />
     </div>
+  );
+}
+
+function PanelSkeleton() {
+  return (
+    <div className="space-y-8" aria-label="Cargando panel">
+      <div className="animate-pulse border-b border-base-300 pb-7">
+        <div className="h-5 w-28 rounded bg-base-300" />
+        <div className="mt-3 h-10 w-64 rounded bg-base-300" />
+        <div className="mt-7 h-24 rounded-2xl bg-base-300" />
+      </div>
+      <div className="h-80 animate-pulse rounded-2xl bg-base-300" />
+    </div>
+  );
+}
+
+function MovementsPreview({
+  movements,
+  loading,
+  error,
+  onOpenAll,
+}: {
+  movements: GroupMovement[];
+  loading: boolean;
+  error: string | null;
+  onOpenAll: () => void;
+}) {
+  return (
+    <section aria-labelledby="dashboard-accounting-title" className="rounded-2xl border border-base-300 bg-base-100 p-4 sm:p-5">
+      <div className="mb-5 flex items-start justify-between gap-4">
+        <div>
+          <h2 id="dashboard-accounting-title" className="text-xl font-bold text-base-content">Últimos movimientos</h2>
+          <p className="mt-1 text-sm text-base-content/60">Actividad reciente del bote.</p>
+        </div>
+        <button type="button" onClick={onOpenAll} className="shrink-0 text-sm font-semibold text-primary hover:underline">Ver todos</button>
+      </div>
+      {loading ? (
+        <div className="space-y-3" aria-label="Cargando movimientos">
+          {[0, 1, 2].map((item) => <div key={item} className="h-12 animate-pulse rounded-xl bg-base-300" />)}
+        </div>
+      ) : error ? (
+        <p className="rounded-xl border border-error/30 bg-error/5 px-3 py-3 text-sm text-error">{error}</p>
+      ) : movements.length === 0 ? (
+        <p className="text-sm text-base-content/65">Todavía no hay movimientos para este grupo.</p>
+      ) : (
+        <div className="divide-y divide-base-300">
+          {movements.slice(0, 5).map((movement) => (
+            <div key={movement.id} className="flex items-center justify-between gap-3 py-3 text-sm">
+              <span className="min-w-0">
+                <span className="block truncate font-semibold text-base-content">{movement.note || movement.type}</span>
+                <span className="block text-xs text-base-content/60">{new Date(movement.occurredAt).toLocaleDateString("es-ES")}</span>
+              </span>
+              <span className={movement.amountCents >= 0 ? "shrink-0 font-bold text-success" : "shrink-0 font-bold text-error"}>{formatPrice(movement.amountCents)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 

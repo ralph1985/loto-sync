@@ -35,7 +35,7 @@ export function useReviewData({ setSelectedTicket }: UseReviewDataOptions) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<"ALL" | TicketStatus>("ALL");
-  const [groupFilter, setGroupFilter] = useState("ALL");
+  const [groupFilter, setGroupFilter] = useState("");
   const [drawTypeFilter, setDrawTypeFilter] = useState<"ALL" | DrawType>("ALL");
   const [filtersHydrated, setFiltersHydrated] = useState(false);
   const [expandedTickets, setExpandedTickets] = useState<Record<string, boolean>>({});
@@ -81,12 +81,13 @@ export function useReviewData({ setSelectedTicket }: UseReviewDataOptions) {
     const rememberedGroup = typeof window !== "undefined"
       ? window.localStorage.getItem(REVIEW_GROUP_STORAGE_KEY)
       : null;
+    const validRememberedGroup = rememberedGroup && rememberedGroup !== "ALL" ? rememberedGroup : "";
     setStatusFilter(
       status && STATUS_OPTIONS.some((option) => option.value === status)
         ? (status as "ALL" | TicketStatus)
         : "ALL"
     );
-    setGroupFilter(group ?? rememberedGroup ?? "ALL");
+    setGroupFilter(group && group !== "ALL" ? group : validRememberedGroup);
     setDrawTypeFilter(
       drawType && DRAW_TYPE_OPTIONS.some((option) => option.value === drawType)
         ? (drawType as "ALL" | DrawType)
@@ -96,20 +97,20 @@ export function useReviewData({ setSelectedTicket }: UseReviewDataOptions) {
   }, [searchParams]);
 
   useEffect(() => {
-    if (!filtersHydrated) return;
+    if (!filtersHydrated || !groupFilter || !groups.some((group) => group.id === groupFilter)) return;
     const params = new URLSearchParams();
     if (statusFilter !== "ALL") params.set("status", statusFilter);
-    if (groupFilter !== "ALL") params.set("group", groupFilter);
+    params.set("group", groupFilter);
     if (drawTypeFilter !== "ALL") params.set("drawType", drawTypeFilter);
     const next = params.toString();
     if (next === searchParams.toString()) return;
     router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false });
-  }, [drawTypeFilter, filtersHydrated, groupFilter, pathname, router, searchParams, statusFilter]);
+  }, [drawTypeFilter, filtersHydrated, groupFilter, groups, pathname, router, searchParams, statusFilter]);
 
   useEffect(() => {
-    if (!filtersHydrated) return;
-    if (groupFilter !== "ALL" && !groups.some((group) => group.id === groupFilter)) {
-      setGroupFilter("ALL");
+    if (!filtersHydrated || groups.length === 0) return;
+    if (!groups.some((group) => group.id === groupFilter)) {
+      setGroupFilter(groups[0].id);
       return;
     }
     window.localStorage.setItem(REVIEW_GROUP_STORAGE_KEY, groupFilter);
@@ -119,7 +120,7 @@ export function useReviewData({ setSelectedTicket }: UseReviewDataOptions) {
     () =>
       tickets.filter((ticket) => {
         const statusOk = statusFilter === "ALL" || ticket.status === statusFilter;
-        const groupOk = groupFilter === "ALL" || ticket.group?.id === groupFilter;
+        const groupOk = ticket.group?.id === groupFilter;
         const drawTypeOk = drawTypeFilter === "ALL" || ticket.draw?.type === drawTypeFilter;
         return statusOk && groupOk && drawTypeOk;
       }),
@@ -143,14 +144,14 @@ export function useReviewData({ setSelectedTicket }: UseReviewDataOptions) {
     [primaryActiveTicket, secondaryVisibleTickets]
   );
   const selectedGroupBalanceCents = useMemo(
-    () => (groupFilter === "ALL" ? null : groups.find((group) => group.id === groupFilter)?.balanceCents ?? null),
+    () => groups.find((group) => group.id === groupFilter)?.balanceCents ?? null,
     [groupFilter, groups]
   );
   const hasMoreSecondaryTickets = archivedVisibleCount < secondaryTickets.length;
 
   const loadMovements = useCallback(
     async (options?: { signal?: AbortSignal; type?: "ALL" | MovementType }) => {
-      if (groupFilter === "ALL") {
+      if (!groupFilter) {
         setGroupMovements([]);
         setMovementsError(null);
         return;
@@ -183,7 +184,7 @@ export function useReviewData({ setSelectedTicket }: UseReviewDataOptions) {
   );
 
   useEffect(() => {
-    if (groupFilter === "ALL") {
+    if (!groupFilter) {
       setGroupMovements([]);
       setMovementsError(null);
       return;

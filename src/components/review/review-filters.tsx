@@ -5,7 +5,6 @@ type ReviewFiltersProps = {
   drawTypeFilter: "ALL" | DrawType;
   onStatusChange: (value: "ALL" | TicketStatus) => void;
   onDrawTypeChange: (value: "ALL" | DrawType) => void;
-  onRefresh: () => void;
 };
 
 const STATUS_OPTIONS: { value: "ALL" | TicketStatus; label: string }[] = [
@@ -26,13 +25,12 @@ export function ReviewFilters({
   drawTypeFilter,
   onStatusChange,
   onDrawTypeChange,
-  onRefresh,
 }: ReviewFiltersProps) {
   return (
-    <section className="rounded-2xl border border-base-300 bg-base-100 p-4 shadow-sm sm:p-5">
-      <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end">
+    <div className="border-y border-base-300 py-4">
+      <div className="grid gap-4 sm:grid-cols-2">
         <label className="flex flex-col gap-2">
-          <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">Estado</span>
+          <span className="text-xs font-semibold text-base-content/60">Estado</span>
           <select
             value={statusFilter}
             onChange={(event) => onStatusChange(event.target.value as "ALL" | TicketStatus)}
@@ -47,7 +45,7 @@ export function ReviewFilters({
         </label>
 
         <label className="flex flex-col gap-2">
-          <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">Sorteo</span>
+          <span className="text-xs font-semibold text-base-content/60">Sorteo</span>
           <select
             value={drawTypeFilter}
             onChange={(event) => onDrawTypeChange(event.target.value as "ALL" | DrawType)}
@@ -60,11 +58,7 @@ export function ReviewFilters({
             ))}
           </select>
         </label>
-
-        <div className="flex flex-wrap items-center gap-2 md:justify-end">
-          <button type="button" onClick={onRefresh} className="btn btn-sm btn-outline">Actualizar boletos</button>
-        </div>
       </div>
-    </section>
+    </div>
   );
 }

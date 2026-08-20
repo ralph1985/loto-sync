@@ -32,19 +32,19 @@ export function TicketReviewList({
   return (
     <section className="flex flex-col gap-4" aria-busy={loading}>
       {error ? (
-        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+        <div className="rounded-xl border border-error/30 bg-error/5 px-4 py-3 text-sm text-error">
           {error}
         </div>
       ) : loading ? (
-        <div className="rounded-2xl border border-slate-200 bg-white/80 px-4 py-6 text-sm text-slate-500">
-          Cargando boletos...
+        <div className="space-y-3" aria-label="Cargando boletos">
+          {[0, 1].map((item) => <div key={item} className="h-40 animate-pulse rounded-2xl bg-base-300" />)}
         </div>
       ) : filteredTickets.length === 0 ? (
-        <div className="rounded-2xl border border-slate-200 bg-white/80 px-4 py-6 text-sm text-slate-500">
+        <div className="rounded-2xl border border-base-300 bg-base-100 px-4 py-6 text-sm text-base-content/60">
           No hay boletos que coincidan con los filtros.
         </div>
       ) : visibleTickets.length === 0 ? (
-        <div className="rounded-2xl border border-slate-200 bg-white/80 px-4 py-6 text-sm text-slate-500">
+        <div className="rounded-2xl border border-base-300 bg-base-100 px-4 py-6 text-sm text-base-content/60">
           No hay apuestas para mostrar.
         </div>
       ) : (
@@ -65,7 +65,7 @@ export function TicketReviewList({
             type="button"
             onClick={onShowMore}
             disabled={!hasMoreSecondaryTickets}
-            className={`rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wide ${
+            className={`rounded-xl px-4 py-2 text-sm font-semibold ${
               hasMoreSecondaryTickets
                 ? "border border-slate-200 bg-white text-slate-600"
                 : "cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-400"

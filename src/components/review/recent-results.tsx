@@ -16,7 +16,7 @@ export function RecentResults({ results, loading, error }: RecentResultsProps) {
   if (results.length === 0) return <p className="text-sm text-base-content/70">No hay resultados recientes.</p>;
 
   return (
-    <div className="space-y-4">
+    <div className="grid gap-6 lg:grid-cols-2">
       {(["PRIMITIVA", "EUROMILLONES"] as const).map((game) => {
         const gameResults = results.filter((result) => result.game === game).slice(0, 3);
         if (gameResults.length === 0) return null;
@@ -26,9 +26,9 @@ export function RecentResults({ results, loading, error }: RecentResultsProps) {
               <h3 className="text-sm font-bold text-base-content">{game === "PRIMITIVA" ? "Primitiva" : "Euromillones"}</h3>
               <Link href={`/results?game=${game}`} className="text-xs font-semibold text-primary hover:underline">Ver histórico</Link>
             </div>
-            <div className="grid gap-2 lg:grid-cols-3">
+            <div className="divide-y divide-base-300">
               {gameResults.map((result) => (
-                <div key={result.id} className="rounded-2xl border border-base-300 bg-base-200/30 p-3">
+                <div key={result.id} className="py-3 first:pt-1 last:pb-0">
                   <p className="text-xs font-semibold text-base-content/70">{formatDate(result.drawDate)}</p>
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {result.numbers.map((value, index) => <NumberBadge key={`${result.id}-number-${index}`} value={value} tone="primary" />)}
