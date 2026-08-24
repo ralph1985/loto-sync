@@ -98,31 +98,32 @@ export function TicketLinesEditor({
                       className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
                     />
                   </label>
-                ) : advancedOpen ? (
-                  <label className="flex flex-col gap-2">
-                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Complementario
-                    </span>
-                    <input
-                      value={line.complement}
-                      onChange={(event) => onLineChange(index, { complement: event.target.value })}
-                      placeholder="Ej: 12"
-                      className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
-                    />
-                  </label>
                 ) : (
-                  <label className="flex flex-col gap-2">
-                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Reintegro
-                    </span>
-                    <input
-                      value={line.reintegro}
-                      onChange={(event) => onLineChange(index, { reintegro: event.target.value })}
-                      placeholder="Ej: 6"
-                      inputMode="numeric"
-                      className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
-                    />
-                  </label>
+                  <>
+                    <label className="flex flex-col gap-2">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Complementario
+                      </span>
+                      <input
+                        value={line.complement}
+                        onChange={(event) => onLineChange(index, { complement: event.target.value })}
+                        placeholder="Ej: 12"
+                        className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-2">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Reintegro
+                      </span>
+                      <input
+                        value={line.reintegro}
+                        onChange={(event) => onLineChange(index, { reintegro: event.target.value })}
+                        placeholder="Ej: 6"
+                        inputMode="numeric"
+                        className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-slate-400 focus:outline-none"
+                      />
+                    </label>
+                  </>
                 )}
               </div>
 
