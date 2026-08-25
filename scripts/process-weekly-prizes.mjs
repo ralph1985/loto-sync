@@ -1,0 +1,284 @@
+import { execFile } from 'node:child_process';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { promisify } from 'node:util';
+import { resolve } from 'node:path';
+import nodemailer from 'nodemailer';
+import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import {
+  buildResultPayload,
+  calculateLinePrize,
+  dateKeyToUtc,
+  normalizeApiResult,
+  normalizeVerification,
+  previousWeekDrawDates,
+  sumLinePrizes
+} from './weekly-prizes-lib.mjs';
+
+const execFileAsync = promisify(execFile);
+const root = resolve(process.cwd());
+const stateDir = resolve(root, 'var/weekly-prizes');
+const statePath = resolve(stateDir, 'state.json');
+const apiBaseUrl = 'https://api.loteriasapi.com/api/v1';
+
+loadLocalEnvFiles(resolve(root, '.env.local'));
+loadLocalEnvFiles(resolve(root, '.env'));
+
+const required = ['DATABASE_URL', 'DB_SYNC_TOKEN', 'REMOTE_SYNC_BASE_URL', 'LOTERIAS_API_KEY', 'RESULTS_SMTP_PASSWORD'];
+const missing = required.filter((key) => !process.env[key]);
+if (missing.length > 0) throw new Error(`Faltan variables de configuración: ${missing.join(', ')}`);
+if (process.env.DATABASE_URL.startsWith('file:')) throw new Error('DATABASE_URL debe apuntar a PostgreSQL remoto.');
+
+mkdirSync(stateDir, { recursive: true });
+const state = readState();
+const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }) });
+const referenceDate = process.argv.includes('--reference-date')
+  ? process.argv[process.argv.indexOf('--reference-date') + 1]
+  : null;
+const draws = previousWeekDrawDates(referenceDate ? dateKeyToUtc(referenceDate) : new Date());
+
+try {
+  const reports = [];
+  for (const draw of draws) reports.push(await prepareDrawReport(draw));
+
+  const pendingReports = reports.filter((report) => !state.runs[report.key]?.databaseCompletedAt);
+  if (pendingReports.length > 0) {
+    await runBackup('PRE');
+    await prisma.$transaction(async (tx) => {
+      for (const report of pendingReports) await persistDrawReport(tx, report);
+    });
+    await runBackup('POST');
+    for (const report of pendingReports) {
+      state.runs[report.key] = {
+        databaseCompletedAt: new Date().toISOString(),
+        sentGroups: state.runs[report.key]?.sentGroups ?? {}
+      };
+    }
+    writeState(state);
+  }
+
+  for (const report of reports) await sendGroupReports(report);
+  console.log(`Weekly prizes: ${draws.length} sorteos procesados.`);
+} catch (error) {
+  await sendOperationalAlert(error);
+  throw error;
+} finally {
+  await prisma.$disconnect();
+}
+
+async function prepareDrawReport(draw) {
+  const resultPayload = await apiRequest(`/results/${draw.game === 'PRIMITIVA' ? 'primitiva' : 'euromillones'}/date/${draw.date}`);
+  const result = normalizeApiResult(resultPayload, draw.game, draw.date);
+  const drawDate = dateKeyToUtc(draw.date);
+  const tickets = await prisma.ticket.findMany({
+    where: {
+      draw: { type: draw.game },
+      purchaseStatus: 'CONFIRMED',
+      OR: [{ checks: { some: { drawDate } } }, { draw: { drawDate } }]
+    },
+    include: {
+      group: { include: { emailRecipients: { where: { enabled: true }, orderBy: { email: 'asc' } } } },
+      lines: { include: { numbers: true }, orderBy: { lineIndex: 'asc' } },
+      checks: { where: { drawDate } }
+    }
+  });
+
+  const rows = [];
+  for (const ticket of tickets) {
+    const lines = [];
+    for (const line of ticket.lines) {
+      const numbers = line.numbers.filter((item) => item.kind === 'MAIN').map((item) => item.value);
+      const extraNumbers = draw.game === 'EUROMILLONES'
+        ? line.numbers.filter((item) => item.kind === 'STAR').map((item) => item.value)
+        : line.complement === null || line.complement === undefined ? [] : [line.complement];
+      const verificationQuery = new URLSearchParams({ numbers: numbers.join(','), ...(extraNumbers.length ? { extraNumbers: extraNumbers.join(',') } : {}), ...(result.drawId ? { drawId: result.drawId } : {}) });
+      const verificationPayload = await apiRequest(`/results/${draw.game === 'PRIMITIVA' ? 'primitiva' : 'euromillones'}/check?${verificationQuery.toString()}`);
+      const verification = normalizeVerification(verificationPayload);
+      const prizeCents = calculateLinePrize({ verification, result, game: draw.game, line });
+      if (prizeCents === null) {
+        throw new Error(`Importe no determinable para ${draw.game} ${draw.date}, ticket ${ticket.id}, línea ${line.lineIndex}.`);
+      }
+      lines.push({
+        lineId: line.id,
+        lineIndex: line.lineIndex,
+        numbers,
+        prizeCents,
+        category: verification.category,
+        matchesMain: verification.matchesMain,
+        matchesExtra: verification.matchesExtra,
+        matchedNumbers: verification.matchedNumbers,
+        matchedExtraNumbers: verification.matchedExtraNumbers,
+        elMillionMatch: draw.game === 'EUROMILLONES' && Boolean(line.elMillionCode && result.elMillionCode && line.elMillionCode === result.elMillionCode),
+        reintegroMatch: draw.game === 'PRIMITIVA' && line.reintegro === result.reintegro
+      });
+    }
+    const prizeCents = sumLinePrizes(lines);
+    rows.push({
+      ticketId: ticket.id,
+      groupId: ticket.groupId,
+      group: ticket.group,
+      existingCheck: ticket.checks[0] ?? null,
+      lines,
+      prizeCents
+    });
+  }
+
+  return {
+    key: `${draw.game}/${draw.date}`,
+    draw,
+    result,
+    rows,
+    groups: [...new Map(rows.map((row) => [row.groupId, row.group])).values()].map((group) => ({
+      ...group,
+      rows: rows.filter((row) => row.groupId === group.id)
+    }))
+  };
+}
+
+async function persistDrawReport(tx, report) {
+  const drawDate = dateKeyToUtc(report.draw.date);
+  await tx.resultCache.upsert({
+    where: { game_drawDate: { game: report.draw.game, drawDate } },
+    update: { payload: buildResultPayload(report.result), fetchedAt: new Date() },
+    create: { game: report.draw.game, drawDate, payload: buildResultPayload(report.result), fetchedAt: new Date() }
+  });
+
+  for (const row of report.rows) {
+    const lineResults = row.lines.map((line) => ({
+      lineIndex: line.lineIndex,
+      matchesMain: line.matchesMain,
+      matchesExtra: line.matchesExtra,
+      matchedNumbers: line.matchedNumbers,
+      matchedExtraNumbers: line.matchedExtraNumbers,
+      prizeCents: line.prizeCents,
+      category: line.category,
+      elMillionMatch: line.elMillionMatch,
+      reintegroMatch: line.reintegroMatch
+    }));
+    const check = await tx.ticketCheck.upsert({
+      where: { ticketId_drawDate: { ticketId: row.ticketId, drawDate } },
+      update: {
+        status: row.prizeCents > 0 ? 'PREMIO' : 'COMPROBADO',
+        reason: null,
+        winningNumbers: report.result.numbers,
+        winningStars: report.result.stars,
+        matchesMain: row.lines[0]?.matchesMain ?? 0,
+        matchesStars: row.lines[0]?.matchesExtra ?? 0,
+        elMillionMatch: row.lines.some((line) => line.elMillionMatch),
+        prizeCents: row.prizeCents,
+        prizeSource: 'LOTERIASAPI',
+        lineResults,
+        checkedAt: new Date()
+      },
+      create: {
+        ticketId: row.ticketId,
+        drawDate,
+        status: row.prizeCents > 0 ? 'PREMIO' : 'COMPROBADO',
+        winningNumbers: report.result.numbers,
+        winningStars: report.result.stars,
+        matchesMain: row.lines[0]?.matchesMain ?? 0,
+        matchesStars: row.lines[0]?.matchesExtra ?? 0,
+        elMillionMatch: row.lines.some((line) => line.elMillionMatch),
+        prizeCents: row.prizeCents,
+        prizeSource: 'LOTERIASAPI',
+        lineResults,
+        checkedAt: new Date()
+      }
+    });
+
+    if (row.group.balanceTrackingEnabled !== false && row.prizeCents > 0) {
+      await tx.groupMovement.upsert({
+        where: { relatedCheckId_type: { relatedCheckId: check.id, type: 'PRIZE' } },
+        update: { amountCents: row.prizeCents, occurredAt: new Date(), note: `Premio loteriasAPI ${report.draw.game} ${report.draw.date}` },
+        create: { groupId: row.groupId, type: 'PRIZE', amountCents: row.prizeCents, occurredAt: new Date(), note: `Premio loteriasAPI ${report.draw.game} ${report.draw.date}`, relatedTicketId: row.ticketId, relatedCheckId: check.id }
+      });
+    } else if (row.group.balanceTrackingEnabled !== false) {
+      await tx.groupMovement.deleteMany({ where: { relatedCheckId: check.id, type: 'PRIZE' } });
+    }
+
+    const checks = await tx.ticketCheck.findMany({ where: { ticketId: row.ticketId }, select: { prizeCents: true } });
+    await tx.ticket.update({ where: { id: row.ticketId }, data: { status: checks.some((item) => (item.prizeCents ?? 0) > 0) ? 'PREMIO' : 'COMPROBADO' } });
+  }
+}
+
+async function sendGroupReports(report) {
+  const balanceByGroup = new Map((await prisma.groupMovement.groupBy({ by: ['groupId'], where: { groupId: { in: report.groups.map((group) => group.id) } }, _sum: { amountCents: true } })).map((item) => [item.groupId, item._sum.amountCents ?? 0]));
+  for (const group of report.groups) {
+    const recipients = group.emailRecipients.map((recipient) => recipient.email);
+    if (recipients.length === 0) throw new Error(`El grupo ${group.name} no tiene destinatarios activos.`);
+    if (state.runs[report.key]?.sentGroups?.[group.id]) continue;
+    const total = group.rows.reduce((sum, row) => sum + row.prizeCents, 0);
+    const balance = group.balanceTrackingEnabled === false ? null : (balanceByGroup.get(group.id) ?? 0) / 100;
+    const text = [
+      `INFORME DE PREMIOS — ${report.draw.game === 'PRIMITIVA' ? 'LA PRIMITIVA' : 'EUROMILLONES'}`,
+      `Sorteo: ${report.draw.date}`,
+      `Grupo: ${group.name}`,
+      '',
+      ...group.rows.map((row) => `Boleto ${row.ticketId}: ${(row.prizeCents / 100).toFixed(2)} € (${row.lines.map((line) => `línea ${line.lineIndex}: ${(line.prizeCents / 100).toFixed(2)} €`).join(', ')})`),
+      '',
+      `Premio total del grupo: ${(total / 100).toFixed(2)} €`,
+      ...(balance === null ? [] : [`Bote actualizado: ${balance.toFixed(2)} €`])
+    ].join('\n');
+    await sendMail(recipients, `${report.draw.game === 'PRIMITIVA' ? 'La Primitiva' : 'Euromillones'} — ${group.name} — premios ${report.draw.date}`, text);
+    state.runs[report.key].sentGroups = { ...(state.runs[report.key].sentGroups ?? {}), [group.id]: new Date().toISOString() };
+    writeState(state);
+  }
+}
+
+async function sendOperationalAlert(error) {
+  const recipients = (process.env.RESULTS_ALERT_RECIPIENTS ?? process.env.RESULTS_SMTP_USER ?? '').split(',').map((value) => value.trim()).filter(Boolean);
+  if (recipients.length === 0) return;
+  try {
+    await sendMail(recipients, 'loto-sync — cálculo semanal pendiente', `El cálculo automático no pudo completarse. La base de datos puede haberse actualizado si el fallo ocurrió después de la escritura; el estado y los backups permiten reanudarlo de forma idempotente.\n\nMotivo: ${error instanceof Error ? error.message : String(error)}\n\nEl worker reintentará la operación en la siguiente ejecución.`);
+  } catch (mailError) {
+    console.error(`No se pudo enviar el aviso operativo: ${mailError instanceof Error ? mailError.message : String(mailError)}`);
+  }
+}
+
+async function sendMail(recipients, subject, text) {
+  const transporter = nodemailer.createTransport({
+    host: process.env.RESULTS_SMTP_HOST ?? 'smtp.dondominio.com',
+    port: Number(process.env.RESULTS_SMTP_PORT ?? '587'),
+    secure: process.env.RESULTS_SMTP_SECURE === 'true',
+    requireTLS: true,
+    auth: { user: process.env.RESULTS_SMTP_USER ?? 'loto@conquense.dev', pass: process.env.RESULTS_SMTP_PASSWORD }
+  });
+  await transporter.sendMail({ from: process.env.RESULTS_REPORT_FROM ?? 'loto@conquense.dev', to: recipients, subject, text });
+}
+
+async function apiRequest(path) {
+  const response = await fetch(`${apiBaseUrl}${path}`, { headers: { 'X-API-Key': process.env.LOTERIAS_API_KEY, Accept: 'application/json' } });
+  if (!response.ok) throw new Error(`loteriasAPI respondió ${response.status} para ${path}.`);
+  return response.json();
+}
+
+async function runBackup(label) {
+  await execFileAsync('npm', ['run', 'backup:db'], { cwd: root, env: process.env, maxBuffer: 2_000_000 });
+  console.log(`Backup ${label} correcto.`);
+}
+
+function readState() {
+  if (!existsSync(statePath)) return { runs: {} };
+  const value = JSON.parse(readFileSync(statePath, 'utf8'));
+  return value && typeof value === 'object' && value.runs && typeof value.runs === 'object' ? value : { runs: {} };
+}
+
+function writeState(value) {
+  const temporaryPath = `${statePath}.tmp`;
+  writeFileSync(temporaryPath, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
+  renameSync(temporaryPath, statePath);
+}
+
+function loadLocalEnvFiles(filePath) {
+  if (!existsSync(filePath)) return;
+  for (const line of readFileSync(filePath, 'utf8').split(/\r?\n/)) {
+    const trimmed = line.trim();
+    const equalIndex = trimmed.indexOf('=');
+    if (!trimmed || trimmed.startsWith('#') || equalIndex <= 0) continue;
+    const key = trimmed.slice(0, equalIndex).trim();
+    let value = trimmed.slice(equalIndex + 1).trim();
+    if (process.env[key] !== undefined) continue;
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) value = value.slice(1, -1);
+    process.env[key] = value;
+  }
+}

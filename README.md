@@ -151,6 +151,7 @@ Configuración adicional en `.env.local`:
 - `RESULTS_IMAP_FILTERS_JSON` permite configurar varios filtros de forma extensible. Cada filtro contiene `id`, `game`, `from`, `subjectIncludes` y `weekdays`. Si no se define, se crean filtros compatibles para Primitiva y Euromillón; el filtro de Euromillón usa por defecto `Resultados y escrutinio de Euromillones`.
 - `RESULTS_CODEX_BIN`, `RESULTS_SMTP_HOST`, `RESULTS_SMTP_PORT`, `RESULTS_SMTP_SECURE`, `RESULTS_SMTP_USER`, `RESULTS_SMTP_PASSWORD` (opcional si reutiliza `RESULTS_IMAP_PASSWORD`) y `RESULTS_REPORT_FROM`.
 - `RESULTS_RETENTION_DAYS` (por defecto, `90`).
+- `LOTERIAS_API_KEY` para el worker dominical de cálculo automático de premios. La clave debe existir solo en `.env.local`.
 
 Las contraseñas IMAP/SMTP solo deben estar en `.env.local`. Los destinatarios se gestionan por grupo mediante la API de destinatarios de correo. El proceso ejecuta `npm run backup:db` antes y después de cualquier escritura remota. Si falla una fase, conserva el correo sin marcarlo como procesado para reintentarlo.
 
@@ -163,6 +164,20 @@ npm run results:process
 # inspección segura de un correo descargado: sin tocar DB, IMAP ni SMTP
 npm run results:inspect -- --file ./resultado.eml
 ```
+
+El cálculo automático semanal se ejecuta los domingos a las 10:00 (`Europe/Madrid`), revisa los sorteos de la semana anterior mediante loteriasAPI y actualiza los premios y botes de forma idempotente. Requiere `LOTERIAS_API_KEY`. Para instalar el cron en el equipo local:
+
+```bash
+bash scripts/install-weekly-prizes-cron.sh
+```
+
+También puede ejecutarse manualmente:
+
+```bash
+npm run weekly-prizes:process
+```
+
+Si loteriasAPI no devuelve un resultado o importe completo, el worker no modifica la base de datos y termina con error para permitir un reintento posterior.
 
 ## Apuestas recurrentes de Euromillón
 
