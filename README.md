@@ -179,6 +179,18 @@ npm run weekly-prizes:process
 
 Si loteriasAPI no devuelve un resultado o importe completo, el worker no modifica la base de datos y termina con error para permitir un reintento posterior.
 
+Para consultar el premio de un único grupo y sorteo sin modificar la base de datos ni enviar correo:
+
+```bash
+npm run weekly-prizes:process -- \
+  --read-only \
+  --game PRIMITIVA \
+  --draw-date 2026-08-24 \
+  --group-name "Junta directiva"
+```
+
+En este modo también se muestra el bote actual. `--group-name` debe coincidir exactamente; si hay grupos duplicados, usa `--group-id`. El modo dominical normal sí actualiza premios, recalcula botes y envía los informes por correo.
+
 ## Apuestas recurrentes de Euromillón
 
 Los boletos de Euromillones pueden contener varias líneas y un código de El Millón por línea. La cobertura semanal opcional conserva las mismas líneas y códigos para los sorteos del martes y viernes; los códigos antiguos guardados directamente en el boleto siguen siendo compatibles.

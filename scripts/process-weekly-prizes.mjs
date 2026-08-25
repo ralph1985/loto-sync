@@ -20,53 +20,65 @@ const root = resolve(process.cwd());
 const stateDir = resolve(root, 'var/weekly-prizes');
 const statePath = resolve(stateDir, 'state.json');
 const apiBaseUrl = 'https://api.loteriasapi.com/api/v1';
+const args = parseArgs(process.argv.slice(2));
+const readOnlyMode = args.readOnly === true;
 
 loadLocalEnvFiles(resolve(root, '.env.local'));
 loadLocalEnvFiles(resolve(root, '.env'));
 
-const required = ['DATABASE_URL', 'DB_SYNC_TOKEN', 'REMOTE_SYNC_BASE_URL', 'LOTERIAS_API_KEY', 'RESULTS_SMTP_PASSWORD'];
+const required = ['DATABASE_URL', 'LOTERIAS_API_KEY'];
+if (!readOnlyMode) required.push('DB_SYNC_TOKEN', 'REMOTE_SYNC_BASE_URL', 'RESULTS_SMTP_PASSWORD');
 const missing = required.filter((key) => !process.env[key]);
 if (missing.length > 0) throw new Error(`Faltan variables de configuración: ${missing.join(', ')}`);
 if (process.env.DATABASE_URL.startsWith('file:')) throw new Error('DATABASE_URL debe apuntar a PostgreSQL remoto.');
 
-mkdirSync(stateDir, { recursive: true });
-const state = readState();
+if (readOnlyMode && (!args.game || !args.drawDate || (!args.groupId && !args.groupName))) {
+  throw new Error('El modo --read-only requiere --game, --draw-date y --group-id o --group-name.');
+}
+if (args.drawDate && !/^\d{4}-\d{2}-\d{2}$/.test(args.drawDate)) {
+  throw new Error('--draw-date debe usar el formato YYYY-MM-DD.');
+}
+
+if (!readOnlyMode) mkdirSync(stateDir, { recursive: true });
+const state = readOnlyMode ? { runs: {} } : readState();
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }) });
-const referenceDate = process.argv.includes('--reference-date')
-  ? process.argv[process.argv.indexOf('--reference-date') + 1]
-  : null;
-const draws = previousWeekDrawDates(referenceDate ? dateKeyToUtc(referenceDate) : new Date());
+const draws = selectDraws(args);
 
 try {
+  const targetGroup = readOnlyMode ? await resolveTargetGroup() : null;
   const reports = [];
-  for (const draw of draws) reports.push(await prepareDrawReport(draw));
+  for (const draw of draws) reports.push(await prepareDrawReport(draw, targetGroup));
 
-  const pendingReports = reports.filter((report) => !state.runs[report.key]?.databaseCompletedAt);
-  if (pendingReports.length > 0) {
-    await runBackup('PRE');
-    await prisma.$transaction(async (tx) => {
-      for (const report of pendingReports) await persistDrawReport(tx, report);
-    });
-    await runBackup('POST');
-    for (const report of pendingReports) {
-      state.runs[report.key] = {
-        databaseCompletedAt: new Date().toISOString(),
-        sentGroups: state.runs[report.key]?.sentGroups ?? {}
-      };
+  if (readOnlyMode) {
+    for (const report of reports) await printReadOnlyReport(report);
+  } else {
+    const pendingReports = reports.filter((report) => !state.runs[report.key]?.databaseCompletedAt);
+    if (pendingReports.length > 0) {
+      await runBackup('PRE');
+      await prisma.$transaction(async (tx) => {
+        for (const report of pendingReports) await persistDrawReport(tx, report);
+      });
+      await runBackup('POST');
+      for (const report of pendingReports) {
+        state.runs[report.key] = {
+          databaseCompletedAt: new Date().toISOString(),
+          sentGroups: state.runs[report.key]?.sentGroups ?? {}
+        };
+      }
+      writeState(state);
     }
-    writeState(state);
-  }
 
-  for (const report of reports) await sendGroupReports(report);
-  console.log(`Weekly prizes: ${draws.length} sorteos procesados.`);
+    for (const report of reports) await sendGroupReports(report);
+    console.log(`Weekly prizes: ${draws.length} sorteos procesados.`);
+  }
 } catch (error) {
-  await sendOperationalAlert(error);
+  if (!readOnlyMode) await sendOperationalAlert(error);
   throw error;
 } finally {
   await prisma.$disconnect();
 }
 
-async function prepareDrawReport(draw) {
+async function prepareDrawReport(draw, targetGroup = null) {
   const resultPayload = await apiRequest(`/results/${draw.game === 'PRIMITIVA' ? 'primitiva' : 'euromillones'}/date/${draw.date}`);
   const result = normalizeApiResult(resultPayload, draw.game, draw.date);
   const drawDate = dateKeyToUtc(draw.date);
@@ -74,6 +86,7 @@ async function prepareDrawReport(draw) {
     where: {
       draw: { type: draw.game },
       purchaseStatus: 'CONFIRMED',
+      ...(targetGroup ? { groupId: targetGroup.id } : {}),
       OR: [{ checks: { some: { drawDate } } }, { draw: { drawDate } }]
     },
     include: {
@@ -128,11 +141,85 @@ async function prepareDrawReport(draw) {
     draw,
     result,
     rows,
-    groups: [...new Map(rows.map((row) => [row.groupId, row.group])).values()].map((group) => ({
-      ...group,
-      rows: rows.filter((row) => row.groupId === group.id)
-    }))
+    groups: targetGroup
+      ? [{ ...targetGroup, rows }]
+      : [...new Map(rows.map((row) => [row.groupId, row.group])).values()].map((group) => ({
+        ...group,
+        rows: rows.filter((row) => row.groupId === group.id)
+      }))
   };
+}
+
+async function resolveTargetGroup() {
+  const where = args.groupId ? { id: args.groupId } : { name: args.groupName };
+  const groups = await prisma.group.findMany({
+    where,
+    select: { id: true, name: true, balanceTrackingEnabled: true }
+  });
+  if (groups.length === 0) throw new Error(`No existe un grupo que coincida con: ${args.groupId ?? args.groupName}.`);
+  if (groups.length > 1) throw new Error(`Hay varios grupos con ese nombre; usa --group-id: ${args.groupName}.`);
+  return groups[0];
+}
+
+async function printReadOnlyReport(report) {
+  const group = report.groups[0];
+  const balance = group.balanceTrackingEnabled === false
+    ? null
+    : ((await prisma.groupMovement.aggregate({
+      where: { groupId: group.id },
+      _sum: { amountCents: true }
+    }))._sum.amountCents ?? 0) / 100;
+  const total = report.rows.reduce((sum, row) => sum + row.prizeCents, 0) / 100;
+  const lines = report.rows.flatMap((row) => row.lines.map((line) => [
+    `  Boleto ${row.ticketId}, línea ${line.lineIndex}: ${formatEuro(line.prizeCents)}`,
+    line.category ? ` (${line.category})` : ''
+  ].join('')));
+  console.log([
+    `CONSULTA DE PREMIO — ${report.draw.game === 'PRIMITIVA' ? 'LA PRIMITIVA' : 'EUROMILLONES'}`,
+    `Grupo: ${group.name}`,
+    `Sorteo: ${report.draw.date}`,
+    '',
+    lines.length > 0 ? lines.join('\n') : '  No hay boletos confirmados para este sorteo.',
+    '',
+    `Premio total: ${formatEuro(total)}`,
+    ...(balance === null ? [] : [`Bote actual: ${formatEuro(balance)}`]),
+    '',
+    'Modo solo lectura: no se han modificado datos ni enviado correos.'
+  ].join('\n'));
+}
+
+function formatEuro(value) {
+  return value.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
+}
+
+function selectDraws(options) {
+  if (options.drawDate && options.game) return [{ game: options.game, date: options.drawDate }];
+  if (options.drawDate || options.game) throw new Error('--draw-date y --game deben utilizarse juntos.');
+  const referenceDate = options.referenceDate ? dateKeyToUtc(options.referenceDate) : new Date();
+  return previousWeekDrawDates(referenceDate);
+}
+
+function parseArgs(argv) {
+  const options = {};
+  for (let index = 0; index < argv.length; index += 1) {
+    const argument = argv[index];
+    if (argument === '--read-only') options.readOnly = true;
+    else if (argument === '--reference-date') options.referenceDate = argv[++index];
+    else if (argument === '--draw-date') options.drawDate = argv[++index];
+    else if (argument === '--group-id') options.groupId = argv[++index];
+    else if (argument === '--group-name') options.groupName = argv[++index];
+    else if (argument === '--game') {
+      const game = String(argv[++index] ?? '').toUpperCase();
+      if (game !== 'PRIMITIVA' && game !== 'EUROMILLONES') throw new Error('--game debe ser PRIMITIVA o EUROMILLONES.');
+      options.game = game;
+    } else if (argument === '--help') {
+      console.log('Uso: npm run weekly-prizes:process -- --read-only --game PRIMITIVA --draw-date YYYY-MM-DD --group-name "Nombre"');
+      process.exit(0);
+    } else {
+      throw new Error(`Argumento no reconocido: ${argument}`);
+    }
+  }
+  return options;
 }
 
 async function persistDrawReport(tx, report) {
