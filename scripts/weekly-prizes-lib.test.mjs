@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   amountToCents,
   calculateLinePrize,
+  calculatePrimitivaLinePrize,
   normalizeApiResult,
   previousWeekDrawDates,
   sumLinePrizes
@@ -40,4 +41,28 @@ test('normaliza el resultado y su tabla de premios', () => {
 
 test('suma los premios de todas las lineas', () => {
   assert.equal(sumLinePrizes([{ prizeCents: 100 }, { prizeCents: 250 }]), 350);
+});
+
+test('calcula 3 aciertos mas reintegro con la tabla de Primitiva', () => {
+  const result = {
+    numbers: [1, 2, 3, 4, 5, 6],
+    complementario: 7,
+    reintegro: 3,
+    prizes: [
+      { categoryName: '5ª (3 Aciertos)', prizeAmount: '800' },
+      { categoryName: 'Reintegro', prizeAmount: '100' }
+    ]
+  };
+  const calculated = calculatePrimitivaLinePrize({
+    result,
+    numbers: [1, 2, 3, 10, 11, 12],
+    line: { complement: 7, reintegro: 3 }
+  });
+  assert.deepEqual(calculated, {
+    prizeCents: 900,
+    category: '3 aciertos + reintegro',
+    matchesMain: 3,
+    complementMatch: true,
+    reintegroMatch: true
+  });
 });

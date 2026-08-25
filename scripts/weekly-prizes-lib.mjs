@@ -112,6 +112,36 @@ export const calculateLinePrize = ({ verification, result, game, line }) => {
   return 0;
 };
 
+const findPrizeAmount = (prizes, matcher) => {
+  const prize = prizes.find((item) => matcher(String(item.categoryName ?? '')));
+  return amountToCents(prize?.prizeAmount ?? prize?.amount);
+};
+
+export const calculatePrimitivaLinePrize = ({ result, line, numbers }) => {
+  const matchesMain = numbers.filter((number) => result.numbers.includes(number)).length;
+  const complementMatch = line.complement !== null && line.complement !== undefined && line.complement === result.complementario;
+  const reintegroMatch = line.reintegro !== null && line.reintegro !== undefined && line.reintegro === result.reintegro;
+  const categoryMatchers = {
+    6: (name) => /6 Aciertos/.test(name) && !/\+ R/.test(name) && !/Especial/.test(name),
+    5: (name) => /5 Aciertos/.test(name) && /\+ C/.test(name),
+    4: (name) => /4 Aciertos/.test(name),
+    3: (name) => /3 Aciertos/.test(name)
+  };
+  const baseMatcher = matchesMain === 5 && !complementMatch
+    ? (name) => /5 Aciertos/.test(name) && !/\+ C/.test(name)
+    : categoryMatchers[matchesMain];
+  const baseAmount = matchesMain >= 3 ? findPrizeAmount(result.prizes, baseMatcher) : 0;
+  const reintegroAmount = reintegroMatch ? findPrizeAmount(result.prizes, (name) => /Reintegro/i.test(name)) : 0;
+  if (baseAmount === null || reintegroAmount === null) return null;
+  return {
+    prizeCents: baseAmount + reintegroAmount,
+    category: [baseAmount > 0 ? `${matchesMain} aciertos${matchesMain === 5 && complementMatch ? ' + complementario' : ''}` : null, reintegroAmount > 0 ? 'reintegro' : null].filter(Boolean).join(' + ') || null,
+    matchesMain,
+    complementMatch,
+    reintegroMatch
+  };
+};
+
 export const sumLinePrizes = (lines) => lines.reduce((total, line) => total + line.prizeCents, 0);
 
 export const buildResultPayload = (result) => ({

@@ -8,6 +8,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import {
   buildResultPayload,
   calculateLinePrize,
+  calculatePrimitivaLinePrize,
   dateKeyToUtc,
   normalizeApiResult,
   normalizeVerification,
@@ -101,13 +102,13 @@ async function prepareDrawReport(draw, targetGroup = null) {
     const lines = [];
     for (const line of ticket.lines) {
       const numbers = line.numbers.filter((item) => item.kind === 'MAIN').map((item) => item.value);
-      const extraNumbers = draw.game === 'EUROMILLONES'
-        ? line.numbers.filter((item) => item.kind === 'STAR').map((item) => item.value)
-        : line.complement === null || line.complement === undefined ? [] : [line.complement];
-      const verificationQuery = new URLSearchParams({ numbers: numbers.join(','), ...(extraNumbers.length ? { extraNumbers: extraNumbers.join(',') } : {}), ...(result.drawId ? { drawId: result.drawId } : {}) });
-      const verificationPayload = await apiRequest(`/results/${draw.game === 'PRIMITIVA' ? 'primitiva' : 'euromillones'}/check?${verificationQuery.toString()}`);
-      const verification = normalizeVerification(verificationPayload);
-      const prizeCents = calculateLinePrize({ verification, result, game: draw.game, line });
+      const verification = draw.game === 'EUROMILLONES'
+        ? normalizeVerification(await apiRequest(`/results/euromillones/check?${new URLSearchParams({ numbers: numbers.join(','), extraNumbers: line.numbers.filter((item) => item.kind === 'STAR').map((item) => item.value).join(','), ...(result.drawId ? { drawId: result.drawId } : {}) }).toString()}`))
+        : null;
+      const primitivaPrize = draw.game === 'PRIMITIVA'
+        ? calculatePrimitivaLinePrize({ result, line, numbers })
+        : null;
+      const prizeCents = draw.game === 'PRIMITIVA' ? primitivaPrize?.prizeCents ?? null : calculateLinePrize({ verification, result, game: draw.game, line });
       if (prizeCents === null) {
         throw new Error(`Importe no determinable para ${draw.game} ${draw.date}, ticket ${ticket.id}, línea ${line.lineIndex}.`);
       }
@@ -116,13 +117,13 @@ async function prepareDrawReport(draw, targetGroup = null) {
         lineIndex: line.lineIndex,
         numbers,
         prizeCents,
-        category: verification.category,
-        matchesMain: verification.matchesMain,
-        matchesExtra: verification.matchesExtra,
-        matchedNumbers: verification.matchedNumbers,
-        matchedExtraNumbers: verification.matchedExtraNumbers,
+        category: primitivaPrize?.category ?? verification?.category,
+        matchesMain: primitivaPrize?.matchesMain ?? verification?.matchesMain,
+        matchesExtra: verification?.matchesExtra,
+        matchedNumbers: verification?.matchedNumbers ?? numbers.filter((number) => result.numbers.includes(number)),
+        matchedExtraNumbers: verification?.matchedExtraNumbers ?? [],
         elMillionMatch: draw.game === 'EUROMILLONES' && Boolean(line.elMillionCode && result.elMillionCode && line.elMillionCode === result.elMillionCode),
-        reintegroMatch: draw.game === 'PRIMITIVA' && line.reintegro === result.reintegro
+        reintegroMatch: primitivaPrize?.reintegroMatch ?? false
       });
     }
     const prizeCents = sumLinePrizes(lines);
