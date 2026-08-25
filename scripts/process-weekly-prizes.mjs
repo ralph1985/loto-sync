@@ -319,7 +319,8 @@ async function sendGroupReports(report) {
       `Premio total del grupo: ${(total / 100).toFixed(2)} €`,
       ...(balance === null ? [] : [`Bote actualizado: ${balance.toFixed(2)} €`])
     ].join('\n');
-    await sendMail(recipients, `${report.draw.game === 'PRIMITIVA' ? 'La Primitiva' : 'Euromillones'} — ${group.name} — premios ${report.draw.date}`, text);
+    const html = buildHtmlPrizeReport(report, group, balance);
+    await sendMail(recipients, `${report.draw.game === 'PRIMITIVA' ? 'La Primitiva' : 'Euromillones'} — ${group.name} — premios ${report.draw.date}`, text, html);
     state.runs[report.key].sentGroups = { ...(state.runs[report.key].sentGroups ?? {}), [group.id]: new Date().toISOString() };
     writeState(state);
   }
@@ -335,7 +336,34 @@ async function sendOperationalAlert(error) {
   }
 }
 
-async function sendMail(recipients, subject, text) {
+function buildHtmlPrizeReport(report, group, balance) {
+  const gameLabel = report.draw.game === 'PRIMITIVA' ? 'La Primitiva' : 'Euromillones';
+  const dateLabel = new Intl.DateTimeFormat('es-ES', { dateStyle: 'long', timeZone: 'UTC' }).format(new Date(`${report.draw.date}T00:00:00.000Z`));
+  const total = group.rows.reduce((sum, row) => sum + row.prizeCents, 0) / 100;
+  const hasPrize = total > 0;
+  const resultNumbers = report.result.numbers.map((number) => `<span style="display:inline-block;margin:2px 4px 2px 0;padding:5px 9px;border-radius:999px;background:#e0e7ff;color:#3730a3;font-weight:700;">${escapeHtml(number)}</span>`).join('');
+  const resultDetails = report.draw.game === 'EUROMILLONES'
+    ? `<strong>Estrellas:</strong> ${escapeHtml(report.result.stars.join(', ') || 'no indicadas')} · <strong>El Millón:</strong> ${escapeHtml(report.result.elMillionCode ?? 'no indicado')}`
+    : `<strong>Complementario:</strong> ${escapeHtml(report.result.complementario ?? 'no indicado')} · <strong>Reintegro:</strong> ${escapeHtml(report.result.reintegro ?? 'no indicado')}`;
+  const ticketSections = group.rows.map((row, ticketIndex) => {
+    const lines = row.lines.map((line) => {
+      const numbers = line.numbers.map((number) => `<span style="display:inline-block;margin:2px 4px 2px 0;padding:4px 8px;border-radius:999px;background:${line.matchedNumbers.includes(number) ? '#dcfce7' : '#f1f5f9'};color:${line.matchedNumbers.includes(number) ? '#166534' : '#475569'};font-weight:700;">${escapeHtml(number)}</span>`).join('');
+      const category = line.category ? `<br><span style="color:#166534;font-weight:700;">${escapeHtml(line.category)}</span>` : '';
+      const reintegro = report.draw.game === 'PRIMITIVA' ? `<br><span style="color:${line.reintegroMatch ? '#166534' : '#64748b'};">Reintegro: ${line.reintegroMatch ? 'acertado' : 'no acertado'}</span>` : '';
+      const euro = report.draw.game === 'EUROMILLONES' && line.elMillionMatch ? '<br><span style="color:#7c3aed;font-weight:700;">El Millón: acertado</span>' : '';
+      return `<tr><td style="padding:12px 0;border-top:1px solid #e2e8f0;vertical-align:top;"><strong>Línea ${line.lineIndex}</strong><div style="margin-top:8px;">${numbers || '<span style="color:#64748b;">sin números</span>'}</div><div style="margin-top:8px;font-size:14px;"><span style="color:#166534;font-weight:700;">Premio:</span> ${formatEuro(line.prizeCents / 100)}${category}${reintegro}${euro}</div></td></tr>`;
+    }).join('');
+    return `<section style="margin:20px 0;padding:16px 18px;border:1px solid #e2e8f0;border-radius:12px;background:#ffffff;"><h3 style="margin:0;color:#0f172a;font-size:17px;">Boleto ${ticketIndex + 1}</h3><p style="margin:4px 0 8px;color:#64748b;font-size:12px;">${escapeHtml(row.ticketId)}</p><table role="presentation" style="width:100%;border-collapse:collapse;">${lines}</table><p style="margin:12px 0 0;color:#0f172a;font-weight:700;text-align:right;">Total del boleto: ${formatEuro(row.prizeCents / 100)}</p></section>`;
+  }).join('');
+  const balanceSection = balance === null ? '' : `<div style="flex:1;min-width:200px;padding:16px;border-radius:12px;background:#fef3c7;border:1px solid #fcd34d;"><div style="font-size:12px;color:#92400e;text-transform:uppercase;letter-spacing:.5px;">Bote actualizado</div><strong style="display:block;margin-top:4px;font-size:22px;color:#92400e;">${formatEuro(balance)}</strong></div>`;
+  return `<!doctype html><html lang="es"><body style="margin:0;background:#f1f5f9;color:#0f172a;font-family:Arial,sans-serif;line-height:1.5;"><div style="max-width:680px;margin:0 auto;padding:24px 14px;"><div style="padding:24px;border-radius:16px 16px 0 0;background:#1e3a8a;color:#ffffff;"><p style="margin:0 0 6px;font-size:12px;letter-spacing:1px;text-transform:uppercase;opacity:.8;">Informe de premios · ${gameLabel}</p><h1 style="margin:0;font-size:26px;">${escapeHtml(group.name)}</h1><p style="margin:6px 0 0;opacity:.9;">Sorteo del ${escapeHtml(dateLabel)}</p></div><div style="padding:20px;background:#ffffff;"><div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px;"><div style="flex:1;min-width:200px;padding:16px;border-radius:12px;background:${hasPrize ? '#dcfce7' : '#f8fafc'};border:1px solid ${hasPrize ? '#86efac' : '#e2e8f0'};"><div style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;">Premio total del grupo</div><strong style="display:block;margin-top:4px;font-size:22px;color:${hasPrize ? '#166534' : '#334155'};">${formatEuro(total)}</strong></div>${balanceSection}</div><div style="padding:16px;border-radius:12px;background:#eef2ff;"><h2 style="margin:0 0 8px;font-size:16px;color:#3730a3;">Resultado del sorteo</h2><div>${resultNumbers}</div><p style="margin:10px 0 0;font-size:14px;color:#475569;">${resultDetails}</p></div>${ticketSections || '<p style="color:#64748b;">No hay boletos correspondientes a este sorteo.</p>'}<p style="margin:24px 0 0;padding-top:16px;border-top:1px solid #e2e8f0;color:#64748b;font-size:12px;">Informe generado automáticamente por <a href="https://conquense.dev" style="color:#1d4ed8;font-weight:700;">conquense.dev</a>. Consulta tus grupos y boletos en <a href="https://loterias.conquense.dev/" style="color:#1d4ed8;font-weight:700;">loterias.conquense.dev</a>.</p></div></div></body></html>`;
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]);
+}
+
+async function sendMail(recipients, subject, text, html = null) {
   const transporter = nodemailer.createTransport({
     host: process.env.RESULTS_SMTP_HOST ?? 'smtp.dondominio.com',
     port: Number(process.env.RESULTS_SMTP_PORT ?? '587'),
@@ -343,7 +371,7 @@ async function sendMail(recipients, subject, text) {
     requireTLS: true,
     auth: { user: process.env.RESULTS_SMTP_USER ?? 'loto@conquense.dev', pass: process.env.RESULTS_SMTP_PASSWORD ?? process.env.RESULTS_IMAP_PASSWORD }
   });
-  await transporter.sendMail({ from: process.env.RESULTS_REPORT_FROM ?? 'loto@conquense.dev', to: recipients, subject, text });
+  await transporter.sendMail({ from: process.env.RESULTS_REPORT_FROM ?? 'loto@conquense.dev', to: recipients, subject, text, ...(html ? { html } : {}) });
 }
 
 async function apiRequest(path) {
