@@ -171,7 +171,7 @@ async function printReadOnlyReport(report) {
     }))._sum.amountCents ?? 0) / 100;
   const total = report.rows.reduce((sum, row) => sum + row.prizeCents, 0) / 100;
   const lines = report.rows.flatMap((row) => row.lines.map((line) => [
-    `  Boleto ${row.ticketId}, línea ${line.lineIndex}: ${formatEuro(line.prizeCents)}`,
+    `  Boleto ${row.ticketId}, línea ${line.lineIndex}: ${formatEuro(line.prizeCents / 100)}`,
     line.category ? ` (${line.category})` : ''
   ].join('')));
   console.log([
