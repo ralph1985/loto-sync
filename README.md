@@ -165,7 +165,7 @@ npm run results:process
 npm run results:inspect -- --file ./resultado.eml
 ```
 
-El cálculo automático semanal se ejecuta los domingos a las 10:00 (`Europe/Madrid`), revisa los sorteos de la semana anterior mediante loteriasAPI y actualiza los premios y botes de forma idempotente. Requiere `LOTERIAS_API_KEY`. Para instalar el cron en el equipo local:
+El cálculo automático se ejecuta al día siguiente de cada sorteo a las 14:00 (`Europe/Madrid`): Primitiva de lunes, jueves y sábado; Euromillones de martes y viernes. Cada sorteo tiene su propia ejecución, backup, actualización, correo y estado idempotente. Si falla un sorteo, los demás días continúan con normalidad y ese sorteo se puede reintentar de forma independiente. Requiere `LOTERIAS_API_KEY`. Para instalar el cron en el equipo local:
 
 ```bash
 bash scripts/install-weekly-prizes-cron.sh
@@ -174,7 +174,7 @@ bash scripts/install-weekly-prizes-cron.sh
 También puede ejecutarse manualmente:
 
 ```bash
-npm run weekly-prizes:process
+npm run weekly-prizes:process -- --scheduled --game PRIMITIVA
 ```
 
 Si loteriasAPI no devuelve un resultado o importe completo, el worker no modifica la base de datos y termina con error para permitir un reintento posterior.

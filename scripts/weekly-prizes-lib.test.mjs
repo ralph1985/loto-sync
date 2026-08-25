@@ -6,6 +6,7 @@ import {
   calculatePrimitivaLinePrize,
   normalizeApiResult,
   previousWeekDrawDates,
+  scheduledDrawDate,
   sumLinePrizes
 } from './weekly-prizes-lib.mjs';
 
@@ -17,6 +18,17 @@ test('calcula los sorteos de la semana anterior desde el domingo', () => {
     { game: 'EUROMILLONES', date: '2026-08-21' },
     { game: 'PRIMITIVA', date: '2026-08-22' }
   ]);
+});
+
+test('resuelve el sorteo del dia anterior para el cron', () => {
+  assert.deepEqual(scheduledDrawDate('PRIMITIVA', new Date('2026-08-25T12:00:00.000Z')), {
+    game: 'PRIMITIVA',
+    date: '2026-08-24'
+  });
+  assert.deepEqual(scheduledDrawDate('EUROMILLONES', new Date('2026-08-26T12:00:00.000Z')), {
+    game: 'EUROMILLONES',
+    date: '2026-08-25'
+  });
 });
 
 test('normaliza importes documentados en centimos', () => {

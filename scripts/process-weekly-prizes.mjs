@@ -13,6 +13,7 @@ import {
   normalizeApiResult,
   normalizeVerification,
   previousWeekDrawDates,
+  scheduledDrawDate,
   sumLinePrizes
 } from './weekly-prizes-lib.mjs';
 
@@ -35,6 +36,12 @@ if (process.env.DATABASE_URL.startsWith('file:')) throw new Error('DATABASE_URL 
 
 if (readOnlyMode && (!args.game || !args.drawDate || (!args.groupId && !args.groupName))) {
   throw new Error('El modo --read-only requiere --game, --draw-date y --group-id o --group-name.');
+}
+if (args.scheduled && !args.game) {
+  throw new Error('El modo --scheduled requiere --game.');
+}
+if (args.scheduled && args.drawDate) {
+  throw new Error('--scheduled y --draw-date no pueden utilizarse juntos.');
 }
 if (args.drawDate && !/^\d{4}-\d{2}-\d{2}$/.test(args.drawDate)) {
   throw new Error('--draw-date debe usar el formato YYYY-MM-DD.');
@@ -194,6 +201,7 @@ function formatEuro(value) {
 }
 
 function selectDraws(options) {
+  if (options.scheduled) return [scheduledDrawDate(options.game)];
   if (options.drawDate && options.game) return [{ game: options.game, date: options.drawDate }];
   if (options.drawDate || options.game) throw new Error('--draw-date y --game deben utilizarse juntos.');
   const referenceDate = options.referenceDate ? dateKeyToUtc(options.referenceDate) : new Date();
@@ -205,6 +213,7 @@ function parseArgs(argv) {
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     if (argument === '--read-only') options.readOnly = true;
+    else if (argument === '--scheduled') options.scheduled = true;
     else if (argument === '--reference-date') options.referenceDate = argv[++index];
     else if (argument === '--draw-date') options.drawDate = argv[++index];
     else if (argument === '--group-id') options.groupId = argv[++index];
@@ -317,7 +326,7 @@ async function sendOperationalAlert(error) {
   const recipients = (process.env.RESULTS_ALERT_RECIPIENTS ?? process.env.RESULTS_SMTP_USER ?? '').split(',').map((value) => value.trim()).filter(Boolean);
   if (recipients.length === 0) return;
   try {
-    await sendMail(recipients, 'loto-sync — cálculo semanal pendiente', `El cálculo automático no pudo completarse. La base de datos puede haberse actualizado si el fallo ocurrió después de la escritura; el estado y los backups permiten reanudarlo de forma idempotente.\n\nMotivo: ${error instanceof Error ? error.message : String(error)}\n\nEl worker reintentará la operación en la siguiente ejecución.`);
+    await sendMail(recipients, 'loto-sync — cálculo de sorteo pendiente', `El cálculo automático no pudo completarse. La base de datos puede haberse actualizado si el fallo ocurrió después de la escritura; el estado y los backups permiten reanudarlo de forma idempotente.\n\nMotivo: ${error instanceof Error ? error.message : String(error)}\n\nEl worker reintentará ese sorteo en su siguiente ejecución.`);
   } catch (mailError) {
     console.error(`No se pudo enviar el aviso operativo: ${mailError instanceof Error ? mailError.message : String(mailError)}`);
   }

@@ -5,6 +5,17 @@ export const DRAW_SCHEDULE = {
   EUROMILLONES: [2, 5]
 };
 
+export const scheduledDrawDate = (game, reference = new Date()) => {
+  const yesterday = dateKeyToUtc(toDateKey(reference));
+  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+  const date = yesterday.toISOString().slice(0, 10);
+  const weekday = yesterday.getUTCDay();
+  if (!DRAW_SCHEDULE[game]?.includes(weekday)) {
+    throw new Error(`No hay sorteo de ${game} el día ${date}.`);
+  }
+  return { game, date };
+};
+
 export const toDateKey = (date) => {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: MADRID_TIME_ZONE,
