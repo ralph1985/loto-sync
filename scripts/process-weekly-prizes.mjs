@@ -29,7 +29,10 @@ loadLocalEnvFiles(resolve(root, '.env.local'));
 loadLocalEnvFiles(resolve(root, '.env'));
 
 const required = ['DATABASE_URL', 'LOTERIAS_API_KEY'];
-if (!readOnlyMode) required.push('DB_SYNC_TOKEN', 'REMOTE_SYNC_BASE_URL', 'RESULTS_SMTP_PASSWORD');
+if (!readOnlyMode) required.push('DB_SYNC_TOKEN', 'REMOTE_SYNC_BASE_URL');
+if (!readOnlyMode && !process.env.RESULTS_SMTP_PASSWORD && !process.env.RESULTS_IMAP_PASSWORD) {
+  required.push('RESULTS_SMTP_PASSWORD or RESULTS_IMAP_PASSWORD');
+}
 const missing = required.filter((key) => !process.env[key]);
 if (missing.length > 0) throw new Error(`Faltan variables de configuración: ${missing.join(', ')}`);
 if (process.env.DATABASE_URL.startsWith('file:')) throw new Error('DATABASE_URL debe apuntar a PostgreSQL remoto.');
@@ -338,7 +341,7 @@ async function sendMail(recipients, subject, text) {
     port: Number(process.env.RESULTS_SMTP_PORT ?? '587'),
     secure: process.env.RESULTS_SMTP_SECURE === 'true',
     requireTLS: true,
-    auth: { user: process.env.RESULTS_SMTP_USER ?? 'loto@conquense.dev', pass: process.env.RESULTS_SMTP_PASSWORD }
+    auth: { user: process.env.RESULTS_SMTP_USER ?? 'loto@conquense.dev', pass: process.env.RESULTS_SMTP_PASSWORD ?? process.env.RESULTS_IMAP_PASSWORD }
   });
   await transporter.sendMail({ from: process.env.RESULTS_REPORT_FROM ?? 'loto@conquense.dev', to: recipients, subject, text });
 }
