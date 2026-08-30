@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev --webpack",
     "build": "prisma generate && next build",
-    "test:unit": "node --experimental-strip-types --test src/features/tickets/create-logic.test.ts src/components/ui/modal-behavior.test.ts src/features/results/data.test.ts src/features/results/line-results.test.ts src/lib/group-balance.test.ts scripts/results-parser.test.mjs scripts/weekly-prizes-lib.test.mjs",
+    "test:unit": "node --experimental-strip-types --test src/features/tickets/create-logic.test.ts src/components/ui/modal-behavior.test.ts src/features/results/data.test.ts src/features/results/line-results.test.ts src/lib/group-balance.test.ts scripts/results-parser.test.mjs scripts/weekly-prizes-lib.test.mjs scripts/weekly-balance-lib.test.mjs",
     "start": "next start",
     "lint": "eslint",
     "postinstall": "prisma generate",
@@ -16,6 +16,7 @@
     "backup:db": "node scripts/backup-db.mjs",
     "results:process": "node scripts/process-results-mail.mjs",
     "weekly-prizes:process": "node scripts/process-weekly-prizes.mjs",
+    "weekly-balance:send": "node scripts/send-weekly-balance-reports.mjs",
     "results:inspect": "node scripts/inspect-result-email.mjs",
     "recurring-tickets:generate": "node scripts/generate-recurring-tickets.mjs",
     "db:sync:up": "node scripts/sync-db-mirror.mjs up",
