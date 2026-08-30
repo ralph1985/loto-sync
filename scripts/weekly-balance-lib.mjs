@@ -34,9 +34,9 @@ export const zonedMidnightUtc = (dateKey) => zonedDateTimeToUtc(dateKey, '00:00:
 export const getWeekWindow = (reference = new Date()) => {
   const referenceKey = typeof reference === 'string' ? reference : toDateKey(reference);
   const day = new Date(`${referenceKey}T00:00:00.000Z`).getUTCDay();
-  const daysSinceMonday = day === 0 ? 6 : day - 1;
-  const startDate = addDays(referenceKey, -daysSinceMonday);
-  const endDate = addDays(startDate, 7);
+  const daysSincePreviousSunday = day === 0 ? 7 : day;
+  const startDate = addDays(referenceKey, -daysSincePreviousSunday);
+  const endDate = addDays(startDate, 8);
   return {
     key: startDate,
     startDate,
@@ -47,6 +47,33 @@ export const getWeekWindow = (reference = new Date()) => {
 };
 
 export const sumAmounts = (movements) => movements.reduce((total, movement) => total + movement.amountCents, 0);
+
+export const summarizeMovements = (movements) => {
+  const summary = {
+    operations: movements.length,
+    contributionsCents: 0,
+    expensesCents: 0,
+    prizesCents: 0,
+    adjustmentsCents: 0,
+    inflowsCents: 0,
+    outflowsCents: 0,
+    netCents: 0
+  };
+
+  for (const movement of movements) {
+    const amountCents = Number(movement.amountCents) || 0;
+    summary.netCents += amountCents;
+    if (amountCents >= 0) summary.inflowsCents += amountCents;
+    else summary.outflowsCents += Math.abs(amountCents);
+
+    if (movement.type === 'CONTRIBUTION') summary.contributionsCents += Math.max(amountCents, 0);
+    if (movement.type === 'TICKET_EXPENSE') summary.expensesCents += Math.abs(amountCents);
+    if (movement.type === 'PRIZE') summary.prizesCents += Math.max(amountCents, 0);
+    if (movement.type === 'ADJUSTMENT' || movement.type === 'OPENING') summary.adjustmentsCents += amountCents;
+  }
+
+  return summary;
+};
 
 export const formatDate = (dateKey) => new Intl.DateTimeFormat('es-ES', {
   dateStyle: 'long',

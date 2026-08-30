@@ -179,6 +179,8 @@ npm run weekly-prizes:process -- --scheduled --game PRIMITIVA
 
 Si loteriasAPI no devuelve un resultado o importe completo, el worker no modifica la base de datos y termina con error para permitir un reintento posterior.
 
+El informe dominical de las 15:00 cubre desde el domingo anterior a las 00:00 hasta el domingo de envío a las 23:59. Envía una radiografía por grupo con bote habilitado: saldo inicial y final, entradas, salidas, aportaciones, gastos de boletos y premios. Cada premio incluye, cuando están disponibles, la línea, categoría y aciertos que lo justifican; cada gasto se vincula al juego, fecha del sorteo, boleto y nota registrada.
+
 Para consultar el premio de un único grupo y sorteo sin modificar la base de datos ni enviar correo:
 
 ```bash
