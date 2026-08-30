@@ -375,7 +375,7 @@ async function sendMail(recipients, subject, text, html = null) {
 }
 
 async function apiRequest(path) {
-  const response = await fetch(`${apiBaseUrl}${path}`, { headers: { 'X-API-Key': process.env.LOTERIAS_API_KEY, Accept: 'application/json' } });
+  const response = await fetch(`${apiBaseUrl}${path}`, { headers: { 'X-API-Key': process.env.LOTERIAS_API_KEY, Accept: 'application/json', 'User-Agent': 'loto-sync/0.1' } });
   if (!response.ok) throw new Error(`loteriasAPI respondió ${response.status} para ${path}.`);
   return response.json();
 }
