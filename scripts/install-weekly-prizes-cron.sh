@@ -24,11 +24,11 @@ END_MARKER="# END LOTO-SYNC WEEKLY PRIZES"
   printf '0 14 * * 3 /usr/bin/flock -n %s/worker.lock /usr/bin/env bash -lc '\''cd %s && %s run weekly-prizes:process -- --scheduled --game EUROMILLONES >> %s/worker.log 2>&1'\''\n' "$LOG_DIR" "$ROOT_DIR" "$NPM_BIN" "$LOG_DIR"
   printf '0 14 * * 5 /usr/bin/flock -n %s/worker.lock /usr/bin/env bash -lc '\''cd %s && %s run weekly-prizes:process -- --scheduled --game PRIMITIVA >> %s/worker.log 2>&1'\''\n' "$LOG_DIR" "$ROOT_DIR" "$NPM_BIN" "$LOG_DIR"
   printf '0 14 * * 6 /usr/bin/flock -n %s/worker.lock /usr/bin/env bash -lc '\''cd %s && %s run weekly-prizes:process -- --scheduled --game EUROMILLONES >> %s/worker.log 2>&1'\''\n' "$LOG_DIR" "$ROOT_DIR" "$NPM_BIN" "$LOG_DIR"
-  printf '0 14 * * 0 /usr/bin/flock -n %s/worker.lock /usr/bin/env bash -lc '\''cd %s && %s run weekly-prizes:process -- --scheduled --game PRIMITIVA >> %s/worker.log 2>&1'\''\n' "$LOG_DIR" "$ROOT_DIR" "$NPM_BIN" "$LOG_DIR"
+  printf '30 12 * * 0 /usr/bin/flock -n %s/worker.lock /usr/bin/env bash -lc '\''cd %s && %s run weekly-prizes:process -- --scheduled --game PRIMITIVA >> %s/worker.log 2>&1'\''\n' "$LOG_DIR" "$ROOT_DIR" "$NPM_BIN" "$LOG_DIR"
   printf '# BEGIN LOTO-SYNC WEEKLY BALANCE\n'
   printf '0 15 * * 0 /usr/bin/flock -n %s/worker.lock /usr/bin/env bash -lc '\''cd %s && %s run weekly-balance:send >> %s/worker.log 2>&1'\''\n' "$BALANCE_LOG_DIR" "$ROOT_DIR" "$NPM_BIN" "$BALANCE_LOG_DIR"
   printf '# END LOTO-SYNC WEEKLY BALANCE\n'
   printf '%s\n' "$END_MARKER"
 } | crontab -
 rm -f "$LOG_DIR/crontab.current"
-echo "Cron de premios instalado: sorteos procesados al día siguiente a las 14:00 Europe/Madrid"
+echo "Cron de premios instalado: sorteos procesados al día siguiente a las 14:00 y el domingo a las 12:30 Europe/Madrid"

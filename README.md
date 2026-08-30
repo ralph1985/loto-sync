@@ -136,7 +136,7 @@ La copia de seguridad se exporta desde Vercel Postgres mediante la API segura y 
 npm run backup:db
 ```
 
-Genera un fichero local `backups/vercel-postgres-YYYYMMDD-HHMMSS.json`. No realiza subidas a OneDrive.
+Genera un fichero local `backups/vercel-postgres-YYYYMMDD-HHMMSS.json`.
 
 En este PC se ejecuta los martes, viernes y domingos a las 04:30 con cron. La salida queda registrada en `backups/backup-cron.log`.
 
@@ -165,7 +165,7 @@ npm run results:process
 npm run results:inspect -- --file ./resultado.eml
 ```
 
-El cálculo automático se ejecuta al día siguiente de cada sorteo a las 14:00 (`Europe/Madrid`): Primitiva de lunes, jueves y sábado; Euromillones de martes y viernes. Cada sorteo tiene su propia ejecución, backup, actualización, correo y estado idempotente. Si falla un sorteo, los demás días continúan con normalidad y ese sorteo se puede reintentar de forma independiente. Requiere `LOTERIAS_API_KEY`. Para instalar el cron en el equipo local:
+El cálculo automático se ejecuta al día siguiente de cada sorteo (`Europe/Madrid`): normalmente a las 14:00 y el procesamiento dominical de La Primitiva a las 12:30, antes del cierre del informe semanal. Cada sorteo tiene su propia ejecución, backup, actualización, correo y estado idempotente. Si falla un sorteo, los demás días continúan con normalidad y ese sorteo se puede reintentar de forma independiente. Requiere `LOTERIAS_API_KEY`. Para instalar el cron en el equipo local:
 
 ```bash
 bash scripts/install-weekly-prizes-cron.sh
@@ -179,7 +179,7 @@ npm run weekly-prizes:process -- --scheduled --game PRIMITIVA
 
 Si loteriasAPI no devuelve un resultado o importe completo, el worker no modifica la base de datos y termina con error para permitir un reintento posterior.
 
-El informe dominical de las 15:00 cubre desde el domingo anterior a las 00:00 hasta el domingo de envío a las 23:59. Envía una radiografía por grupo con bote habilitado: saldo inicial y final, entradas, salidas, aportaciones, gastos de boletos y premios. Cada premio incluye, cuando están disponibles, la línea, categoría y aciertos que lo justifican; cada gasto se vincula al juego, fecha del sorteo, boleto y nota registrada.
+El informe dominical de las 15:00 cubre desde el domingo anterior a las 14:00 hasta el domingo de envío a las 14:00. Envía una radiografía por grupo con bote habilitado: saldo inicial y final, entradas, salidas, aportaciones, gastos de boletos y premios. Cada premio incluye, cuando están disponibles, la línea, categoría y aciertos que lo justifican; cada gasto se vincula al juego, fecha del sorteo, boleto y nota registrada. Una compra posterior a las 14:00 queda para el informe siguiente, aunque su sorteo sea el mismo día.
 
 Para consultar el premio de un único grupo y sorteo sin modificar la base de datos ni enviar correo:
 

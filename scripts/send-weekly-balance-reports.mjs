@@ -4,7 +4,6 @@ import nodemailer from 'nodemailer';
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import {
-  addDays,
   formatDate,
   formatShortDate,
   getWeekWindow,
@@ -216,7 +215,8 @@ function buildTextReport(report) {
   const otherMovements = report.movements.filter((movement) => !['PRIZE', 'TICKET_EXPENSE'].includes(movement.type));
   return [
     `RADIOGRAFÍA SEMANAL DEL BOTE — ${report.group.name}`,
-    `Periodo: ${formatShortDate(report.week.startDate)} a ${formatShortDate(addDays(report.week.endDate, -1))}`,
+    `Periodo: domingo ${formatShortDate(report.week.startDate)} 14:00 a domingo ${formatShortDate(report.week.endDate)} 14:00`,
+    'Nota: el saldo se cierra a las 14:00; las compras posteriores pasan al siguiente informe.',
     '',
     buildNarrative(report),
     '',
@@ -224,7 +224,7 @@ function buildTextReport(report) {
     `Bote al inicio: ${opening}`,
     `Entradas registradas: ${formatEuro(summary.inflowsCents)}`,
     `Salidas registradas: ${formatEuro(summary.outflowsCents)}`,
-    `Bote al cierre: ${closing}`,
+    `Bote al cierre (14:00): ${closing}`,
     `Variación neta: ${change}`,
     `Operaciones: ${summary.operations}`,
     '',
@@ -250,9 +250,9 @@ function buildHtmlReport(report) {
   const prizes = report.movements.filter((movement) => movement.type === 'PRIZE');
   const expenses = report.movements.filter((movement) => movement.type === 'TICKET_EXPENSE');
   const otherMovements = report.movements.filter((movement) => !['PRIZE', 'TICKET_EXPENSE'].includes(movement.type));
-  const periodLabel = `${formatDate(report.week.startDate)} al ${formatDate(addDays(report.week.endDate, -1))}`;
+  const periodLabel = `Domingo ${formatDate(report.week.startDate)} 14:00 → domingo ${formatDate(report.week.endDate)} 14:00`;
   const metric = (label, value, color, background) => `<td style="width:50%;padding:0 6px 12px 0;vertical-align:top;"><div style="padding:16px;border:1px solid ${background};border-radius:14px;background:${background};"><div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#64748b;">${label}</div><strong style="display:block;margin-top:5px;font-size:22px;line-height:1.1;color:${color};">${escapeHtml(value)}</strong></div></td>`;
-  return `<!doctype html><html lang="es"><body style="margin:0;background:#e9eef3;color:#15202b;font-family:Arial,sans-serif;line-height:1.5;"><div style="max-width:700px;margin:0 auto;padding:22px 12px;"><header style="padding:28px 24px;border-radius:18px 18px 0 0;background:#132c3f;color:#ffffff;"><p style="margin:0 0 10px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#f5b544;">Loto-sync / radiografía semanal</p><h1 style="margin:0;font-size:30px;line-height:1.1;">${escapeHtml(report.group.name)}</h1><p style="margin:10px 0 0;color:#c7d5df;font-size:14px;">${escapeHtml(periodLabel)} · 8 días de historia</p></header><main style="padding:22px 20px;background:#ffffff;"><div style="padding:16px 18px;margin-bottom:20px;border-left:4px solid #f5b544;background:#fff8e8;color:#344452;font-size:15px;">${escapeHtml(buildNarrative(report))}</div><table role="presentation" style="width:100%;border-collapse:collapse;"><tr>${metric('Bote inicial', opening, '#244c68', '#eef5f8')}${metric('Bote final', closing, changeCents >= 0 ? '#166534' : '#b91c1c', changeCents >= 0 ? '#edf9f0' : '#fff1f1')}</tr><tr>${metric('Entradas', formatEuro(summary.inflowsCents), '#166534', '#f0f8f2')}${metric('Salidas', formatEuro(summary.outflowsCents), '#9a3412', '#fff4ec')}</tr></table><section style="margin-top:14px;padding-top:18px;border-top:1px solid #dce4ea;"><h2 style="margin:0 0 10px;font-size:18px;color:#132c3f;">El balance, sin letra pequeña</h2><p style="margin:0;color:#526370;font-size:14px;">${escapeHtml(`Hubo ${summary.operations} operaciones. El bote ${changeCents >= 0 ? 'creció' : 'bajó'} ${escapeHtml(change)} durante el periodo. ${buildCoverageSentence(summary)}`)}</p></section>${buildHtmlMovementSection('Premios · por qué entró el dinero', prizes, formatPrizeHtml, '#edf9f0', '#166534', 'No se han registrado premios en este periodo.')}${buildHtmlMovementSection('Gastos · en qué se usó el dinero', expenses, formatExpenseHtml, '#fff4ec', '#9a3412', 'No se han registrado gastos de boletos en este periodo.')}${buildHtmlMovementSection('Otros movimientos', otherMovements, formatOtherMovementHtml, '#f4f6f8', '#526370', 'No hay aportaciones ni ajustes en este periodo.')}<div style="margin-top:22px;padding:16px;border-radius:14px;background:#132c3f;color:#ffffff;"><div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#f5b544;">Conclusión</div><p style="margin:6px 0 0;font-size:16px;line-height:1.45;">${escapeHtml(buildClosingSentence(report))}</p></div><p style="margin:24px 0 0;padding-top:16px;border-top:1px solid #e2e8f0;color:#71808c;font-size:12px;">Informe generado automáticamente por <a href="https://conquense.dev" style="color:#1d4ed8;font-weight:700;">conquense.dev</a>. Consulta tus grupos y boletos en <a href="https://loterias.conquense.dev/" style="color:#1d4ed8;font-weight:700;">loterias.conquense.dev</a>.</p></main></div></body></html>`;
+  return `<!doctype html><html lang="es"><body style="margin:0;background:#e9eef3;color:#15202b;font-family:Arial,sans-serif;line-height:1.5;"><div style="max-width:700px;margin:0 auto;padding:22px 12px;"><header style="padding:28px 24px;border-radius:18px 18px 0 0;background:#132c3f;color:#ffffff;"><p style="margin:0 0 10px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#f5b544;">Loto-sync / radiografía semanal</p><h1 style="margin:0;font-size:30px;line-height:1.1;">${escapeHtml(report.group.name)}</h1><p style="margin:10px 0 0;color:#c7d5df;font-size:14px;">${escapeHtml(periodLabel)} · 7 días operativos</p><p style="margin:8px 0 0;color:#f4d58c;font-size:12px;">Cierre contable a las 14:00; las compras posteriores pasan al siguiente informe.</p></header><main style="padding:22px 20px;background:#ffffff;"><div style="padding:16px 18px;margin-bottom:20px;border-left:4px solid #f5b544;background:#fff8e8;color:#344452;font-size:15px;">${escapeHtml(buildNarrative(report))}</div><table role="presentation" style="width:100%;border-collapse:collapse;"><tr>${metric('Bote inicial', opening, '#244c68', '#eef5f8')}${metric('Bote final · 14:00', closing, changeCents >= 0 ? '#166534' : '#b91c1c', changeCents >= 0 ? '#edf9f0' : '#fff1f1')}</tr><tr>${metric('Entradas', formatEuro(summary.inflowsCents), '#166534', '#f0f8f2')}${metric('Salidas', formatEuro(summary.outflowsCents), '#9a3412', '#fff4ec')}</tr></table><section style="margin-top:14px;padding-top:18px;border-top:1px solid #dce4ea;"><h2 style="margin:0 0 10px;font-size:18px;color:#132c3f;">El balance, sin letra pequeña</h2><p style="margin:0;color:#526370;font-size:14px;">${escapeHtml(`Hubo ${summary.operations} operaciones. El bote ${changeCents >= 0 ? 'creció' : 'bajó'} ${escapeHtml(change)} durante el periodo. ${buildCoverageSentence(summary)}`)}</p></section>${buildHtmlMovementSection('Premios · por qué entró el dinero', prizes, formatPrizeHtml, '#edf9f0', '#166534', 'No se han registrado premios en este periodo.')}${buildHtmlMovementSection('Gastos · en qué se usó el dinero', expenses, formatExpenseHtml, '#fff4ec', '#9a3412', 'No se han registrado gastos de boletos en este periodo.')}${buildHtmlMovementSection('Otros movimientos', otherMovements, formatOtherMovementHtml, '#f4f6f8', '#526370', 'No hay aportaciones ni ajustes en este periodo.')}<div style="margin-top:22px;padding:16px;border-radius:14px;background:#132c3f;color:#ffffff;"><div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#f5b544;">Conclusión</div><p style="margin:6px 0 0;font-size:16px;line-height:1.45;">${escapeHtml(buildClosingSentence(report))}</p></div><p style="margin:24px 0 0;padding-top:16px;border-top:1px solid #e2e8f0;color:#71808c;font-size:12px;">Informe generado automáticamente por <a href="https://conquense.dev" style="color:#1d4ed8;font-weight:700;">conquense.dev</a>. Consulta tus grupos y boletos en <a href="https://loterias.conquense.dev/" style="color:#1d4ed8;font-weight:700;">loterias.conquense.dev</a>.</p></main></div></body></html>`;
 }
 
 function buildNarrative(report) {
@@ -267,7 +267,7 @@ function buildCoverageSentence(summary) {
   if (summary.prizesCents > 0 && summary.expensesCents > 0) parts.push(`los premios cubrieron el ${Math.round((summary.prizesCents / summary.expensesCents) * 100)}% de ese gasto`);
   else if (summary.prizesCents > 0) parts.push(`entraron ${formatEuro(summary.prizesCents)} en premios`);
   if (summary.contributionsCents > 0) parts.push(`hubo ${formatEuro(summary.contributionsCents)} de aportaciones`);
-  return parts.length > 0 ? `${parts.join('; ')}.` : 'No hubo movimientos económicos registrados.';
+  return parts.length > 0 ? `${parts.join('; ').replace(/^./, (character) => character.toUpperCase())}.` : 'No hubo movimientos económicos registrados.';
 }
 
 function formatPrizeText(prize) {

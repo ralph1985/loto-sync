@@ -30,19 +30,19 @@ export const addDays = (dateKey, days) => {
 };
 
 export const zonedMidnightUtc = (dateKey) => zonedDateTimeToUtc(dateKey, '00:00:00');
+export const zonedDateTimeUtc = (dateKey, time) => zonedDateTimeToUtc(dateKey, time);
 
 export const getWeekWindow = (reference = new Date()) => {
   const referenceKey = typeof reference === 'string' ? reference : toDateKey(reference);
   const day = new Date(`${referenceKey}T00:00:00.000Z`).getUTCDay();
-  const daysSincePreviousSunday = day === 0 ? 7 : day;
-  const startDate = addDays(referenceKey, -daysSincePreviousSunday);
-  const endDate = addDays(startDate, 8);
+  const endDate = addDays(referenceKey, -day);
+  const startDate = addDays(endDate, -7);
   return {
     key: startDate,
     startDate,
     endDate,
-    start: zonedMidnightUtc(startDate),
-    end: zonedMidnightUtc(endDate)
+    start: zonedDateTimeUtc(startDate, '14:00:00'),
+    end: zonedDateTimeUtc(endDate, '14:00:00')
   };
 };
 

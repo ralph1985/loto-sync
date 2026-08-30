@@ -37,7 +37,7 @@ Este archivo aplica a todo este repositorio.
 ## Base de datos y backups
 
 - Comando de backup: `npm run backup:db`.
-- El backup genera un snapshot JSON en `backups/` y lo sube a OneDrive.
+- El backup exporta un snapshot JSON de Vercel Postgres y lo guarda únicamente en `backups/`; no realiza subidas a servicios externos.
 - `db:sync:up` y `db:sync:down` estan intencionadamente desactivados para evitar sobrescrituras accidentales.
 - Cualquier migracion o cambio de datos debe preservar compatibilidad con los datos actuales de produccion.
 - Politica obligatoria al interactuar con Vercel DB:
