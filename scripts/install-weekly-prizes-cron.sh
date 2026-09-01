@@ -21,7 +21,6 @@ END_MARKER="# END LOTO-SYNC WEEKLY PRIZES"
   printf '%s\n' "$BEGIN_MARKER"
   printf 'CRON_TZ=Europe/Madrid\n'
   printf '0 14 * * 2 /usr/bin/flock -n %s/worker.lock /usr/bin/env bash -lc '\''cd %s && %s run weekly-prizes:process -- --scheduled --game PRIMITIVA >> %s/worker.log 2>&1'\''\n' "$LOG_DIR" "$ROOT_DIR" "$NPM_BIN" "$LOG_DIR"
-  printf '0 14 * * 3 /usr/bin/flock -n %s/worker.lock /usr/bin/env bash -lc '\''cd %s && %s run weekly-prizes:process -- --scheduled --game EUROMILLONES >> %s/worker.log 2>&1'\''\n' "$LOG_DIR" "$ROOT_DIR" "$NPM_BIN" "$LOG_DIR"
   printf '0 14 * * 5 /usr/bin/flock -n %s/worker.lock /usr/bin/env bash -lc '\''cd %s && %s run weekly-prizes:process -- --scheduled --game PRIMITIVA >> %s/worker.log 2>&1'\''\n' "$LOG_DIR" "$ROOT_DIR" "$NPM_BIN" "$LOG_DIR"
   printf '0 14 * * 6 /usr/bin/flock -n %s/worker.lock /usr/bin/env bash -lc '\''cd %s && %s run weekly-prizes:process -- --scheduled --game EUROMILLONES >> %s/worker.log 2>&1'\''\n' "$LOG_DIR" "$ROOT_DIR" "$NPM_BIN" "$LOG_DIR"
   printf '30 12 * * 0 /usr/bin/flock -n %s/worker.lock /usr/bin/env bash -lc '\''cd %s && %s run weekly-prizes:process -- --scheduled --game PRIMITIVA >> %s/worker.log 2>&1'\''\n' "$LOG_DIR" "$ROOT_DIR" "$NPM_BIN" "$LOG_DIR"

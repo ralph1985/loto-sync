@@ -13,7 +13,6 @@ import {
 test('calcula los sorteos de la semana anterior desde el domingo', () => {
   assert.deepEqual(previousWeekDrawDates(new Date('2026-08-23T08:00:00.000Z')), [
     { game: 'PRIMITIVA', date: '2026-08-17' },
-    { game: 'EUROMILLONES', date: '2026-08-18' },
     { game: 'PRIMITIVA', date: '2026-08-20' },
     { game: 'EUROMILLONES', date: '2026-08-21' },
     { game: 'PRIMITIVA', date: '2026-08-22' }
@@ -25,10 +24,11 @@ test('resuelve el sorteo del dia anterior para el cron', () => {
     game: 'PRIMITIVA',
     date: '2026-08-24'
   });
-  assert.deepEqual(scheduledDrawDate('EUROMILLONES', new Date('2026-08-26T12:00:00.000Z')), {
+  assert.deepEqual(scheduledDrawDate('EUROMILLONES', new Date('2026-08-29T12:00:00.000Z')), {
     game: 'EUROMILLONES',
-    date: '2026-08-25'
+    date: '2026-08-28'
   });
+  assert.throws(() => scheduledDrawDate('EUROMILLONES', new Date('2026-08-26T12:00:00.000Z')), /No hay sorteo/);
 });
 
 test('normaliza importes documentados en centimos', () => {

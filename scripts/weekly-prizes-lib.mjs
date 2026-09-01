@@ -2,7 +2,7 @@ const MADRID_TIME_ZONE = 'Europe/Madrid';
 
 export const DRAW_SCHEDULE = {
   PRIMITIVA: [1, 4, 6],
-  EUROMILLONES: [2, 5]
+  EUROMILLONES: [5]
 };
 
 export const scheduledDrawDate = (game, reference = new Date()) => {

@@ -165,7 +165,7 @@ npm run results:process
 npm run results:inspect -- --file ./resultado.eml
 ```
 
-El cálculo automático se ejecuta al día siguiente de cada sorteo (`Europe/Madrid`): normalmente a las 14:00 y el procesamiento dominical de La Primitiva a las 12:30, antes del cierre del informe semanal. Cada sorteo tiene su propia ejecución, backup, actualización, correo y estado idempotente. Si falla un sorteo, los demás días continúan con normalidad y ese sorteo se puede reintentar de forma independiente. Requiere `LOTERIAS_API_KEY`. Para instalar el cron en el equipo local:
+El cálculo automático se ejecuta al día siguiente de cada sorteo (`Europe/Madrid`): La Primitiva se procesa normalmente a las 14:00 los martes, jueves y sábados, y Euromillones únicamente el viernes se procesa el sábado a las 14:00. El procesamiento dominical de La Primitiva se ejecuta a las 12:30, antes del cierre del informe semanal. Cada sorteo tiene su propia ejecución, backup, actualización, correo y estado idempotente. Si falla un sorteo, los demás días continúan con normalidad y ese sorteo se puede reintentar de forma independiente. Requiere `LOTERIAS_API_KEY`. Para instalar el cron en el equipo local:
 
 ```bash
 bash scripts/install-weekly-prizes-cron.sh
