@@ -142,7 +142,7 @@ En este PC se ejecuta los martes, viernes y domingos a las 04:30 con cron. La sa
 
 ## Automatización de resultados de Primitiva y Euromillón
 
-El worker local consulta por IMAP los mensajes nuevos del buzón configurado, conserva el `.eml`, usa Codex en modo solo lectura para extraer un JSON validable, importa el resultado en `ResultCache`, recalcula los boletos afectados y envía un informe SMTP independiente por grupo. Admite La Primitiva (lunes, jueves y sábado) y Euromillón (martes y viernes). Para Euromillón también guarda y comprueba el código de El Millón de cada resguardo.
+El worker local consulta por IMAP los mensajes nuevos del buzón configurado, conserva el `.eml`, usa Codex en modo solo lectura para extraer un JSON validable, importa el resultado en `ResultCache` y recalcula los boletos afectados. Ya no envía un informe separado de resultados: los correos a usuarios salen del worker de premios y del resumen semanal del bote. Admite La Primitiva (lunes, jueves y sábado) y Euromillón (martes y viernes). Para Euromillón también guarda y comprueba el código de El Millón de cada resguardo.
 
 Configuración adicional en `.env.local`:
 
