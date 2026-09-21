@@ -25,7 +25,7 @@ END_MARKER="# END LOTO-SYNC WEEKLY PRIZES"
   printf '0 14 * * 6 /usr/bin/flock -n %s/worker.lock /usr/bin/env bash -lc '\''cd %s && %s run weekly-prizes:process -- --scheduled --game EUROMILLONES >> %s/worker.log 2>&1'\''\n' "$LOG_DIR" "$ROOT_DIR" "$NPM_BIN" "$LOG_DIR"
   printf '30 12 * * 0 /usr/bin/flock -n %s/worker.lock /usr/bin/env bash -lc '\''cd %s && %s run weekly-prizes:process -- --scheduled --game PRIMITIVA >> %s/worker.log 2>&1'\''\n' "$LOG_DIR" "$ROOT_DIR" "$NPM_BIN" "$LOG_DIR"
   printf '# BEGIN LOTO-SYNC WEEKLY BALANCE\n'
-  printf '0 15 * * 0 /usr/bin/flock -n %s/worker.lock /usr/bin/env bash -lc '\''cd %s && %s run weekly-balance:send >> %s/worker.log 2>&1'\''\n' "$BALANCE_LOG_DIR" "$ROOT_DIR" "$NPM_BIN" "$BALANCE_LOG_DIR"
+  printf '0 15 * * 0 /usr/bin/flock -n %s/worker.lock /usr/bin/env bash -lc '\''cd %s && /usr/bin/bash %s 3 60 %s run weekly-balance:send >> %s/worker.log 2>&1'\''\n' "$BALANCE_LOG_DIR" "$ROOT_DIR" "$ROOT_DIR/scripts/run-with-retries.sh" "$NPM_BIN" "$BALANCE_LOG_DIR"
   printf '# END LOTO-SYNC WEEKLY BALANCE\n'
   printf '%s\n' "$END_MARKER"
 } | crontab -

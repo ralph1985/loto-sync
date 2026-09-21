@@ -181,6 +181,8 @@ Si loteriasAPI no devuelve un resultado o importe completo, el worker no modific
 
 El informe dominical de las 15:00 cubre desde el domingo anterior a las 14:00 hasta el domingo de envío a las 14:00. Envía una radiografía por grupo con bote habilitado: saldo inicial y final, entradas, salidas, aportaciones, gastos de boletos y premios. Cada premio incluye, cuando están disponibles, la línea, categoría y aciertos que lo justifican; cada gasto se vincula al juego, fecha del sorteo, boleto y nota registrada. Una compra posterior a las 14:00 queda para el informe siguiente, aunque su sorteo sea el mismo día.
 
+Si el envío del informe semanal falla, el cron hace hasta tres intentos en total, con esperas de 60 y 120 segundos entre ellos. El estado por grupo evita reenviar los informes que ya se hayan entregado durante un reintento.
+
 Para consultar el premio de un único grupo y sorteo sin modificar la base de datos ni enviar correo:
 
 ```bash
