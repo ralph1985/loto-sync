@@ -25,12 +25,12 @@
     "db:sync:down:force": "node scripts/sync-db-mirror.mjs down --force"
   },
   "dependencies": {
-    "@prisma/adapter-pg": "7.4.2",
-    "@prisma/client": "7.4.2",
-    "imapflow": "^1.0.196",
-    "mailparser": "^3.7.4",
-    "nodemailer": "^7.0.6",
-    "next": "16.1.6",
+    "@prisma/adapter-pg": "7.10.0",
+    "@prisma/client": "7.10.0",
+    "imapflow": "1.7.8",
+    "mailparser": "3.9.36",
+    "next": "16.3.8",
+    "nodemailer": "10.0.15",
     "pg": "8.16.3",
     "react": "19.2.3",
     "react-dom": "19.2.3"
@@ -42,13 +42,15 @@
     "@types/react-dom": "19.2.3",
     "daisyui": "5.0.0",
     "eslint": "9.39.2",
-    "eslint-config-next": "16.1.6",
+    "eslint-config-next": "16.3.8",
     "husky": "9.0.11",
-    "prisma": "7.4.2",
+    "prisma": "7.10.0",
     "tailwindcss": "4.1.18",
     "typescript": "5.9.3"
   },
   "overrides": {
-    "js-yaml": "4.3.2"
+    "js-yaml": "4.3.2",
+    "deepmerge-ts": "8.0.2",
+    "mysql2": "3.24.5"
   }
 }

@@ -211,6 +211,12 @@ El comando es idempotente y ejecuta backup PRE/POST cuando crea boletos. Los bol
 
 Los comandos `db:sync:up` y `db:sync:down` quedan desactivados para evitar sobrescrituras de una base local.
 
+## Seguridad y dependencias
+
+Dependabot mantiene las dependencias de npm agrupadas por ámbito y propone actualizaciones semanales. Los workflows de GitHub ejecutan revisión de dependencias, `npm audit` y CodeQL en los cambios de `main`, además de una ejecución semanal. La auditoría de producción es la condición bloqueante; la auditoría completa también se publica para no ocultar problemas del tooling de desarrollo.
+
+La auditoría no se silencia cuando una dependencia transitoria todavía no tiene una versión compatible corregida: el workflow deja visible el fallo y Dependabot continúa siguiendo el aviso. Antes de fusionar una actualización, hay que revisar especialmente los avisos que afecten al runtime desplegado.
+
 ---
 
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
