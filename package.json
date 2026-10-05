@@ -27,9 +27,9 @@
   "dependencies": {
     "@prisma/adapter-pg": "7.4.2",
     "@prisma/client": "7.4.2",
-    "imapflow": "^1.0.196",
-    "mailparser": "^3.7.4",
-    "nodemailer": "^7.0.6",
+    "imapflow": "^1.7.8",
+    "mailparser": "^3.9.36",
+    "nodemailer": "^10.0.15",
     "next": "16.1.6",
     "pg": "8.16.3",
     "react": "19.2.3",
