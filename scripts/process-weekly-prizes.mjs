@@ -16,6 +16,7 @@ import {
   scheduledDrawDate,
   sumLinePrizes
 } from './weekly-prizes-lib.mjs';
+import { fallbackPrizePhrase, generatePrizePhrases } from './prize-phrases.mjs';
 
 const execFileAsync = promisify(execFile);
 const root = resolve(process.cwd());
@@ -309,17 +310,27 @@ async function sendGroupReports(report) {
     if (state.runs[report.key]?.sentGroups?.[group.id]) continue;
     const total = group.rows.reduce((sum, row) => sum + row.prizeCents, 0);
     const balance = group.balanceTrackingEnabled === false ? null : (balanceByGroup.get(group.id) ?? 0) / 100;
+    let phraseByTicket;
+    try {
+      phraseByTicket = await generatePrizePhrases(group.rows);
+    } catch (error) {
+      console.warn(`No se pudieron generar las frases de los premios; se usarán respaldos: ${error instanceof Error ? error.message : String(error)}`);
+      phraseByTicket = new Map(group.rows.map((row) => [row.ticketId, fallbackPrizePhrase(row.prizeCents)]));
+    }
     const text = [
       `INFORME DE PREMIOS — ${report.draw.game === 'PRIMITIVA' ? 'LA PRIMITIVA' : 'EUROMILLONES'}`,
       `Sorteo: ${report.draw.date}`,
       `Grupo: ${group.name}`,
       '',
-      ...group.rows.map((row) => `Boleto ${row.ticketId}: ${(row.prizeCents / 100).toFixed(2)} € (${row.lines.map((line) => `línea ${line.lineIndex}: ${(line.prizeCents / 100).toFixed(2)} €`).join(', ')})`),
+      ...group.rows.flatMap((row) => [
+        `Boleto ${row.ticketId}: ${(row.prizeCents / 100).toFixed(2)} € (${row.lines.map((line) => `línea ${line.lineIndex}: ${(line.prizeCents / 100).toFixed(2)} €`).join(', ')})`,
+        `  ${phraseByTicket.get(row.ticketId) ?? fallbackPrizePhrase(row.prizeCents)}`
+      ]),
       '',
       `Premio total del grupo: ${(total / 100).toFixed(2)} €`,
       ...(balance === null ? [] : [`Bote actualizado: ${balance.toFixed(2)} €`])
     ].join('\n');
-    const html = buildHtmlPrizeReport(report, group, balance);
+    const html = buildHtmlPrizeReport(report, group, balance, phraseByTicket);
     await sendMail(recipients, `${report.draw.game === 'PRIMITIVA' ? 'La Primitiva' : 'Euromillones'} — ${group.name} — premios ${report.draw.date}`, text, html);
     state.runs[report.key].sentGroups = { ...(state.runs[report.key].sentGroups ?? {}), [group.id]: new Date().toISOString() };
     writeState(state);
@@ -336,7 +347,7 @@ async function sendOperationalAlert(error) {
   }
 }
 
-function buildHtmlPrizeReport(report, group, balance) {
+function buildHtmlPrizeReport(report, group, balance, phraseByTicket = new Map()) {
   const gameLabel = report.draw.game === 'PRIMITIVA' ? 'La Primitiva' : 'Euromillones';
   const dateLabel = new Intl.DateTimeFormat('es-ES', { dateStyle: 'long', timeZone: 'UTC' }).format(new Date(`${report.draw.date}T00:00:00.000Z`));
   const total = group.rows.reduce((sum, row) => sum + row.prizeCents, 0) / 100;
@@ -353,7 +364,8 @@ function buildHtmlPrizeReport(report, group, balance) {
       const euro = report.draw.game === 'EUROMILLONES' && line.elMillionMatch ? '<br><span style="color:#7c3aed;font-weight:700;">El Millón: acertado</span>' : '';
       return `<tr><td style="padding:12px 0;border-top:1px solid #e2e8f0;vertical-align:top;"><strong>Línea ${line.lineIndex}</strong><div style="margin-top:8px;">${numbers || '<span style="color:#64748b;">sin números</span>'}</div><div style="margin-top:8px;font-size:14px;"><span style="color:#166534;font-weight:700;">Premio:</span> ${formatEuro(line.prizeCents / 100)}${category}${reintegro}${euro}</div></td></tr>`;
     }).join('');
-    return `<section style="margin:20px 0;padding:16px 18px;border:1px solid #e2e8f0;border-radius:12px;background:#ffffff;"><h3 style="margin:0;color:#0f172a;font-size:17px;">Boleto ${ticketIndex + 1}</h3><p style="margin:4px 0 8px;color:#64748b;font-size:12px;">${escapeHtml(row.ticketId)}</p><table role="presentation" style="width:100%;border-collapse:collapse;">${lines}</table><p style="margin:12px 0 0;color:#0f172a;font-weight:700;text-align:right;">Total del boleto: ${formatEuro(row.prizeCents / 100)}</p></section>`;
+    const phrase = phraseByTicket.get(row.ticketId) ?? fallbackPrizePhrase(row.prizeCents);
+    return `<section style="margin:20px 0;padding:16px 18px;border:1px solid #e2e8f0;border-radius:12px;background:#ffffff;"><h3 style="margin:0;color:#0f172a;font-size:17px;">Boleto ${ticketIndex + 1}</h3><p style="margin:4px 0 8px;color:#64748b;font-size:12px;">${escapeHtml(row.ticketId)}</p><table role="presentation" style="width:100%;border-collapse:collapse;">${lines}</table><p style="margin:12px 0 0;color:#0f172a;font-weight:700;text-align:right;">Total del boleto: ${formatEuro(row.prizeCents / 100)}</p><p style="margin:8px 0 0;color:#3730a3;font-size:14px;text-align:right;">${escapeHtml(phrase)}</p></section>`;
   }).join('');
   const balanceSection = balance === null ? '' : `<div style="flex:1;min-width:200px;padding:16px;border-radius:12px;background:#fef3c7;border:1px solid #fcd34d;"><div style="font-size:12px;color:#92400e;text-transform:uppercase;letter-spacing:.5px;">Bote actualizado</div><strong style="display:block;margin-top:4px;font-size:22px;color:#92400e;">${formatEuro(balance)}</strong></div>`;
   return `<!doctype html><html lang="es"><body style="margin:0;background:#f1f5f9;color:#0f172a;font-family:Arial,sans-serif;line-height:1.5;"><div style="max-width:680px;margin:0 auto;padding:24px 14px;"><div style="padding:24px;border-radius:16px 16px 0 0;background:#1e3a8a;color:#ffffff;"><p style="margin:0 0 6px;font-size:12px;letter-spacing:1px;text-transform:uppercase;opacity:.8;">Informe de premios · ${gameLabel}</p><h1 style="margin:0;font-size:26px;">${escapeHtml(group.name)}</h1><p style="margin:6px 0 0;opacity:.9;">Sorteo del ${escapeHtml(dateLabel)}</p></div><div style="padding:20px;background:#ffffff;"><div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px;"><div style="flex:1;min-width:200px;padding:16px;border-radius:12px;background:${hasPrize ? '#dcfce7' : '#f8fafc'};border:1px solid ${hasPrize ? '#86efac' : '#e2e8f0'};"><div style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;">Premio total del grupo</div><strong style="display:block;margin-top:4px;font-size:22px;color:${hasPrize ? '#166534' : '#334155'};">${formatEuro(total)}</strong></div>${balanceSection}</div><div style="padding:16px;border-radius:12px;background:#eef2ff;"><h2 style="margin:0 0 8px;font-size:16px;color:#3730a3;">Resultado del sorteo</h2><div>${resultNumbers}</div><p style="margin:10px 0 0;font-size:14px;color:#475569;">${resultDetails}</p></div>${ticketSections || '<p style="color:#64748b;">No hay boletos correspondientes a este sorteo.</p>'}<p style="margin:24px 0 0;padding-top:16px;border-top:1px solid #e2e8f0;color:#64748b;font-size:12px;">Informe generado automáticamente por <a href="https://conquense.dev" style="color:#1d4ed8;font-weight:700;">conquense.dev</a>. Consulta tus grupos y boletos en <a href="https://loterias.conquense.dev/" style="color:#1d4ed8;font-weight:700;">loterias.conquense.dev</a>.</p></div></div></body></html>`;
