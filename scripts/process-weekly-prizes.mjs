@@ -17,6 +17,7 @@ import {
   sumLinePrizes
 } from './weekly-prizes-lib.mjs';
 import { fallbackPrizePhrase, generatePrizePhrases } from './prize-phrases.mjs';
+import { buildPrizeEmailPreview } from './prize-email-format.mjs';
 
 const execFileAsync = promisify(execFile);
 const root = resolve(process.cwd());
@@ -41,6 +42,9 @@ if (process.env.DATABASE_URL.startsWith('file:')) throw new Error('DATABASE_URL 
 if (readOnlyMode && (!args.game || !args.drawDate || (!args.groupId && !args.groupName))) {
   throw new Error('El modo --read-only requiere --game, --draw-date y --group-id o --group-name.');
 }
+if (args.resend && (readOnlyMode || !args.game || !args.drawDate || (!args.groupId && !args.groupName))) {
+  throw new Error('El modo --resend requiere --game, --draw-date y --group-id o --group-name, y no admite --read-only.');
+}
 if (args.scheduled && !args.game) {
   throw new Error('El modo --scheduled requiere --game.');
 }
@@ -57,13 +61,16 @@ const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: proc
 const draws = selectDraws(args);
 
 try {
-  const targetGroup = readOnlyMode ? await resolveTargetGroup() : null;
+  const targetGroup = args.groupId || args.groupName ? await resolveTargetGroup() : null;
   const reports = [];
   for (const draw of draws) reports.push(await prepareDrawReport(draw, targetGroup));
 
   if (readOnlyMode) {
     for (const report of reports) await printReadOnlyReport(report);
   } else {
+    if (args.resend && reports.some((report) => !state.runs[report.key]?.databaseCompletedAt)) {
+      throw new Error('No se reenvía: el sorteo seleccionado no consta como procesado en la base de datos.');
+    }
     const pendingReports = reports.filter((report) => !state.runs[report.key]?.databaseCompletedAt);
     if (pendingReports.length > 0) {
       await runBackup('PRE');
@@ -217,6 +224,7 @@ function parseArgs(argv) {
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     if (argument === '--read-only') options.readOnly = true;
+    else if (argument === '--resend') options.resend = true;
     else if (argument === '--scheduled') options.scheduled = true;
     else if (argument === '--reference-date') options.referenceDate = argv[++index];
     else if (argument === '--draw-date') options.drawDate = argv[++index];
@@ -228,6 +236,7 @@ function parseArgs(argv) {
       options.game = game;
     } else if (argument === '--help') {
       console.log('Uso: npm run weekly-prizes:process -- --read-only --game PRIMITIVA --draw-date YYYY-MM-DD --group-name "Nombre"');
+      console.log('Reenvío puntual: añadir --resend; solo reenvía para un sorteo ya procesado y el grupo indicado.');
       process.exit(0);
     } else {
       throw new Error(`Argumento no reconocido: ${argument}`);
@@ -307,9 +316,16 @@ async function sendGroupReports(report) {
   for (const group of report.groups) {
     const recipients = group.emailRecipients.map((recipient) => recipient.email);
     if (recipients.length === 0) throw new Error(`El grupo ${group.name} no tiene destinatarios activos.`);
-    if (state.runs[report.key]?.sentGroups?.[group.id]) continue;
+    if (!args.resend && state.runs[report.key]?.sentGroups?.[group.id]) continue;
     const total = group.rows.reduce((sum, row) => sum + row.prizeCents, 0);
     const balance = group.balanceTrackingEnabled === false ? null : (balanceByGroup.get(group.id) ?? 0) / 100;
+    const preview = buildPrizeEmailPreview({
+      game: report.draw.game,
+      groupName: group.name,
+      drawDate: report.draw.date,
+      totalCents: total,
+      balanceCents: balance === null ? null : Math.round(balance * 100)
+    });
     let phraseByTicket;
     try {
       phraseByTicket = await generatePrizePhrases(group.rows);
@@ -318,6 +334,8 @@ async function sendGroupReports(report) {
       phraseByTicket = new Map(group.rows.map((row) => [row.ticketId, fallbackPrizePhrase(row.prizeCents)]));
     }
     const text = [
+      preview,
+      '',
       `INFORME DE PREMIOS — ${report.draw.game === 'PRIMITIVA' ? 'LA PRIMITIVA' : 'EUROMILLONES'}`,
       `Sorteo: ${report.draw.date}`,
       `Grupo: ${group.name}`,
@@ -331,7 +349,7 @@ async function sendGroupReports(report) {
       ...(balance === null ? [] : [`Bote actualizado: ${balance.toFixed(2)} €`])
     ].join('\n');
     const html = buildHtmlPrizeReport(report, group, balance, phraseByTicket);
-    await sendMail(recipients, `${report.draw.game === 'PRIMITIVA' ? 'La Primitiva' : 'Euromillones'} — ${group.name} — premios ${report.draw.date}`, text, html);
+    await sendMail(recipients, `${report.draw.game === 'PRIMITIVA' ? 'La Primitiva' : 'Euromillones'} — ${group.name} — ${formatEuro(total / 100)} — ${report.draw.date}`, text, html);
     state.runs[report.key].sentGroups = { ...(state.runs[report.key].sentGroups ?? {}), [group.id]: new Date().toISOString() };
     writeState(state);
   }
@@ -352,6 +370,13 @@ function buildHtmlPrizeReport(report, group, balance, phraseByTicket = new Map()
   const dateLabel = new Intl.DateTimeFormat('es-ES', { dateStyle: 'long', timeZone: 'UTC' }).format(new Date(`${report.draw.date}T00:00:00.000Z`));
   const total = group.rows.reduce((sum, row) => sum + row.prizeCents, 0) / 100;
   const hasPrize = total > 0;
+  const preview = buildPrizeEmailPreview({
+    game: report.draw.game,
+    groupName: group.name,
+    drawDate: report.draw.date,
+    totalCents: Math.round(total * 100),
+    balanceCents: balance === null ? null : Math.round(balance * 100)
+  });
   const resultNumbers = report.result.numbers.map((number) => `<span style="display:inline-block;margin:2px 4px 2px 0;padding:5px 9px;border-radius:999px;background:#e0e7ff;color:#3730a3;font-weight:700;">${escapeHtml(number)}</span>`).join('');
   const resultDetails = report.draw.game === 'EUROMILLONES'
     ? `<strong>Estrellas:</strong> ${escapeHtml(report.result.stars.join(', ') || 'no indicadas')} · <strong>El Millón:</strong> ${escapeHtml(report.result.elMillionCode ?? 'no indicado')}`
@@ -368,7 +393,7 @@ function buildHtmlPrizeReport(report, group, balance, phraseByTicket = new Map()
     return `<section style="margin:20px 0;padding:16px 18px;border:1px solid #e2e8f0;border-radius:12px;background:#ffffff;"><h3 style="margin:0;color:#0f172a;font-size:17px;">Boleto ${ticketIndex + 1}</h3><p style="margin:4px 0 8px;color:#64748b;font-size:12px;">${escapeHtml(row.ticketId)}</p><table role="presentation" style="width:100%;border-collapse:collapse;">${lines}</table><p style="margin:12px 0 0;color:#0f172a;font-weight:700;text-align:right;">Total del boleto: ${formatEuro(row.prizeCents / 100)}</p><p style="margin:8px 0 0;color:#3730a3;font-size:14px;text-align:right;">${escapeHtml(phrase)}</p></section>`;
   }).join('');
   const balanceSection = balance === null ? '' : `<div style="flex:1;min-width:200px;padding:16px;border-radius:12px;background:#fef3c7;border:1px solid #fcd34d;"><div style="font-size:12px;color:#92400e;text-transform:uppercase;letter-spacing:.5px;">Bote actualizado</div><strong style="display:block;margin-top:4px;font-size:22px;color:#92400e;">${formatEuro(balance)}</strong></div>`;
-  return `<!doctype html><html lang="es"><body style="margin:0;background:#f1f5f9;color:#0f172a;font-family:Arial,sans-serif;line-height:1.5;"><div style="max-width:680px;margin:0 auto;padding:24px 14px;"><div style="padding:24px;border-radius:16px 16px 0 0;background:#1e3a8a;color:#ffffff;"><p style="margin:0 0 6px;font-size:12px;letter-spacing:1px;text-transform:uppercase;opacity:.8;">Informe de premios · ${gameLabel}</p><h1 style="margin:0;font-size:26px;">${escapeHtml(group.name)}</h1><p style="margin:6px 0 0;opacity:.9;">Sorteo del ${escapeHtml(dateLabel)}</p></div><div style="padding:20px;background:#ffffff;"><div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px;"><div style="flex:1;min-width:200px;padding:16px;border-radius:12px;background:${hasPrize ? '#dcfce7' : '#f8fafc'};border:1px solid ${hasPrize ? '#86efac' : '#e2e8f0'};"><div style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;">Premio total del grupo</div><strong style="display:block;margin-top:4px;font-size:22px;color:${hasPrize ? '#166534' : '#334155'};">${formatEuro(total)}</strong></div>${balanceSection}</div><div style="padding:16px;border-radius:12px;background:#eef2ff;"><h2 style="margin:0 0 8px;font-size:16px;color:#3730a3;">Resultado del sorteo</h2><div>${resultNumbers}</div><p style="margin:10px 0 0;font-size:14px;color:#475569;">${resultDetails}</p></div>${ticketSections || '<p style="color:#64748b;">No hay boletos correspondientes a este sorteo.</p>'}<p style="margin:24px 0 0;padding-top:16px;border-top:1px solid #e2e8f0;color:#64748b;font-size:12px;">Informe generado automáticamente por <a href="https://conquense.dev" style="color:#1d4ed8;font-weight:700;">conquense.dev</a>. Consulta tus grupos y boletos en <a href="https://loterias.conquense.dev/" style="color:#1d4ed8;font-weight:700;">loterias.conquense.dev</a>.</p></div></div></body></html>`;
+  return `<!doctype html><html lang="es"><body style="margin:0;background:#f1f5f9;color:#0f172a;font-family:Arial,sans-serif;line-height:1.5;"><div style="display:none!important;visibility:hidden;opacity:0;color:transparent;height:0;width:0;overflow:hidden;mso-hide:all;">${escapeHtml(preview)}</div><div style="max-width:680px;margin:0 auto;padding:24px 14px;"><div style="padding:24px;border-radius:16px 16px 0 0;background:#1e3a8a;color:#ffffff;"><p style="margin:0 0 6px;font-size:12px;letter-spacing:1px;text-transform:uppercase;opacity:.8;">Informe de premios · ${gameLabel}</p><h1 style="margin:0;font-size:26px;">${escapeHtml(group.name)}</h1><p style="margin:6px 0 0;opacity:.9;">Sorteo del ${escapeHtml(dateLabel)}</p></div><div style="padding:20px;background:#ffffff;"><div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px;"><div style="flex:1;min-width:200px;padding:16px;border-radius:12px;background:${hasPrize ? '#dcfce7' : '#f8fafc'};border:1px solid ${hasPrize ? '#86efac' : '#e2e8f0'};"><div style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;">Premio total del grupo</div><strong style="display:block;margin-top:4px;font-size:22px;color:${hasPrize ? '#166534' : '#334155'};">${formatEuro(total)}</strong></div>${balanceSection}</div><div style="padding:16px;border-radius:12px;background:#eef2ff;"><h2 style="margin:0 0 8px;font-size:16px;color:#3730a3;">Resultado del sorteo</h2><div>${resultNumbers}</div><p style="margin:10px 0 0;font-size:14px;color:#475569;">${resultDetails}</p></div>${ticketSections || '<p style="color:#64748b;">No hay boletos correspondientes a este sorteo.</p>'}<p style="margin:24px 0 0;padding-top:16px;border-top:1px solid #e2e8f0;color:#64748b;font-size:12px;">Informe generado automáticamente por <a href="https://conquense.dev" style="color:#1d4ed8;font-weight:700;">conquense.dev</a>. Consulta tus grupos y boletos en <a href="https://loterias.conquense.dev/" style="color:#1d4ed8;font-weight:700;">loterias.conquense.dev</a>.</p></div></div></body></html>`;
 }
 
 function escapeHtml(value) {
