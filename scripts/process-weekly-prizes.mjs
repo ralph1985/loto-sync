@@ -91,7 +91,7 @@ try {
     console.log(`Weekly prizes: ${draws.length} sorteos procesados.`);
   }
 } catch (error) {
-  if (!readOnlyMode) await sendOperationalAlert(error);
+  if (!readOnlyMode && !args.resend) await sendOperationalAlert(error);
   throw error;
 } finally {
   await prisma.$disconnect();
@@ -173,7 +173,16 @@ async function resolveTargetGroup() {
   const where = args.groupId ? { id: args.groupId } : { name: args.groupName };
   const groups = await prisma.group.findMany({
     where,
-    select: { id: true, name: true, balanceTrackingEnabled: true }
+    select: {
+      id: true,
+      name: true,
+      balanceTrackingEnabled: true,
+      emailRecipients: {
+        where: { enabled: true },
+        orderBy: { email: 'asc' },
+        select: { email: true }
+      }
+    }
   });
   if (groups.length === 0) throw new Error(`No existe un grupo que coincida con: ${args.groupId ?? args.groupName}.`);
   if (groups.length > 1) throw new Error(`Hay varios grupos con ese nombre; usa --group-id: ${args.groupName}.`);
