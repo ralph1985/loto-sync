@@ -30,7 +30,7 @@
     "imapflow": "1.7.8",
     "mailparser": "3.9.36",
     "next": "16.3.8",
-    "nodemailer": "10.0.15",
+    "nodemailer": "10.1.4",
     "pg": "8.16.3",
     "react": "19.2.3",
     "react-dom": "19.2.3"
